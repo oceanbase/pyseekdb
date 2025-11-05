@@ -170,7 +170,7 @@ class SqlBasedCollectionOperator:
                     if metadatas and metadatas[i] is not None else ""
                 update_set_sql += f",{CollectionFieldNames.EMBEDDING}={sql_stringifier.stringify_value(vectors[i])}" \
                     if vectors and vectors[i] is not None else ""
-
+                update_set_sql = update_set_sql.lstrip(',')
                 sql = base_sql + values_str + duplicate_key_sql + update_set_sql
                 logger.debug(f"Upsert collection. collection={collection_name}, sql={sql}")
                 client.execute(sql)
