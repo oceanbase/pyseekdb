@@ -110,7 +110,7 @@ class SqlBasedCollectionOperator:
         with client.begin():
             base_sql = f"UPDATE {CollectionNames.table_name(collection_name)} SET "
             for i in range(len(ids)):
-                where_sql = f" WHERE {CollectionFieldNames.ID}={ids[i]}"
+                where_sql = f" WHERE {CollectionFieldNames.ID}={sql_stringifier.stringify_value(ids[i])}"
                 set_sql = ''
                 set_sql += f",{CollectionFieldNames.DOCUMENT}={sql_stringifier.stringify_value(documents[i])}" \
                     if documents else ""
