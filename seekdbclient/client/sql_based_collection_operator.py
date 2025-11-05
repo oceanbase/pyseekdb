@@ -95,7 +95,7 @@ class SqlBasedCollectionOperator:
         if vectors and isinstance(vectors, list) and not isinstance(vectors[0], list):
             vectors = [vectors]
         if not documents and not metadatas and not vectors:
-            raise ValueError(f"You must specific at least one column to update")
+            raise ValueError(f"You must specify at least one column to update")
         if documents and len(documents) != len(ids):
             raise ValueError(
                 f"The number of documents({len(documents)}) is not equal to the number of ids({len(ids)}).")
