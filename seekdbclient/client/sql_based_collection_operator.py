@@ -65,7 +65,7 @@ class SqlBasedCollectionOperator:
         for i in range(num_item):
             document = sql_stringifier.stringify_value(documents[i]) if documents else "NULL"
             metadata = sql_stringifier.stringify_value(metadatas[i]) if metadatas else "NULL"
-            embedding = sql_stringifier.stringify_value({vectors[i]}) if vectors else "NULL"
+            embedding = sql_stringifier.stringify_value(vectors[i]) if vectors else "NULL"
             values_str += '(' + ','.join([document, metadata, embedding])
             if ids:
                 values_str += ',' + sql_stringifier.stringify_value(ids[i])
