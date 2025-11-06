@@ -192,11 +192,9 @@ class SqlBasedCollectionOperator:
                                                       **kwargs)
             if not results_to_delete:
                 return
-            if CollectionFieldNames.ID not in results_to_delete:
-                raise ValueError(f"[Internal Error] {CollectionFieldNames.ID} not found in results_to_delete. collection={collection_name}")
 
             sql_stringifier = SqlStringifier()
-            ids_to_delete = results_to_delete[CollectionFieldNames.ID]
+            ids_to_delete = [ result_item.id for result_item in results_to_delete ]
             if not ids_to_delete:
                 logger.debug(f"No ids to delete. collection={collection_name}")
                 return
