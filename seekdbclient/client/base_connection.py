@@ -8,7 +8,7 @@ class _Transaction:
     """
     Internal transaction object
     """
-    def __init__(self, connection: BaseConnection):
+    def __init__(self, connection: "BaseConnection"):
         self._connection = connection
 
     def __enter__(self):

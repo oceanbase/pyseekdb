@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import Any, Dict, List, Optional, Union
 from .meta_info import CollectionFieldNames, CollectionNames
 from .sql_utils import SqlStringifier
@@ -24,7 +25,7 @@ class SqlBasedCollectionOperator:
             ids = [ids]
         if isinstance(documents, str):
             documents = [documents]
-        if isinstance(metadatas, str):
+        if metadatas is not None and isinstance(metadatas, dict):
             metadatas = [metadatas]
         if isinstance(vectors, list) and vectors and not isinstance(vectors[0], list):
             vectors = [vectors]
@@ -64,8 +65,8 @@ class SqlBasedCollectionOperator:
         values_list = []
         for i in range(num_item):
             document = sql_stringifier.stringify_value(documents[i]) if documents else "NULL"
-            metadata = sql_stringifier.stringify_value(metadatas[i]) if metadatas else "NULL"
-            embedding = sql_stringifier.stringify_value({vectors[i]}) if vectors else "NULL"
+            metadata = sql_stringifier.stringify_value(json.dumps(metadatas[i])) if metadatas else "NULL"
+            embedding = sql_stringifier.stringify_value(str(vectors[i])) if vectors else "NULL"
             value_items = [document, metadata, embedding]
             if ids:
                 value_items.append(sql_stringifier.stringify_value(ids[i]))
@@ -90,7 +91,7 @@ class SqlBasedCollectionOperator:
             raise ValueError(f"ids must not be empty")
         if isinstance(documents, str):
             documents = [documents]
-        if isinstance(metadatas, str):
+        if metadatas is not None and isinstance(metadatas, dict):
             metadatas = [metadatas]
         if vectors and isinstance(vectors, list) and not isinstance(vectors[0], list):
             vectors = [vectors]
@@ -114,9 +115,9 @@ class SqlBasedCollectionOperator:
                 set_sql = ''
                 set_sql += f",{CollectionFieldNames.DOCUMENT}={sql_stringifier.stringify_value(documents[i])}" \
                     if documents else ""
-                set_sql += f",{CollectionFieldNames.METADATA}={sql_stringifier.stringify_value(metadatas[i])}" \
+                set_sql += f",{CollectionFieldNames.METADATA}={sql_stringifier.stringify_value(json.dumps(metadatas[i]))}" \
                     if metadatas else ""
-                set_sql += f",{CollectionFieldNames.EMBEDDING}={sql_stringifier.stringify_value(vectors[i])}" \
+                set_sql += f",{CollectionFieldNames.EMBEDDING}={sql_stringifier.stringify_value(str(vectors[i]))}" \
                     if vectors else ""
                 sql = base_sql + set_sql[1:] + where_sql
                 logger.debug(f"Update document. collection={collection_name}, sql={sql}")
@@ -134,7 +135,7 @@ class SqlBasedCollectionOperator:
             raise ValueError(f"ids must not be empty")
         if isinstance(documents, str):
             documents = [documents]
-        if isinstance(metadatas, str):
+        if metadatas is not None and isinstance(metadatas, dict):
             metadatas = [metadatas]
         if vectors and isinstance(vectors, list) and not isinstance(vectors[0], list):
             vectors = [vectors]
@@ -156,22 +157,21 @@ class SqlBasedCollectionOperator:
         duplicate_key_sql = " ON DUPLICATE KEY UPDATE "
         with client.begin():
             for i in range(len(ids)):
-                document_insert = sql_stringifier.stringify_value(documents[i]) if documents else "NULL"
-                metadata_insert = sql_stringifier.stringify_value(metadatas[i]) \
-                    if metadatas and metadatas[i] else "NULL"
-                embedding_insert = sql_stringifier.stringify_value(vectors[i]) if vectors else "NULL"
+                document = documents[i] if documents else None
+                metadata = metadatas[i] if metadatas else None
+                vector = vectors[i] if vectors else None
+                document_insert = sql_stringifier.stringify_value(document) if document else "NULL"
+                metadata_insert = sql_stringifier.stringify_value(json.dumps(metadata)) if metadata else "NULL"
+                embedding_insert = sql_stringifier.stringify_value(str(vector)) if vector else "NULL"
                 id_insert = sql_stringifier.stringify_value(ids[i])
                 values_str = '(' + ','.join([id_insert, document_insert, metadata_insert, embedding_insert]) + ')'
 
                 update_set_sql = ''
-                update_set_sql += f",{CollectionFieldNames.DOCUMENT}={sql_stringifier.stringify_value(documents[i])}" \
-                    if documents and documents[i] is not None else ""
-                update_set_sql += f",{CollectionFieldNames.METADATA}={sql_stringifier.stringify_value(metadatas[i])}" \
-                    if metadatas and metadatas[i] is not None else ""
-                update_set_sql += f",{CollectionFieldNames.EMBEDDING}={sql_stringifier.stringify_value(vectors[i])}" \
-                    if vectors and vectors[i] is not None else ""
-                update_set_sql = update_set_sql.lstrip(',')
-                sql = base_sql + values_str + duplicate_key_sql + update_set_sql
+                update_set_sql += f",{CollectionFieldNames.DOCUMENT}={document_insert}" if document else ""
+                update_set_sql += f",{CollectionFieldNames.METADATA}={metadata_insert}" if metadata else ""
+                update_set_sql += f",{CollectionFieldNames.EMBEDDING}={embedding_insert}" if vector else ""
+                on_duplicate_key_update_sql = duplicate_key_sql + update_set_sql.lstrip(',') if update_set_sql else ""
+                sql = base_sql + values_str + on_duplicate_key_update_sql
                 logger.debug(f"Upsert collection. collection={collection_name}, sql={sql}")
                 client.execute(sql)
     

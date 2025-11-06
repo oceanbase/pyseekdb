@@ -16,7 +16,7 @@ class SqlStringifier:
     Translate values into strings in SQL.
     """
 
-    def __init__(self, *, quota: str = "'", identifier: str = "`"):
+    def __init__(self, *, quote: str = "'", identifier: str = "`"):
         self._quote = quote
         self._identifier = identifier
 
