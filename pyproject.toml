@@ -1,18 +1,13 @@
 [tool.poetry]
-name = "pyobvector"
-version = "0.2.17"
-description = "A python SDK for OceanBase Vector Store, based on SQLAlchemy, compatible with Milvus API."
-authors = ["shanhaikang.shk <shanhaikang.shk@oceanbase.com>"]
+name = "seekdbclient"
+version = "0.1.0"
+description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase connection modes with vector database capabilities."
+authors = ["SeekDBClient Team"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
-numpy = ">=1.17.0,<2.0.0"
-sqlalchemy = ">=1.4,<=3"
+python = ">=3.8,<4.0"
 pymysql = "^1.1.1"
-aiomysql = "^0.3.2"
-sqlglot = ">=26.0.1"
-pydantic = ">=2.7.0,<3"
 seekdb = "*"
 
 [tool.poetry.group.dev.dependencies]
