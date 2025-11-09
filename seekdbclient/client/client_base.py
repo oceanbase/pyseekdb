@@ -9,8 +9,7 @@ from typing import List, Optional, Sequence, Dict, Any, Union, TYPE_CHECKING, Tu
 
 from .base_connection import BaseConnection
 from .admin_client import AdminAPI, DEFAULT_TENANT
-from .sql_based_collection_operator import SqlBasedCollectionOperator
-from .meta_info import CollectionNames
+from .meta_info import CollectionNames, CollectionFieldNames
 from .query_result import QueryResult
 from .filters import FilterBuilder
 
@@ -310,7 +309,7 @@ class BaseClient(BaseConnection, AdminAPI):
         **kwargs
     ) -> None:
         """
-        [Internal] Add data to collection
+        [Internal] Add data to collection - Common SQL-based implementation
         
         Args:
             collection_id: Collection ID
@@ -321,7 +320,108 @@ class BaseClient(BaseConnection, AdminAPI):
             documents: Single document or list of documents (optional)
             **kwargs: Additional parameters
         """
-        SqlBasedCollectionOperator.add(self, collection_name, ids, vectors, metadatas, documents)
+        logger.info(f"Adding data to collection '{collection_name}'")
+        
+        # Normalize inputs to lists
+        if isinstance(ids, str):
+            ids = [ids]
+        if isinstance(documents, str):
+            documents = [documents]
+        if metadatas is not None and isinstance(metadatas, dict):
+            metadatas = [metadatas]
+        if vectors is not None:
+            if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
+                vectors = [vectors]
+        
+        # Validate inputs
+        if not documents and not vectors and not metadatas:
+            raise ValueError("At least one of documents, vectors, or metadatas must be provided")
+        
+        # Determine number of items
+        num_items = 0
+        if ids:
+            num_items = len(ids)
+        elif documents:
+            num_items = len(documents)
+        elif vectors:
+            num_items = len(vectors)
+        elif metadatas:
+            num_items = len(metadatas)
+        
+        if num_items == 0:
+            raise ValueError("No items to add")
+        
+        # Validate lengths match
+        if ids and len(ids) != num_items:
+            raise ValueError(f"Number of ids ({len(ids)}) does not match number of items ({num_items})")
+        if documents and len(documents) != num_items:
+            raise ValueError(f"Number of documents ({len(documents)}) does not match number of items ({num_items})")
+        if metadatas and len(metadatas) != num_items:
+            raise ValueError(f"Number of metadatas ({len(metadatas)}) does not match number of items ({num_items})")
+        if vectors and len(vectors) != num_items:
+            raise ValueError(f"Number of vectors ({len(vectors)}) does not match number of items ({num_items})")
+        
+        # Get table name
+        table_name = CollectionNames.table_name(collection_name)
+        
+        # Build INSERT SQL
+        values_list = []
+        for i in range(num_items):
+            # Process ID - convert UUID to hex string for varbinary _id field
+            id_val = ids[i] if ids else None
+            if id_val:
+                if isinstance(id_val, str) and '-' in id_val and len(id_val) == 36:
+                    # UUID format: convert to hex string (remove dashes)
+                    hex_id = id_val.replace("-", "")
+                    if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
+                        id_sql = f"UNHEX('{hex_id}')"
+                    else:
+                        raise ValueError(f"Invalid UUID format: {id_val}")
+                elif isinstance(id_val, str) and len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
+                    # Valid hex string
+                    id_sql = f"UNHEX('{id_val}')"
+                else:
+                    raise ValueError(f"Invalid ID format for varbinary _id field: '{id_val}'")
+            else:
+                raise ValueError("ids must be provided for add operation")
+            
+            # Process document
+            doc_val = documents[i] if documents else None
+            if doc_val is not None:
+                # Escape single quotes
+                doc_val_escaped = doc_val.replace("'", "''")
+                doc_sql = f"'{doc_val_escaped}'"
+            else:
+                doc_sql = "NULL"
+            
+            # Process metadata
+            meta_val = metadatas[i] if metadatas else None
+            if meta_val is not None:
+                # Convert to JSON string and escape
+                meta_json = json.dumps(meta_val, ensure_ascii=False)
+                meta_json_escaped = meta_json.replace("'", "''")
+                meta_sql = f"'{meta_json_escaped}'"
+            else:
+                meta_sql = "NULL"
+            
+            # Process vector
+            vec_val = vectors[i] if vectors else None
+            if vec_val is not None:
+                # Convert vector to string format: [1.0,2.0,3.0]
+                vec_str = "[" + ",".join(map(str, vec_val)) + "]"
+                vec_sql = f"'{vec_str}'"
+            else:
+                vec_sql = "NULL"
+            
+            values_list.append(f"({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})")
+        
+        # Build final SQL
+        sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}) 
+                 VALUES {','.join(values_list)}"""
+        
+        logger.debug(f"Executing SQL: {sql}")
+        self.execute(sql)
+        logger.info(f"✅ Successfully added {num_items} item(s) to collection '{collection_name}'")
     
     def _collection_update(
         self,
@@ -334,7 +434,7 @@ class BaseClient(BaseConnection, AdminAPI):
         **kwargs
     ) -> None:
         """
-        [Internal] Update data in collection
+        [Internal] Update data in collection - Common SQL-based implementation
         
         Args:
             collection_id: Collection ID
@@ -345,7 +445,85 @@ class BaseClient(BaseConnection, AdminAPI):
             documents: New documents (optional)
             **kwargs: Additional parameters
         """
-        SqlBasedCollectionOperator.update(self, collection_name, ids, vectors, metadatas, documents)
+        logger.info(f"Updating data in collection '{collection_name}'")
+        
+        # Normalize inputs to lists
+        if isinstance(ids, str):
+            ids = [ids]
+        if isinstance(documents, str):
+            documents = [documents]
+        if metadatas is not None and isinstance(metadatas, dict):
+            metadatas = [metadatas]
+        if vectors is not None:
+            if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
+                vectors = [vectors]
+        
+        # Validate inputs
+        if not ids:
+            raise ValueError("ids must not be empty")
+        if not documents and not metadatas and not vectors:
+            raise ValueError("You must specify at least one column to update")
+        
+        # Validate lengths match
+        if documents and len(documents) != len(ids):
+            raise ValueError(f"Number of documents ({len(documents)}) does not match number of ids ({len(ids)})")
+        if metadatas and len(metadatas) != len(ids):
+            raise ValueError(f"Number of metadatas ({len(metadatas)}) does not match number of ids ({len(ids)})")
+        if vectors and len(vectors) != len(ids):
+            raise ValueError(f"Number of vectors ({len(vectors)}) does not match number of ids ({len(ids)})")
+        
+        # Get table name
+        table_name = CollectionNames.table_name(collection_name)
+        
+        # Update each item
+        for i in range(len(ids)):
+            # Process ID - convert UUID to hex string for varbinary _id field
+            id_val = ids[i]
+            if isinstance(id_val, str) and '-' in id_val and len(id_val) == 36:
+                # UUID format: convert to hex string (remove dashes)
+                hex_id = id_val.replace("-", "")
+                if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
+                    id_sql = f"UNHEX('{hex_id}')"
+                else:
+                    raise ValueError(f"Invalid UUID format: {id_val}")
+            elif isinstance(id_val, str) and len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
+                # Valid hex string
+                id_sql = f"UNHEX('{id_val}')"
+            else:
+                raise ValueError(f"Invalid ID format for varbinary _id field: '{id_val}'")
+            
+            # Build SET clause
+            set_clauses = []
+            
+            if documents:
+                doc_val = documents[i]
+                if doc_val is not None:
+                    doc_val_escaped = doc_val.replace("'", "''")
+                    set_clauses.append(f"{CollectionFieldNames.DOCUMENT} = '{doc_val_escaped}'")
+            
+            if metadatas:
+                meta_val = metadatas[i]
+                if meta_val is not None:
+                    meta_json = json.dumps(meta_val, ensure_ascii=False)
+                    meta_json_escaped = meta_json.replace("'", "''")
+                    set_clauses.append(f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'")
+            
+            if vectors:
+                vec_val = vectors[i]
+                if vec_val is not None:
+                    vec_str = "[" + ",".join(map(str, vec_val)) + "]"
+                    set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = '{vec_str}'")
+            
+            if not set_clauses:
+                continue
+            
+            # Build UPDATE SQL
+            sql = f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
+            
+            logger.debug(f"Executing SQL: {sql}")
+            self.execute(sql)
+        
+        logger.info(f"✅ Successfully updated {len(ids)} item(s) in collection '{collection_name}'")
     
     def _collection_upsert(
         self,
@@ -358,7 +536,7 @@ class BaseClient(BaseConnection, AdminAPI):
         **kwargs
     ) -> None:
         """
-        [Internal] Insert or update data in collection
+        [Internal] Insert or update data in collection - Common SQL-based implementation
         
         Args:
             collection_id: Collection ID
@@ -369,7 +547,125 @@ class BaseClient(BaseConnection, AdminAPI):
             documents: Documents (optional)
             **kwargs: Additional parameters
         """
-        SqlBasedCollectionOperator.upsert(self, collection_name, ids, vectors, metadatas, documents)
+        logger.info(f"Upserting data in collection '{collection_name}'")
+        
+        # Normalize inputs to lists
+        if isinstance(ids, str):
+            ids = [ids]
+        if isinstance(documents, str):
+            documents = [documents]
+        if metadatas is not None and isinstance(metadatas, dict):
+            metadatas = [metadatas]
+        if vectors is not None:
+            if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
+                vectors = [vectors]
+        
+        # Validate inputs
+        if not ids:
+            raise ValueError("ids must not be empty")
+        if not documents and not metadatas and not vectors:
+            raise ValueError("You must specify at least one column to upsert")
+        
+        # Validate lengths match
+        if documents and len(documents) != len(ids):
+            raise ValueError(f"Number of documents ({len(documents)}) does not match number of ids ({len(ids)})")
+        if metadatas and len(metadatas) != len(ids):
+            raise ValueError(f"Number of metadatas ({len(metadatas)}) does not match number of ids ({len(ids)})")
+        if vectors and len(vectors) != len(ids):
+            raise ValueError(f"Number of vectors ({len(vectors)}) does not match number of ids ({len(ids)})")
+        
+        # Get table name
+        table_name = CollectionNames.table_name(collection_name)
+        
+        # Upsert each item
+        for i in range(len(ids)):
+            # Process ID - convert UUID to hex string for varbinary _id field
+            id_val = ids[i]
+            if isinstance(id_val, str) and '-' in id_val and len(id_val) == 36:
+                # UUID format: convert to hex string (remove dashes)
+                hex_id = id_val.replace("-", "")
+                if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
+                    id_sql = f"UNHEX('{hex_id}')"
+                else:
+                    raise ValueError(f"Invalid UUID format: {id_val}")
+            elif isinstance(id_val, str) and len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
+                # Valid hex string
+                id_sql = f"UNHEX('{id_val}')"
+            else:
+                raise ValueError(f"Invalid ID format for varbinary _id field: '{id_val}'")
+            
+            # Check if record exists
+            existing = self._collection_get(
+                collection_id=collection_id,
+                collection_name=collection_name,
+                ids=[ids[i]],  # Use original UUID format for query
+                include=["documents", "metadatas", "embeddings"]
+            )
+            
+            # Get values for this item
+            doc_val = documents[i] if documents else None
+            meta_val = metadatas[i] if metadatas else None
+            vec_val = vectors[i] if vectors else None
+            
+            if existing and len(existing) > 0:
+                # Update existing record - only update provided fields
+                existing_item = existing[0]
+                existing_doc = existing_item.document if hasattr(existing_item, 'document') else None
+                existing_meta = existing_item.metadata if hasattr(existing_item, 'metadata') else None
+                existing_vec = existing_item.embedding if hasattr(existing_item, 'embedding') else None
+                
+                # Use provided values or keep existing values
+                final_document = doc_val if doc_val is not None else existing_doc
+                final_metadata = meta_val if meta_val is not None else existing_meta
+                final_vector = vec_val if vec_val is not None else existing_vec
+                
+                # Build SET clause
+                set_clauses = []
+                
+                if doc_val is not None:
+                    doc_val_escaped = final_document.replace("'", "''") if final_document else "NULL"
+                    set_clauses.append(f"{CollectionFieldNames.DOCUMENT} = '{doc_val_escaped}'")
+                
+                if meta_val is not None:
+                    meta_json = json.dumps(final_metadata, ensure_ascii=False) if final_metadata else "{}"
+                    meta_json_escaped = meta_json.replace("'", "''")
+                    set_clauses.append(f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'")
+                
+                if vec_val is not None:
+                    vec_str = "[" + ",".join(map(str, final_vector)) + "]" if final_vector else "NULL"
+                    set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = '{vec_str}'")
+                
+                if set_clauses:
+                    sql = f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
+                    logger.debug(f"Executing SQL: {sql}")
+                    self.execute(sql)
+            else:
+                # Insert new record
+                if doc_val:
+                    doc_val_escaped = doc_val.replace("'", "''")
+                    doc_sql = f"'{doc_val_escaped}'"
+                else:
+                    doc_sql = "NULL"
+                
+                if meta_val is not None:
+                    meta_json = json.dumps(meta_val, ensure_ascii=False)
+                    meta_json_escaped = meta_json.replace("'", "''")
+                    meta_sql = f"'{meta_json_escaped}'"
+                else:
+                    meta_sql = "NULL"
+                
+                if vec_val is not None:
+                    vec_str = "[" + ",".join(map(str, vec_val)) + "]"
+                    vec_sql = f"'{vec_str}'"
+                else:
+                    vec_sql = "NULL"
+                
+                sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}) 
+                         VALUES ({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})"""
+                logger.debug(f"Executing SQL: {sql}")
+                self.execute(sql)
+        
+        logger.info(f"✅ Successfully upserted {len(ids)} item(s) in collection '{collection_name}'")
     
     def _collection_delete(
         self,
@@ -381,7 +677,7 @@ class BaseClient(BaseConnection, AdminAPI):
         **kwargs
     ) -> None:
         """
-        [Internal] Delete data from collection
+        [Internal] Delete data from collection - Common SQL-based implementation
         
         Args:
             collection_id: Collection ID
@@ -391,7 +687,38 @@ class BaseClient(BaseConnection, AdminAPI):
             where_document: Filter condition on documents (optional)
             **kwargs: Additional parameters
         """
-        SqlBasedCollectionOperator.delete(self, collection_name, ids, where, where_document, **kwargs)
+        logger.info(f"Deleting data from collection '{collection_name}'")
+        
+        # Validate that at least one filter is provided
+        if not ids and not where and not where_document:
+            raise ValueError("At least one of ids, where, or where_document must be provided")
+        
+        # Normalize ids to list
+        id_list = None
+        if ids is not None:
+            if isinstance(ids, str):
+                id_list = [ids]
+            else:
+                id_list = ids
+        
+        # Get table name
+        table_name = CollectionNames.table_name(collection_name)
+        
+        # Build WHERE clause
+        where_clause, params = self._build_where_clause(where, where_document, id_list)
+        
+        # Build DELETE SQL
+        sql = f"DELETE FROM `{table_name}` {where_clause}"
+        
+        logger.debug(f"Executing SQL: {sql}")
+        logger.debug(f"Parameters: {params}")
+        
+        # Execute DELETE using parameterized query
+        conn = self._ensure_connection()
+        use_context_manager = self._use_context_manager_for_cursor()
+        self._execute_query_with_cursor(conn, sql, params, use_context_manager)
+        
+        logger.info(f"✅ Successfully deleted data from collection '{collection_name}'")
     
     # -------------------- DQL Operations --------------------
     # Note: _collection_query() and _collection_get() are implemented below with common SQL-based logic
@@ -652,6 +979,30 @@ class BaseClient(BaseConnection, AdminAPI):
         
         return value
     
+    def _convert_id_to_uuid_string(self, record_id: Any) -> str:
+        """
+        Convert _id from bytes to UUID string format
+        
+        Args:
+            record_id: Record ID (can be bytes, str, or other format)
+            
+        Returns:
+            UUID string format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        """
+        # If it's already a string, return as is (assuming it's already in UUID format)
+        if isinstance(record_id, str):
+            return record_id
+        
+        # Convert bytes _id to UUID string format if it's 16 bytes (32 hex chars)
+        if isinstance(record_id, bytes) and len(record_id) == 16:
+            # Convert bytes to hex string and format as UUID
+            hex_str = record_id.hex()
+            # Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+            return f"{hex_str[:8]}-{hex_str[8:12]}-{hex_str[12:16]}-{hex_str[16:20]}-{hex_str[20:]}"
+        
+        # For other formats, convert to string
+        return str(record_id)
+    
     def _process_query_row(
         self,
         row: Dict[str, Any],
@@ -667,7 +1018,9 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             Result item dictionary
         """
-        result_item = {"_id": row["_id"]}
+        # Convert _id from bytes to UUID string format
+        record_id = self._convert_id_to_uuid_string(row["_id"])
+        result_item = {"_id": record_id}
         
         if "document" in row and row["document"] is not None:
             result_item["document"] = row["document"]
@@ -698,7 +1051,9 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             Result item dictionary with id, document, embedding, metadata
         """
-        record_id = row["_id"]
+        # Convert _id from bytes to UUID string format
+        record_id = self._convert_id_to_uuid_string(row["_id"])
+        
         document = None
         embedding = None
         metadata = None
@@ -1395,6 +1750,8 @@ class BaseClient(BaseConnection, AdminAPI):
         for row in result_rows:
             # Extract id (may be in different column names)
             row_id = row.get("id") or row.get("_id") or row.get("ID")
+            # Convert bytes _id to UUID string format
+            row_id = self._convert_id_to_uuid_string(row_id)
             ids.append(row_id)
             
             # Extract distance/score (may be in different column names)
