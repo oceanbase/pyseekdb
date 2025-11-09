@@ -7,6 +7,7 @@ import sys
 import os
 import time
 import json
+import uuid
 from pathlib import Path
 
 # Add project path
@@ -99,6 +100,8 @@ class TestCollectionHybridSearch:
         ]
         
         for data in test_data:
+            # Generate UUID for _id (convert to hex string for varbinary)
+            record_id = str(uuid.uuid4()).replace("-", "")  # Remove dashes to get hex string
             # Convert vector to string format: [1.0,2.0,3.0]
             vector_str = "[" + ",".join(map(str, data["embedding"])) + "]"
             # Convert metadata to JSON string
@@ -106,8 +109,8 @@ class TestCollectionHybridSearch:
             # Escape single quotes in document
             document_str = data["document"].replace("'", "\\'")
             
-            sql = f"""INSERT INTO `{table_name}` (document, embedding, metadata) 
-                     VALUES ('{document_str}', '{vector_str}', '{metadata_str}')"""
+            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
+                     VALUES (UNHEX('{record_id}'), '{document_str}', '{vector_str}', '{metadata_str}')"""
             client._server.execute(sql)
         
         print(f"   Inserted {len(test_data)} test records")
