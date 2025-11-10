@@ -15,6 +15,9 @@ SeekDBClient is a unified Python client that wraps three database connection mod
 ## Installation
 
 ```bash
+# install from pypi
+pip install seekdbclient
+# install from source code
 poetry install
 ```
 
@@ -50,7 +53,7 @@ import seekdbclient
 # Create server client
 client = seekdbclient.Client(
     host="127.0.0.1",      # Server host
-    port=2882,              # Server port (default: 2882)
+    port=2881,              # Server port (default: 2881)
     database="demo",        # Database name
     user="root",            # Username (default: "root")
     password=""             # Password
@@ -806,4 +809,4 @@ AdminClient() → _AdminClientProxy → BaseClient (ServerAPI)
 
 ## License
 
-MIT License
+This package is licensed under Apache 2.0.

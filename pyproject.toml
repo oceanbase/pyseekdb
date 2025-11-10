@@ -1,9 +1,16 @@
 [tool.poetry]
 name = "seekdbclient"
-version = "0.1.0"
+version = "0.1.0.dev2"
 description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase connection modes with vector database capabilities."
-authors = ["SeekDBClient Team"]
+authors = ["SeekDBClient Team <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
+license = "Apache-2.0"
+
+homepage = "https://github.com/oceanbase/pyseekdb/"
+repository = "https://github.com/oceanbase/pyseekdb/"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/oceanbase/pyseekdb/issues"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"

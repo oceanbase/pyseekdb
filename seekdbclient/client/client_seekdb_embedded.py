@@ -70,11 +70,7 @@ class SeekdbEmbeddedClient(BaseClient):
             
             # Initialize seekdb module while sys.path still does not contain project root
             if not self._initialized:
-                # 1. Check if data directory exists
-                if not os.path.exists(self.path):
-                    raise FileNotFoundError(f"SeekDB data directory does not exist: {self.path}")
-                
-                # 2. Ensure seekdb module is properly initialized
+                # 1. Ensure seekdb module is properly initialized
                 if not hasattr(seekdb, 'open'):
                     logger.info("SeekDB module needs initialization, calling _initialize_module()...")
                     attrs = seekdb._initialize_module()  # type: ignore
@@ -92,7 +88,7 @@ class SeekdbEmbeddedClient(BaseClient):
         
         if not self._initialized:
             
-            # 3. Switch to data directory and open
+            # 2. Switch to data directory and open
             original_dir = os.getcwd()
             try:
                 os.chdir(self.path)
@@ -108,7 +104,7 @@ class SeekdbEmbeddedClient(BaseClient):
             
             self._initialized = True
         
-        # 4. Create connection
+        # 3. Create connection
         if self._connection is None:
             self._connection = seekdb.connect(  # type: ignore
                 db_name=self.database,

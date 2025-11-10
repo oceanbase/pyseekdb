@@ -17,7 +17,7 @@ Examples:
     >>> # Server mode - Collection management
     >>> client = seekdbclient.Client(
     ...     host='localhost',
-    ...     port=2882,
+    ...     port=2881,
     ...     database="test",
     ...     user="root",
     ...     password="pass"
@@ -39,6 +39,7 @@ Examples:
     >>> databases = admin.list_databases()
 """
 import logging
+import importlib.metadata
 
 from .client import (
     BaseConnection,
@@ -57,7 +58,11 @@ from .client import (
 from .client.collection import Collection
 from .client.query_result import QueryResult
 
-__version__ = "0.1.0"
+try:
+  __version__ = importlib.metadata.version("seekdbclient")
+except importlib.metadata.PackageNotFoundError:
+  __version__ = "0.0.1.dev1"
+
 __author__ = "SeekDBClient Team"
 
 __all__ = [
