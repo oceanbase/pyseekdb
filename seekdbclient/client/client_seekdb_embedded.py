@@ -62,7 +62,7 @@ class SeekdbEmbeddedClient(BaseClient):
         # 3. Create connection
         if self._connection is None:
             self._connection = seekdb.connect(  # type: ignore
-                db_name=self.database,
+                database=self.database,
                 autocommit=self.autocommit
             )
             logger.info(f"✅ Connected to database: {self.database}")
