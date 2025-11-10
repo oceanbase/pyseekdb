@@ -75,7 +75,8 @@ for i in range(len(documents)):
     vectors.append(vector)
 
 # Generate unique IDs for each document
-ids = [str(uuid.uuid4()) for _ in documents]
+# ids = [str(uuid.uuid4()) for _ in documents]
+ids = ["id1", "id2", "id3", "id4", "id5"]
 
 # Add data to collection
 collection.add(

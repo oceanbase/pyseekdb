@@ -412,5 +412,4 @@ except Exception as e:
     print(f"Could not delete 'another_collection': {e}")
 
 # Uncomment to delete main collection
-# client.delete_collection(collection_name)
-
+client.delete_collection(collection_name)

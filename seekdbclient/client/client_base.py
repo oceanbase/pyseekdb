@@ -381,21 +381,12 @@ class BaseClient(BaseConnection, AdminAPI):
         # Build INSERT SQL
         values_list = []
         for i in range(num_items):
-            # Process ID - convert UUID to hex string for varbinary _id field
+            # Process ID - support any string format
             id_val = ids[i] if ids else None
             if id_val:
-                if isinstance(id_val, str) and '-' in id_val and len(id_val) == 36:
-                    # UUID format: convert to hex string (remove dashes)
-                    hex_id = id_val.replace("-", "")
-                    if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
-                        id_sql = f"UNHEX('{hex_id}')"
-                    else:
-                        raise ValueError(f"Invalid UUID format: {id_val}")
-                elif isinstance(id_val, str) and len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
-                    # Valid hex string
-                    id_sql = f"UNHEX('{id_val}')"
-                else:
-                    raise ValueError(f"Invalid ID format for varbinary _id field: '{id_val}'")
+                if not isinstance(id_val, str):
+                    id_val = str(id_val)
+                id_sql = self._convert_id_to_sql(id_val)
             else:
                 raise ValueError("ids must be provided for add operation")
             
@@ -491,20 +482,11 @@ class BaseClient(BaseConnection, AdminAPI):
         
         # Update each item
         for i in range(len(ids)):
-            # Process ID - convert UUID to hex string for varbinary _id field
+            # Process ID - support any string format
             id_val = ids[i]
-            if isinstance(id_val, str) and '-' in id_val and len(id_val) == 36:
-                # UUID format: convert to hex string (remove dashes)
-                hex_id = id_val.replace("-", "")
-                if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
-                    id_sql = f"UNHEX('{hex_id}')"
-                else:
-                    raise ValueError(f"Invalid UUID format: {id_val}")
-            elif isinstance(id_val, str) and len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
-                # Valid hex string
-                id_sql = f"UNHEX('{id_val}')"
-            else:
-                raise ValueError(f"Invalid ID format for varbinary _id field: '{id_val}'")
+            if not isinstance(id_val, str):
+                id_val = str(id_val)
+            id_sql = self._convert_id_to_sql(id_val)
             
             # Build SET clause
             set_clauses = []
@@ -593,26 +575,17 @@ class BaseClient(BaseConnection, AdminAPI):
         
         # Upsert each item
         for i in range(len(ids)):
-            # Process ID - convert UUID to hex string for varbinary _id field
+            # Process ID - support any string format
             id_val = ids[i]
-            if isinstance(id_val, str) and '-' in id_val and len(id_val) == 36:
-                # UUID format: convert to hex string (remove dashes)
-                hex_id = id_val.replace("-", "")
-                if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
-                    id_sql = f"UNHEX('{hex_id}')"
-                else:
-                    raise ValueError(f"Invalid UUID format: {id_val}")
-            elif isinstance(id_val, str) and len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
-                # Valid hex string
-                id_sql = f"UNHEX('{id_val}')"
-            else:
-                raise ValueError(f"Invalid ID format for varbinary _id field: '{id_val}'")
+            if not isinstance(id_val, str):
+                id_val = str(id_val)
+            id_sql = self._convert_id_to_sql(id_val)
             
             # Check if record exists
             existing = self._collection_get(
                 collection_id=collection_id,
                 collection_name=collection_name,
-                ids=[ids[i]],  # Use original UUID format for query
+                ids=[ids[i]],  # Use original string ID for query
                 include=["documents", "metadatas", "embeddings"]
             )
             
@@ -918,40 +891,12 @@ class BaseClient(BaseConnection, AdminAPI):
         
         # Add ids filter if provided
         if id_list:
-            # Process IDs for varbinary(512) _id field
-            # Since _id is varbinary(512), we need to convert IDs to binary format using UNHEX
-            # Support formats:
-            # 1. UUID format: "550e8400-e29b-41d4-a716-446655440000" (36 chars with dashes)
-            # 2. Hex string: "550e8400e29b41d4a716446655440000" (32 chars, no dashes)
-            # 3. Other formats: treat as hex if valid, otherwise raise error
+            # Process IDs for varbinary(512) _id field - support any string format
             processed_ids = []
             for id_val in id_list:
                 if not isinstance(id_val, str):
-                    # Convert non-string to string first
                     id_val = str(id_val)
-                
-                # Check if it's a UUID format (contains dashes, 36 chars)
-                if '-' in id_val and len(id_val) == 36:
-                    # Convert UUID to hex string (remove dashes) for varbinary storage
-                    hex_id = id_val.replace("-", "")
-                    # Validate hex string (should be 32 chars, all hex)
-                    if len(hex_id) == 32 and all(c in '0123456789abcdefABCDEF' for c in hex_id):
-                        processed_ids.append(f"UNHEX('{hex_id}')")
-                    else:
-                        raise ValueError(f"Invalid UUID format: {id_val}")
-                else:
-                    # Check if it's a valid hex string for varbinary
-                    # For _id field, we expect either UUID format or valid hex string
-                    if len(id_val) > 0 and len(id_val) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in id_val):
-                        # Valid hex string, use UNHEX
-                        processed_ids.append(f"UNHEX('{id_val}')")
-                    else:
-                        # Not a valid hex string for varbinary _id field
-                        raise ValueError(
-                            f"Invalid ID format for varbinary _id field: '{id_val}'. "
-                            f"Expected UUID format (e.g., '550e8400-e29b-41d4-a716-446655440000') "
-                            f"or hex string (e.g., '550e8400e29b41d4a716446655440000')"
-                        )
+                processed_ids.append(self._convert_id_to_sql(id_val))
             
             where_clauses.append(f"_id IN ({','.join(processed_ids)})")
         
@@ -993,26 +938,45 @@ class BaseClient(BaseConnection, AdminAPI):
         
         return value
     
-    def _convert_id_to_uuid_string(self, record_id: Any) -> str:
+    def _convert_id_to_sql(self, id_val: str) -> str:
         """
-        Convert _id from bytes to UUID string format
+        Convert string ID to SQL format for varbinary(512) _id field
         
         Args:
-            record_id: Record ID (can be bytes, str, or other format)
+            id_val: String ID (can be any string like "id1", "item-123", etc.)
             
         Returns:
-            UUID string format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+            SQL expression to convert string to binary (e.g., "CAST('id1' AS BINARY)")
         """
-        # If it's already a string, return as is (assuming it's already in UUID format)
+        if not isinstance(id_val, str):
+            id_val = str(id_val)
+        
+        # Escape single quotes in the ID
+        id_val_escaped = id_val.replace("'", "''")
+        # Use CAST to convert string to binary for varbinary(512) field
+        return f"CAST('{id_val_escaped}' AS BINARY)"
+    
+    def _convert_id_from_bytes(self, record_id: Any) -> str:
+        """
+        Convert _id from bytes to string format
+        
+        Args:
+            record_id: Record ID from database (can be bytes, str, or other format)
+            
+        Returns:
+            String ID
+        """
+        # If it's already a string, return as is
         if isinstance(record_id, str):
             return record_id
         
-        # Convert bytes _id to UUID string format if it's 16 bytes (32 hex chars)
-        if isinstance(record_id, bytes) and len(record_id) == 16:
-            # Convert bytes to hex string and format as UUID
-            hex_str = record_id.hex()
-            # Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-            return f"{hex_str[:8]}-{hex_str[8:12]}-{hex_str[12:16]}-{hex_str[16:20]}-{hex_str[20:]}"
+        # Convert bytes to string (UTF-8 decode)
+        if isinstance(record_id, bytes):
+            try:
+                return record_id.decode('utf-8')
+            except UnicodeDecodeError:
+                # If UTF-8 decode fails, return hex representation as fallback
+                return record_id.hex()
         
         # For other formats, convert to string
         return str(record_id)
@@ -1032,8 +996,8 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             Result item dictionary
         """
-        # Convert _id from bytes to UUID string format
-        record_id = self._convert_id_to_uuid_string(row["_id"])
+        # Convert _id from bytes to string format
+        record_id = self._convert_id_from_bytes(row["_id"])
         result_item = {"_id": record_id}
         
         if "document" in row and row["document"] is not None:
@@ -1065,8 +1029,8 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             Result item dictionary with id, document, embedding, metadata
         """
-        # Convert _id from bytes to UUID string format
-        record_id = self._convert_id_to_uuid_string(row["_id"])
+        # Convert _id from bytes to string format
+        record_id = self._convert_id_from_bytes(row["_id"])
         
         document = None
         embedding = None
@@ -1818,8 +1782,8 @@ class BaseClient(BaseConnection, AdminAPI):
         for row in result_rows:
             # Extract id (may be in different column names)
             row_id = row.get("id") or row.get("_id") or row.get("ID")
-            # Convert bytes _id to UUID string format
-            row_id = self._convert_id_to_uuid_string(row_id)
+            # Convert bytes _id to string format
+            row_id = self._convert_id_from_bytes(row_id)
             ids.append(row_id)
             
             # Extract distance/score (may be in different column names)

@@ -84,13 +84,12 @@ class TestCollectionGet:
         
         # Insert all data with generated UUIDs
         for data in test_data:
-            # Generate UUID for _id (convert to hex string for varbinary)
-            uuid_str = data["_id"]
-            record_id = uuid_str.replace("-", "")  # Remove dashes to get hex string
-            # Validate hex string (should be 32 chars, all hex)
-            if len(record_id) != 32 or not all(c in '0123456789abcdefABCDEF' for c in record_id):
-                raise ValueError(f"Invalid UUID format after conversion: {uuid_str} -> {record_id}")
-            inserted_ids.append(uuid_str)  # Store original UUID string for return
+            # Use string ID directly (support any string format)
+            id_str = data["_id"]
+            inserted_ids.append(id_str)  # Store original ID string for return
+            
+            # Escape single quotes in ID
+            id_str_escaped = id_str.replace("'", "''")
             
             # Convert vector to string format: [1.0,2.0,3.0]
             vector_str = "[" + ",".join(map(str, data["embedding"])) + "]"
@@ -99,8 +98,9 @@ class TestCollectionGet:
             # Escape single quotes in document
             document_str = data["document"].replace("'", "\\'")
             
+            # Use CAST to convert string to binary for varbinary(512) field
             sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
-                     VALUES (UNHEX('{record_id}'), '{document_str}', '{vector_str}', '{metadata_str}')"""
+                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
             client._server.execute(sql)
         
         return inserted_ids
