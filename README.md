@@ -89,6 +89,7 @@ client = seekdbclient.OBClient(
 | `list_collections()`  | List all collections in the current database                   |
 | `has_collection()`    | Check if a collection exists                                   |
 | `get_or_create_collection()` | Get an existing collection or create it if it doesn't exist |
+| `count_collection()`  | Count the number of collections in the current database         |
 
 **Note:** The `Client` factory function returns a proxy that only exposes collection operations. For database management operations, use `AdminClient` (see section 2).
 
@@ -238,6 +239,10 @@ if client.has_collection("my_collection"):
 collections = client.list_collections()
 for coll in collections:
     print(f"Collection: {coll.name}, Dimension: {coll.dimension}")
+
+# Count collections in database
+collection_count = client.count_collection()
+print(f"Database has {collection_count} collections")
 ```
 
 ### 3.4 Deleting a Collection
@@ -755,7 +760,22 @@ print(f"Collection has {count} items")
 # Get detailed collection information
 info = collection.describe()
 print(f"Name: {info['name']}, Dimension: {info['dimension']}")
+
+# Preview first few items in collection
+preview = collection.peek(limit=5)
+for item in preview:
+    print(f"ID: {item._id}, Document: {item.document}")
+
+# Count collections in database
+collection_count = client.count_collection()
+print(f"Database has {collection_count} collections")
 ```
+
+**Methods:**
+- `collection.count()` - Get the number of items in the collection
+- `collection.describe()` - Get detailed collection information
+- `collection.peek(limit=10)` - Quickly preview the first few items in the collection
+- `client.count_collection()` - Count the number of collections in the current database
 
 ## Testing
 

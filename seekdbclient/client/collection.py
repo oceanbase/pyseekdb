@@ -460,18 +460,26 @@ class Collection:
             collection_name=self._name
         )
     
-    def describe(self) -> Dict[str, Any]:
+    def peek(self, limit: int = 10) -> QueryResult:
         """
-        Get detailed collection information
+        Quickly preview the first few items in the collection
         
+        Args:
+            limit: Number of items to preview (default: 10)
+            
         Returns:
-            Collection information dictionary
+            QueryResult object containing the first limit items
             
         Examples:
-            info = collection.describe()
-            print(f"Name: {info['name']}, Dimension: {info['dimension']}")
+            # Preview first 5 items
+            preview = collection.peek(limit=5)
+            for item in preview:
+                print(f"ID: {item._id}, Document: {item.document}")
         """
-        return self._client._collection_describe(
+        return self._client._collection_get(
             collection_id=self._id,
-            collection_name=self._name
+            collection_name=self._name,
+            limit=limit,
+            offset=0,
+            include=["documents", "metadatas", "embeddings"]
         )

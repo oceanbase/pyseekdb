@@ -131,62 +131,7 @@ class SeekdbServerClient(BaseClient):
     
     # -------------------- Collection Info --------------------
     
-    def _collection_count(
-        self,
-        collection_id: Optional[str],
-        collection_name: str
-    ) -> int:
-        """
-        [Internal] Get item count in collection - Seekdb implementation
-        
-        Args:
-            collection_id: Collection ID
-            collection_name: Collection name
-            
-        Returns:
-            Item count
-        """
-        logger.info(f"Seekdb: Counting items in collection '{collection_name}'")
-        conn = self._ensure_connection()
-        
-        # TODO: Implement Seekdb specific count logic
-        # Example SQL: SELECT COUNT(*) as cnt FROM {collection_name}
-        
-        count = 0
-        logger.info(f"✅ Collection '{collection_name}' has {count} items")
-        return count
-    
-    def _collection_describe(
-        self,
-        collection_id: Optional[str],
-        collection_name: str
-    ) -> Dict[str, Any]:
-        """
-        [Internal] Get collection information - Seekdb implementation
-        
-        Args:
-            collection_id: Collection ID
-            collection_name: Collection name
-            
-        Returns:
-            Collection information dictionary
-        """
-        logger.info(f"Seekdb: Describing collection '{collection_name}'")
-        conn = self._ensure_connection()
-        
-        # TODO: Implement Seekdb specific describe logic
-        # Query collection metadata table
-        
-        info = {
-            "name": collection_name,
-            "id": collection_id,
-            "dimension": None,
-            "count": 0,
-            "metadata": {}
-        }
-        
-        logger.info(f"✅ Retrieved info for collection '{collection_name}'")
-        return info
+    # _collection_count is inherited from BaseClient - no override needed
     
     # ==================== Database Management ====================
     

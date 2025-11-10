@@ -185,6 +185,55 @@ class TestClientCreation:
             assert "dimension parameter is required" in str(e)
             print(f"\n✅ get_or_create_collection correctly raises ValueError when dimension is missing")
         
+        # Test 11: count_collection - count the number of collections
+        collection_count = client.count_collection()
+        assert isinstance(collection_count, int)
+        assert collection_count >= 1  # At least the test collection we created
+        print(f"\n✅ count_collection successfully returned count: {collection_count}")
+        
+        # Test 12: collection.count() - count items in collection (should be 0 for empty collection)
+        item_count = collection.count()
+        assert isinstance(item_count, int)
+        assert item_count == 0  # Collection is empty
+        print(f"\n✅ collection.count() successfully returned count: {item_count}")
+        
+        # Test 13: collection.peek() - preview items in empty collection
+        preview = collection.peek(limit=5)
+        assert preview is not None
+        assert len(preview) == 0  # Empty collection
+        print(f"\n✅ collection.peek() successfully returned preview: {len(preview)} items")
+        
+        # Add some test data to test count and peek with data
+        import uuid
+        test_ids = [str(uuid.uuid4()) for _ in range(3)]
+        collection.add(
+            ids=test_ids,
+            vectors=[[1.0, 2.0, 3.0] for _ in range(3)],
+            documents=[f"Test document {i}" for i in range(3)],
+            metadatas=[{"index": i} for i in range(3)]
+        )
+        
+        # Test 14: collection.count() - count items after adding data
+        item_count_after = collection.count()
+        assert item_count_after == 3
+        print(f"\n✅ collection.count() after adding data: {item_count_after} items")
+        
+        # Test 15: collection.peek() - preview items with data
+        preview_with_data = collection.peek(limit=2)
+        assert preview_with_data is not None
+        assert len(preview_with_data) == 2  # Limited to 2 items
+        # Verify preview items have expected fields
+        for item in preview_with_data:
+            assert hasattr(item, '_id')
+            assert hasattr(item, 'document')
+            assert hasattr(item, 'metadata')
+        print(f"\n✅ collection.peek() with data returned {len(preview_with_data)} items")
+        
+        # Test 16: collection.peek() with different limit
+        preview_all = collection.peek(limit=10)
+        assert len(preview_all) == 3  # All 3 items
+        print(f"\n✅ collection.peek(limit=10) returned {len(preview_all)} items")
+        
         # Clean up: delete the test collection table
         try:
             client._server.execute(f"DROP TABLE IF EXISTS `{table_name}`")

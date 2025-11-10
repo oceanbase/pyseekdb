@@ -391,6 +391,16 @@ print(f"Collection count: {count} items")
 info = collection.describe()
 print(f"Collection info: {info}")
 
+# 10.3 Preview first few items in collection
+preview = collection.peek(limit=5)
+print(f"Preview: {len(preview)} items")
+for item in preview:
+    print(f"  ID: {item._id}, Document: {item.document}")
+
+# 10.4 Count collections in database
+collection_count = client.count_collection()
+print(f"Database has {collection_count} collections")
+
 # ============================================================================
 # PART 11: CLEANUP
 # ============================================================================

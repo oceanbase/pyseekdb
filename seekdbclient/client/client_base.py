@@ -238,6 +238,20 @@ class BaseClient(BaseConnection, AdminAPI):
         
         return collections
     
+    def count_collection(self) -> int:
+        """
+        Count the number of collections in the current database
+        
+        Returns:
+            Number of collections
+            
+        Examples:
+            count = client.count_collection()
+            print(f"Database has {count} collections")
+        """
+        collections = self.list_collections()
+        return len(collections)
+    
     def has_collection(self, name: str) -> bool:
         """
         Check if a collection exists (user-facing API)
@@ -1899,14 +1913,13 @@ class BaseClient(BaseConnection, AdminAPI):
     
     # -------------------- Collection Info --------------------
     
-    @abstractmethod
     def _collection_count(
         self,
         collection_id: Optional[str],
         collection_name: str
     ) -> int:
         """
-        [Internal] Get the number of items in collection
+        [Internal] Get the number of items in collection - Common SQL-based implementation
         
         Args:
             collection_id: Collection ID
@@ -1915,22 +1928,30 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             Item count
         """
-        pass
-    
-    @abstractmethod
-    def _collection_describe(
-        self,
-        collection_id: Optional[str],
-        collection_name: str
-    ) -> Dict[str, Any]:
-        """
-        [Internal] Get detailed collection information
+        logger.info(f"Counting items in collection '{collection_name}'")
+        conn = self._ensure_connection()
         
-        Args:
-            collection_id: Collection ID
-            collection_name: Collection name
-            
-        Returns:
-            Collection information dictionary
-        """
-        pass
+        # Convert collection name to table name
+        table_name = CollectionNames.table_name(collection_name)
+        
+        # Execute COUNT query
+        sql = f"SELECT COUNT(*) as cnt FROM `{table_name}`"
+        logger.debug(f"Executing SQL: {sql}")
+        
+        use_context_manager = self._use_context_manager_for_cursor()
+        rows = self._execute_query_with_cursor(conn, sql, [], use_context_manager)
+        
+        if not rows:
+            count = 0
+        else:
+            # Extract count from result
+            row = rows[0]
+            if isinstance(row, dict):
+                count = row.get('cnt', 0)
+            elif isinstance(row, (tuple, list)):
+                count = row[0] if len(row) > 0 else 0
+            else:
+                count = int(row) if row else 0
+        
+        logger.info(f"✅ Collection '{collection_name}' has {count} items")
+        return count
