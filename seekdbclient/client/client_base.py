@@ -1408,7 +1408,7 @@ class BaseClient(BaseConnection, AdminAPI):
         self._execute_query_with_cursor(conn, set_sql, [], use_context_manager)
         
         # Get SQL query from DBMS_HYBRID_SEARCH.GET_SQL
-        get_sql_query = f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql"
+        get_sql_query = f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"
         logger.debug(f"Getting SQL query: {get_sql_query}")
         
         rows = self._execute_query_with_cursor(conn, get_sql_query, [], use_context_manager)

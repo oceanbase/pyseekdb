@@ -20,13 +20,13 @@ import seekdbclient
 # ============================================================================
 
 # Option 1: Embedded mode (local SeekDB)
-# embedded_client = seekdbclient.Client(
+# client = seekdbclient.Client(
 #     path="./seekdb",
 #     database="test"
 # )
 
 # Option 2: Server mode (remote SeekDB server)
-server_client = seekdbclient.Client(
+client = seekdbclient.Client(
     host="127.0.0.1",
     port=2881,
     database="test",
@@ -44,9 +44,6 @@ server_client = seekdbclient.Client(
 #     password=""
 # )
 
-# Use server client for this example
-client = server_client
-
 # ============================================================================
 # PART 2: COLLECTION MANAGEMENT
 # ============================================================================
@@ -55,7 +52,7 @@ collection_name = "comprehensive_example"
 dimension = 128
 
 # 2.1 Create a collection
-collection = client.create_collection(
+collection = client.get_or_create_collection(
     name=collection_name,
     dimension=dimension
 )
