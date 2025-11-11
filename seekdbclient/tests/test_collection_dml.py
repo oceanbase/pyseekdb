@@ -43,12 +43,6 @@ class TestCollectionDML:
     
     def test_embedded_collection_dml(self):
         """Test collection DML operations with embedded client"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb

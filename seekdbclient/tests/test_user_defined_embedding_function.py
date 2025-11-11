@@ -214,12 +214,6 @@ class TestUserDefinedEmbeddingFunction:
     
     def test_embedded_simple_hash_embedding_function(self):
         """Test simple hash-based embedding function with embedded client"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -319,12 +313,6 @@ class TestUserDefinedEmbeddingFunction:
     
     def test_embedded_sentence_transformer_embedding_function(self):
         """Test sentence-transformer custom embedding function with embedded client"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb

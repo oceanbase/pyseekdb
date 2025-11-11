@@ -844,12 +844,6 @@ class TestCollectionHybridSearch:
 
     def test_embedded_hybrid_search_full_text_only(self):
         """Test hybrid_search with only full-text search (query) using SeekdbEmbedded"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -907,12 +901,6 @@ class TestCollectionHybridSearch:
     
     def test_embedded_hybrid_search_vector_only(self):
         """Test hybrid_search with only vector search (knn) using SeekdbEmbedded"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -967,12 +955,6 @@ class TestCollectionHybridSearch:
     
     def test_embedded_hybrid_search_combined(self):
         """Test hybrid_search with both full-text and vector search using SeekdbEmbedded"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -1030,12 +1012,6 @@ class TestCollectionHybridSearch:
     
     def test_embedded_hybrid_search_with_metadata_filter(self):
         """Test hybrid_search with metadata filters using SeekdbEmbedded"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -1104,12 +1080,6 @@ class TestCollectionHybridSearch:
     
     def test_embedded_hybrid_search_with_logical_operators(self):
         """Test hybrid_search with logical operators in metadata filters using SeekdbEmbedded"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb

@@ -47,12 +47,6 @@ class TestDefaultEmbeddingFunction:
     
     def test_embedded_default_embedding_function(self):
         """Test default embedding function with embedded client"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb

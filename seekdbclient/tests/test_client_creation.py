@@ -255,16 +255,6 @@ class TestClientCreation:
     
     def test_create_embedded_client(self):
         """Test creating embedded client (lazy loading) and executing queries"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.fail(
-                f"❌ SeekDB data directory does not exist: {SEEKDB_PATH}\n\n"
-                f"Solution:\n"
-                f"  1. Create the directory: mkdir -p {SEEKDB_PATH}\n"
-                f"  2. Or set SEEKDB_PATH environment variable to an existing directory:\n"
-                f"     export SEEKDB_PATH=/path/to/your/seekdb/data\n"
-                f"     python3 -m pytest seekdbclient/tests/test_client_creation.py -v -s"
-            )
-        
         # Check if seekdb package is available and properly configured
         try:
             import sys

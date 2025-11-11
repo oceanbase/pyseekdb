@@ -41,54 +41,74 @@ OB_PASSWORD = os.environ.get('OB_PASSWORD', '')
 class TestCollectionQuery:
     """Test collection.query() interface for all three modes"""
     
-    def _insert_test_data(self, client, collection_name: str):
-        """Helper method to insert test data using direct SQL"""
+    def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
+        """Helper method to insert test data using direct SQL
+        
+        Args:
+            client: Client instance
+            collection_name: Collection name
+            dimension: Actual dimension of the collection (used to generate vectors)
+        """
         table_name = f"c$v1${collection_name}"
+        
+        # Base vectors (3D) - will be extended or truncated to match actual dimension
+        base_vectors = [
+            [1.0, 2.0, 3.0],
+            [2.0, 3.0, 4.0],
+            [1.1, 2.1, 3.1],
+            [2.1, 3.1, 4.1],
+            [1.2, 2.2, 3.2]
+        ]
         
         # Insert test data with vectors, documents, and metadata
         test_data = [
             {
-                "_id": str(uuid.uuid4()),
                 "document": "This is a test document about machine learning",
-                "embedding": [1.0, 2.0, 3.0],
+                "base_vector": base_vectors[0],
                 "metadata": {"category": "AI", "score": 95, "tag": "ml"}
             },
             {
-                "_id": str(uuid.uuid4()),
                 "document": "Python programming tutorial for beginners",
-                "embedding": [2.0, 3.0, 4.0],
+                "base_vector": base_vectors[1],
                 "metadata": {"category": "Programming", "score": 88, "tag": "python"}
             },
             {
-                "_id": str(uuid.uuid4()),
                 "document": "Advanced machine learning algorithms",
-                "embedding": [1.1, 2.1, 3.1],
+                "base_vector": base_vectors[2],
                 "metadata": {"category": "AI", "score": 92, "tag": "ml"}
             },
             {
-                "_id": str(uuid.uuid4()),
                 "document": "Data science with Python",
-                "embedding": [2.1, 3.1, 4.1],
+                "base_vector": base_vectors[3],
                 "metadata": {"category": "Data Science", "score": 90, "tag": "python"}
             },
             {
-                "_id": str(uuid.uuid4()),
                 "document": "Introduction to neural networks",
-                "embedding": [1.2, 2.2, 3.2],
+                "base_vector": base_vectors[4],
                 "metadata": {"category": "AI", "score": 85, "tag": "neural"}
             }
         ]
         
         for data in test_data:
-            # Use string ID directly (support any string format)
-            id_str = data["_id"]
+            # Generate UUID for _id (use string format directly)
+            id_str = str(uuid.uuid4())
             # Escape single quotes in ID
             id_str_escaped = id_str.replace("'", "''")
             
+            # Generate vector with correct dimension
+            base_vec = data["base_vector"]
+            if dimension <= len(base_vec):
+                # Truncate if dimension is smaller
+                embedding = base_vec[:dimension]
+            else:
+                # Extend if dimension is larger (repeat pattern)
+                embedding = base_vec * ((dimension // len(base_vec)) + 1)
+                embedding = embedding[:dimension]
+            
             # Convert vector to string format: [1.0,2.0,3.0]
-            vector_str = "[" + ",".join(map(str, data["embedding"])) + "]"
+            vector_str = "[" + ",".join(map(str, embedding)) + "]"
             # Convert metadata to JSON string
-            metadata_str = json.dumps(data["metadata"]).replace("'", "\\'")
+            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
             # Escape single quotes in document
             document_str = data["document"].replace("'", "\\'")
             
@@ -96,15 +116,11 @@ class TestCollectionQuery:
             sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
                      VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
             client._server.execute(sql)
+        
+        print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
     
     def test_embedded_collection_query(self):
         """Test collection.query() with embedded client"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -126,15 +142,20 @@ class TestCollectionQuery:
         from seekdbclient import HNSWConfiguration
         config = HNSWConfiguration(dimension=3, distance='l2')
         collection = client.create_collection(name=collection_name, configuration=config, embedding_function=None)
+        # Get actual dimension (may be different from requested due to default embedding function)
+        actual_dimension = collection.dimension
         
         try:
             # Insert test data
-            self._insert_test_data(client, collection_name)
+            self._insert_test_data(client, collection_name, dimension=actual_dimension)
             
             # Test 1: Basic vector similarity query
             print(f"\n✅ Testing basic query for embedded client")
+            # Generate query vector with correct dimension
+            query_vector = [1.0, 2.0, 3.0] * ((actual_dimension // 3) + 1)
+            query_vector = query_vector[:actual_dimension]
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 n_results=3
             )
             assert results is not None
@@ -144,7 +165,7 @@ class TestCollectionQuery:
             # Test 2: Query with metadata filter
             print(f"✅ Testing query with metadata filter")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 where={"category": {"$eq": "AI"}},
                 n_results=5
             )
@@ -154,7 +175,7 @@ class TestCollectionQuery:
             # Test 3: Query with document filter
             print(f"✅ Testing query with document filter")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 where_document={"$contains": "machine learning"},
                 n_results=5
             )
@@ -164,7 +185,7 @@ class TestCollectionQuery:
             # Test 4: Query with include parameter
             print(f"✅ Testing query with include parameter")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 include=["documents", "metadatas"],
                 n_results=3
             )
@@ -176,8 +197,10 @@ class TestCollectionQuery:
             
             # Test 5: Query with multiple vectors (should return List[QueryResult])
             print(f"✅ Testing query with multiple vectors (returns List[QueryResult])")
+            query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
+            query_vector2 = query_vector2[:actual_dimension]
             results = collection.query(
-                query_embeddings=[[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]],
+                query_embeddings=[query_vector, query_vector2],
                 n_results=2
             )
             assert results is not None
@@ -191,7 +214,7 @@ class TestCollectionQuery:
             # Test 6: Single vector still returns single QueryResult (backward compatibility)
             print(f"✅ Testing single vector returns single QueryResult (backward compatibility)")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 n_results=2
             )
             assert results is not None
@@ -234,15 +257,20 @@ class TestCollectionQuery:
         from seekdbclient import HNSWConfiguration
         config = HNSWConfiguration(dimension=3, distance='l2')
         collection = client.create_collection(name=collection_name, configuration=config, embedding_function=None)
+        # Get actual dimension (may be different from requested due to default embedding function)
+        actual_dimension = collection.dimension
         
         try:
             # Insert test data
-            self._insert_test_data(client, collection_name)
+            self._insert_test_data(client, collection_name, dimension=actual_dimension)
             
             # Test 1: Basic vector similarity query
             print(f"\n✅ Testing basic query for server client")
+            # Generate query vector with correct dimension
+            query_vector = [1.0, 2.0, 3.0] * ((actual_dimension // 3) + 1)
+            query_vector = query_vector[:actual_dimension]
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 n_results=3
             )
             assert results is not None
@@ -252,7 +280,7 @@ class TestCollectionQuery:
             # Test 2: Query with metadata filter using comparison operators
             print(f"✅ Testing query with metadata filter ($gte)")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 where={"score": {"$gte": 90}},
                 n_results=5
             )
@@ -262,7 +290,7 @@ class TestCollectionQuery:
             # Test 3: Query with combined filters
             print(f"✅ Testing query with combined filters")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 where={"category": {"$eq": "AI"}, "score": {"$gte": 90}},
                 where_document={"$contains": "machine"},
                 n_results=5
@@ -273,7 +301,7 @@ class TestCollectionQuery:
             # Test 4: Query with $in operator
             print(f"✅ Testing query with $in operator")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 where={"tag": {"$in": ["ml", "python"]}},
                 n_results=5
             )
@@ -282,8 +310,12 @@ class TestCollectionQuery:
             
             # Test 5: Query with multiple vectors (should return List[QueryResult])
             print(f"✅ Testing query with multiple vectors (returns List[QueryResult])")
+            query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
+            query_vector2 = query_vector2[:actual_dimension]
+            query_vector3 = [1.1, 2.1, 3.1] * ((actual_dimension // 3) + 1)
+            query_vector3 = query_vector3[:actual_dimension]
             results = collection.query(
-                query_embeddings=[[1.0, 2.0, 3.0], [2.0, 3.0, 4.0], [1.1, 2.1, 3.1]],
+                query_embeddings=[query_vector, query_vector2, query_vector3],
                 n_results=2
             )
             assert results is not None
@@ -297,7 +329,7 @@ class TestCollectionQuery:
             # Test 6: Single vector still returns single QueryResult (backward compatibility)
             print(f"✅ Testing single vector returns single QueryResult (backward compatibility)")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 n_results=2
             )
             assert results is not None
@@ -341,15 +373,20 @@ class TestCollectionQuery:
         from seekdbclient import HNSWConfiguration
         config = HNSWConfiguration(dimension=3, distance='l2')
         collection = client.create_collection(name=collection_name, configuration=config, embedding_function=None)
+        # Get actual dimension (may be different from requested due to default embedding function)
+        actual_dimension = collection.dimension
         
         try:
             # Insert test data
-            self._insert_test_data(client, collection_name)
+            self._insert_test_data(client, collection_name, dimension=actual_dimension)
             
             # Test 1: Basic vector similarity query
             print(f"\n✅ Testing basic query for OceanBase client")
+            # Generate query vector with correct dimension
+            query_vector = [1.0, 2.0, 3.0] * ((actual_dimension // 3) + 1)
+            query_vector = query_vector[:actual_dimension]
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 n_results=3
             )
             assert results is not None
@@ -358,8 +395,10 @@ class TestCollectionQuery:
             
             # Test 2: Query with multiple vectors (should return List[QueryResult])
             print(f"✅ Testing query with multiple vectors (returns List[QueryResult])")
+            query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
+            query_vector2 = query_vector2[:actual_dimension]
             results = collection.query(
-                query_embeddings=[[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]],
+                query_embeddings=[query_vector, query_vector2],
                 n_results=2
             )
             assert results is not None
@@ -373,7 +412,7 @@ class TestCollectionQuery:
             # Test 3: Query with logical operators
             print(f"✅ Testing query with logical operators ($or)")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 where={
                     "$or": [
                         {"category": {"$eq": "AI"}},
@@ -388,7 +427,7 @@ class TestCollectionQuery:
             # Test 4: Query with include parameter to get specific fields
             print(f"✅ Testing query with include parameter")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 include=["documents", "metadatas", "embeddings"],
                 n_results=3
             )
@@ -403,7 +442,7 @@ class TestCollectionQuery:
             # Test 5: Single vector still returns single QueryResult (backward compatibility)
             print(f"✅ Testing single vector returns single QueryResult (backward compatibility)")
             results = collection.query(
-                query_embeddings=[1.0, 2.0, 3.0],
+                query_embeddings=query_vector,
                 n_results=2
             )
             assert results is not None
