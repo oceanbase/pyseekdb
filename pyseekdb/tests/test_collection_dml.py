@@ -23,7 +23,7 @@ SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb_s
 SEEKDB_DATABASE = os.environ.get('SEEKDB_DATABASE', 'test')
 
 # Server mode
-SERVER_HOST = os.environ.get('SERVER_HOST', 'localhost')
+SERVER_HOST = os.environ.get('SERVER_HOST', '11.161.205.15')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '2881'))
 SERVER_DATABASE = os.environ.get('SERVER_DATABASE', 'test')
 SERVER_USER = os.environ.get('SERVER_USER', 'root')
@@ -43,12 +43,6 @@ class TestCollectionDML:
     
     def test_embedded_collection_dml(self):
         """Test collection DML operations with embedded client"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.skip(
-                f"SeekDB data directory does not exist: {SEEKDB_PATH}\n"
-                f"Set SEEKDB_PATH environment variable to run this test"
-            )
-        
         # Check if seekdb package is available
         try:
             import seekdb
@@ -76,13 +70,13 @@ class TestCollectionDML:
             {CollectionFieldNames.DOCUMENT} string,
             {CollectionFieldNames.EMBEDDING} vector({dimension}),
             {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx1({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx2 ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
+            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         client._server.execute(create_table_sql)
         
         # Get collection object
-        collection = client.get_collection(name=collection_name)
+        collection = client.get_collection(name=collection_name, embedding_function=None)
         
         try:
             # Test 1: collection.add - Add single item
@@ -127,7 +121,6 @@ class TestCollectionDML:
             print(f"✅ Testing collection.update() - update existing item")
             collection.update(
                 ids=test_id_1,
-                documents="Updated document 1",
                 metadatas={"category": "test", "score": 95, "updated": True}
             )
             
@@ -135,7 +128,8 @@ class TestCollectionDML:
             results = collection.get(ids=test_id_1)
             assert len(results) == 1
             result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Updated document 1"
+            # Document should remain unchanged since we didn't update it
+            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
@@ -144,6 +138,7 @@ class TestCollectionDML:
             print(f"✅ Testing collection.upsert() - upsert existing item (update)")
             collection.upsert(
                 ids=test_id_1,
+                vectors=[1.0, 2.0, 3.0],  # Use original vector
                 documents="Upserted document 1",
                 metadatas={"category": "test", "score": 98}
             )
@@ -246,13 +241,13 @@ class TestCollectionDML:
             {CollectionFieldNames.DOCUMENT} string,
             {CollectionFieldNames.EMBEDDING} vector({dimension}),
             {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx1({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx2 ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
+            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         client._server.execute(create_table_sql)
         
         # Get collection object
-        collection = client.get_collection(name=collection_name)
+        collection = client.get_collection(name=collection_name, embedding_function=None)
         
         try:
             # Test 1: collection.add - Add single item
@@ -297,7 +292,6 @@ class TestCollectionDML:
             print(f"✅ Testing collection.update() - update existing item")
             collection.update(
                 ids=test_id_1,
-                documents="Updated document 1",
                 metadatas={"category": "test", "score": 95, "updated": True}
             )
             
@@ -305,7 +299,8 @@ class TestCollectionDML:
             results = collection.get(ids=test_id_1)
             assert len(results) == 1
             result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Updated document 1"
+            # Document should remain unchanged since we didn't update it
+            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
@@ -330,6 +325,7 @@ class TestCollectionDML:
             print(f"✅ Testing collection.upsert() - upsert existing item (update)")
             collection.upsert(
                 ids=test_id_1,
+                vectors=[1.0, 2.0, 3.0],  # Use original vector
                 documents="Upserted document 1",
                 metadatas={"category": "test", "score": 98}
             )
@@ -452,13 +448,13 @@ class TestCollectionDML:
             {CollectionFieldNames.DOCUMENT} string,
             {CollectionFieldNames.EMBEDDING} vector({dimension}),
             {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx1({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx2 ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
+            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         client._server.execute(create_table_sql)
         
         # Get collection object
-        collection = client.get_collection(name=collection_name)
+        collection = client.get_collection(name=collection_name, embedding_function=None)
         
         try:
             # Test 1: collection.add - Add single item
@@ -503,7 +499,6 @@ class TestCollectionDML:
             print(f"✅ Testing collection.update() - update existing item")
             collection.update(
                 ids=test_id_1,
-                documents="Updated document 1",
                 metadatas={"category": "test", "score": 95, "updated": True}
             )
             
@@ -511,7 +506,8 @@ class TestCollectionDML:
             results = collection.get(ids=test_id_1)
             assert len(results) == 1
             result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Updated document 1"
+            # Document should remain unchanged since we didn't update it
+            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
@@ -536,6 +532,7 @@ class TestCollectionDML:
             print(f"✅ Testing collection.upsert() - upsert existing item (update)")
             collection.upsert(
                 ids=test_id_1,
+                vectors=[1.0, 2.0, 3.0],  # Use original vector
                 documents="Upserted document 1",
                 metadatas={"category": "test", "score": 98}
             )

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyseekdb"
-version = "0.1.0.dev3"
+version = "0.1.0.dev4"
 description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase connection modes with vector database capabilities."
 authors = ["SeekDBClient Team <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
@@ -16,6 +16,10 @@ repository = "https://github.com/oceanbase/pyseekdb/"
 python = ">=3.8,<4.0"
 pymysql = "^1.1.1"
 seekdb = "*"
+sentence-transformers = {version = "*", optional = true}
+
+[tool.poetry.extras]
+embedding = ["sentence-transformers"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"

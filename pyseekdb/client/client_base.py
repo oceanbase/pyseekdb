@@ -6,18 +6,64 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from typing import List, Optional, Sequence, Dict, Any, Union, TYPE_CHECKING, Tuple, Callable
+from dataclasses import dataclass
 
 from .base_connection import BaseConnection
 from .admin_client import AdminAPI, DEFAULT_TENANT
 from .meta_info import CollectionNames, CollectionFieldNames
 from .query_result import QueryResult
 from .filters import FilterBuilder
+from .embedding_function import (
+    EmbeddingFunction,
+    DefaultEmbeddingFunction,
+    get_default_embedding_function,
+    Documents as EmbeddingDocuments,
+    Embeddings as EmbeddingVectors
+)
 
 from .collection import Collection
 
 from .database import Database
 
 logger = logging.getLogger(__name__)
+
+# Default configuration constants
+# Note: Default embedding function (DefaultEmbeddingFunction) produces 384-dim vectors
+# So we use 384 as the default dimension to match
+DEFAULT_VECTOR_DIMENSION = 384  # Matches DefaultEmbeddingFunction dimension
+DEFAULT_DISTANCE_METRIC = 'cosine'
+
+# Sentinel object to distinguish between "parameter not provided" and "explicitly set to None"
+class _NotProvided:
+    """Sentinel object to indicate a parameter was not provided"""
+    pass
+
+_NOT_PROVIDED = _NotProvided()
+
+# Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
+EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
+
+
+@dataclass
+class HNSWConfiguration:
+    """
+    HNSW (Hierarchical Navigable Small World) index configuration
+    
+    Args:
+        dimension: Vector dimension (number of elements in each vector)
+        distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
+    """
+    dimension: int
+    distance: str = 'l2'
+    
+    def __post_init__(self):
+        if self.dimension <= 0:
+            raise ValueError(f"dimension must be positive, got {self.dimension}")
+        if self.distance not in ['l2', 'cosine', 'inner_product']:
+            raise ValueError(f"distance must be one of ['l2', 'cosine', 'inner_product'], got {self.distance}")
+
+# Type alias for configuration parameter that can be HNSWConfiguration, None, or sentinel
+ConfigurationParam = Union[HNSWConfiguration, None, Any]
 
 class ClientAPI(ABC):
     """
@@ -29,15 +75,40 @@ class ClientAPI(ABC):
     def create_collection(
         self,
         name: str,
-        dimension: Optional[int] = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs
     ) -> "Collection":
-        """Create collection"""
+        """
+        Create collection
+        
+        Args:
+            name: Collection name
+            configuration: HNSW index configuration (HNSWConfiguration)
+            embedding_function: Embedding function to convert documents to vectors.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
+                               If provided, the dimension in configuration should match the
+                               embedding function's output dimension.
+            **kwargs: Additional parameters
+        """
         pass
     
     @abstractmethod
-    def get_collection(self, name: str) -> "Collection":
-        """Get collection object"""
+    def get_collection(
+        self,
+        name: str,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
+    ) -> "Collection":
+        """
+        Get collection object
+        
+        Args:
+            name: Collection name
+            embedding_function: Embedding function to convert documents to vectors.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
+        """
         pass
     
     @abstractmethod
@@ -78,7 +149,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def create_collection(
         self,
         name: str,
-        dimension: Optional[int] = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs
     ) -> "Collection":
         """
@@ -86,14 +158,123 @@ class BaseClient(BaseConnection, AdminAPI):
         
         Args:
             name: Collection name
-            dimension: Vector dimension
-            **kwargs: Additional parameters
+            configuration: HNSW index configuration (HNSWConfiguration)
+                          If not provided, uses default configuration (dimension=384, distance='cosine').
+                          If explicitly set to None, will try to calculate dimension from embedding_function.
+                          If embedding_function is also None, will raise an error.
+            embedding_function: Embedding function to convert documents to vectors.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
+                               If provided, the actual dimension will be calculated by calling
+                               embedding_function.__call__("seekdb"), and this dimension will be used
+                               to create the table. If configuration.dimension is set and doesn't match
+                               the calculated dimension, a ValueError will be raised.
+            **kwargs: Additional parameters 
             
         Returns:
             Collection object
+            
+        Raises:
+            ValueError: If configuration is explicitly set to None and embedding_function is also None
+                       (cannot determine dimension), or if embedding_function is provided and
+                       configuration.dimension doesn't match the calculated dimension from embedding_function
+            
+        Examples:
+            # Using default configuration and default embedding function
+            >>> collection = client.create_collection('my_collection')
+            
+            # Using custom embedding function (dimension will be calculated automatically)
+            >>> from pyseekdb import DefaultEmbeddingFunction
+            >>> ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
+            >>> config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
+            >>> collection = client.create_collection(
+            ...     'my_collection',
+            ...     configuration=config,
+            ...     embedding_function=ef
+            ... )
+            
+            # Explicitly set configuration=None, use embedding function to determine dimension
+            >>> collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
+            
+            # Explicitly disable embedding function (use configuration dimension)
+            >>> config = HNSWConfiguration(dimension=128, distance='cosine')
+            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
         """
-        if dimension is None:
-            raise ValueError("dimension parameter is required for creating a collection")
+        # Handle embedding function first
+        # If not provided (sentinel), use default embedding function
+        if embedding_function is _NOT_PROVIDED:
+            embedding_function = get_default_embedding_function()
+        
+        # Calculate actual dimension from embedding function if provided
+        actual_dimension = None
+        if embedding_function is not None:
+            try:
+                # Call embedding function with "seekdb" to get actual dimension
+                test_embeddings = embedding_function.__call__("seekdb")
+                if test_embeddings and len(test_embeddings) > 0:
+                    actual_dimension = len(test_embeddings[0])
+                    logger.info(f"Calculated embedding function dimension: {actual_dimension}")
+                else:
+                    raise ValueError("Embedding function returned empty result when called with 'seekdb'")
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to calculate dimension from embedding function: {e}. "
+                    f"Please ensure the embedding function can be called with a string input."
+                ) from e
+        
+        # Handle configuration
+        # If not provided (sentinel), use default configuration
+        if configuration is _NOT_PROVIDED:
+            # Use default configuration, but if embedding_function is provided, use its dimension
+            if actual_dimension is not None:
+                configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+            else:
+                configuration = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
+        elif configuration is None:
+            # Configuration is explicitly set to None
+            # Try to calculate dimension from embedding_function
+            if embedding_function is None:
+                raise ValueError(
+                    "Cannot create collection: configuration is explicitly set to None and "
+                    "embedding_function is also None. Cannot determine dimension without either a configuration "
+                    "or an embedding function. Please either:\n"
+                    "  1. Provide a configuration with dimension specified (e.g., HNSWConfiguration(dimension=128, distance='cosine')), or\n"
+                    "  2. Provide an embedding_function to calculate dimension automatically, or\n"
+                    "  3. Do not set configuration=None (use default configuration)."
+                )
+            
+            # Use calculated dimension from embedding function and default distance metric
+            if actual_dimension is not None:
+                configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+            else:
+                raise ValueError(
+                    "Failed to calculate dimension from embedding function. "
+                    "Please ensure the embedding function can be called with a string input."
+                )
+        
+        # Validate configuration type
+        if not isinstance(configuration, HNSWConfiguration):
+            raise TypeError(f"configuration must be HNSWConfiguration, got {type(configuration)}")
+        
+        # If embedding_function is provided, validate configuration dimension matches
+        if embedding_function is not None and actual_dimension is not None:
+            if configuration.dimension != actual_dimension:
+                raise ValueError(
+                    f"Configuration dimension ({configuration.dimension}) doesn't match "
+                    f"embedding function dimension ({actual_dimension}). "
+                    f"Please update configuration to use dimension={actual_dimension} or remove dimension from configuration."
+                )
+            # Use actual dimension from embedding function
+            dimension = actual_dimension
+        else:
+            # No embedding function, use configuration dimension
+            dimension = configuration.dimension
+        
+        # Extract distance from configuration
+        distance = configuration.distance
+        
+        # HNSW is the only supported index type
+        index_type = 'hnsw'
         
         # Construct table name: c$v1${name}
         table_name = CollectionNames.table_name(name)
@@ -104,22 +285,32 @@ class BaseClient(BaseConnection, AdminAPI):
             document string,
             embedding vector({dimension}),
             metadata json,
-            FULLTEXT INDEX idx1(document),
-            VECTOR INDEX idx2 (embedding) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts(document),
+            VECTOR INDEX idx_vec (embedding) with(distance={distance}, type={index_type}, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         
         # Execute SQL to create table
         self.execute(sql)
         
+        # Store embedding function in kwargs to pass to Collection
+        kwargs['embedding_function'] = embedding_function
+        
         # Create and return Collection object
         return Collection(client=self, name=name, dimension=dimension, **kwargs)
     
-    def get_collection(self, name: str) -> "Collection":
+    def get_collection(
+        self,
+        name: str,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
+    ) -> "Collection":
         """
         Get a collection object (user-facing API)
         
         Args:
             name: Collection name
+            embedding_function: Embedding function to convert documents to vectors.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
             
         Returns:
             Collection object
@@ -162,8 +353,13 @@ class BaseClient(BaseConnection, AdminAPI):
                     dimension = int(match.group(1))
                 break
         
+        # Handle embedding function
+        # If not provided (sentinel), use default embedding function
+        if embedding_function is _NOT_PROVIDED:
+            embedding_function = get_default_embedding_function()
+        
         # Create and return Collection object
-        return Collection(client=self, name=name, dimension=dimension)
+        return Collection(client=self, name=name, dimension=dimension, embedding_function=embedding_function)
     
     def delete_collection(self, name: str) -> None:
         """
@@ -277,7 +473,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def get_or_create_collection(
         self,
         name: str,
-        dimension: Optional[int] = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs
     ) -> "Collection":
         """
@@ -285,27 +482,40 @@ class BaseClient(BaseConnection, AdminAPI):
         
         Args:
             name: Collection name
-            dimension: Vector dimension (required if creating new collection)
+            configuration: HNSW index configuration (HNSWConfiguration)
+                          If not provided, uses default configuration (dimension=384, distance='cosine').
+                          If explicitly set to None, will try to calculate dimension from embedding_function.
+                          If embedding_function is also None, will raise an error.
+            embedding_function: Embedding function to convert documents to vectors.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
+                               If provided when creating a new collection, the actual dimension will be
+                               calculated by calling embedding_function.__call__("seekdb"), and this
+                               dimension will be used to create the table. If configuration.dimension is
+                               set and doesn't match the calculated dimension, a ValueError will be raised.
             **kwargs: Additional parameters for create_collection
             
         Returns:
             Collection object
             
         Raises:
-            ValueError: If collection doesn't exist and dimension is not provided
+            ValueError: If creating a new collection and configuration is explicitly set to None and
+                       embedding_function is also None (cannot determine dimension), or if embedding_function
+                       is provided and configuration.dimension doesn't match the calculated dimension
         """
         # First, try to get the collection
         if self.has_collection(name):
-            return self.get_collection(name)
+            # Collection exists, return it
+            # Pass embedding_function (could be _NOT_PROVIDED, None, or an EmbeddingFunction instance)
+            return self.get_collection(name, embedding_function=embedding_function)
         
-        # Collection doesn't exist, create it
-        if dimension is None:
-            raise ValueError(
-                f"Collection '{name}' does not exist and dimension parameter is required "
-                f"for creating a new collection"
-            )
-        
-        return self.create_collection(name=name, dimension=dimension, **kwargs)
+        # Collection doesn't exist, create it with provided or default configuration
+        return self.create_collection(
+            name=name,
+            configuration=configuration,
+            embedding_function=embedding_function,
+            **kwargs
+        )
     
     # ==================== Collection Internal Operations (Called by Collection) ====================
     # These methods are called by Collection objects, different clients implement different logic
@@ -320,6 +530,7 @@ class BaseClient(BaseConnection, AdminAPI):
         vectors: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> None:
         """
@@ -332,6 +543,10 @@ class BaseClient(BaseConnection, AdminAPI):
             vectors: Single vector or list of vectors (optional)
             metadatas: Single metadata dict or list of metadata dicts (optional)
             documents: Single document or list of documents (optional)
+            embedding_function: EmbeddingFunction instance to convert documents to vectors.
+                               Required if documents provided but vectors not provided.
+                               Must implement __call__ method that accepts Documents
+                               and returns Embeddings (List[List[float]]).
             **kwargs: Additional parameters
         """
         logger.info(f"Adding data to collection '{collection_name}'")
@@ -347,9 +562,41 @@ class BaseClient(BaseConnection, AdminAPI):
             if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
                 vectors = [vectors]
         
-        # Validate inputs
-        if not documents and not vectors and not metadatas:
-            raise ValueError("At least one of documents, vectors, or metadatas must be provided")
+        # Handle vector generation logic:
+        # 1. If vectors are provided, use them directly without embedding
+        # 2. If vectors are not provided but documents are provided:
+        #    - If embedding_function is provided, use it to generate vectors from documents
+        #    - If embedding_function is not provided, raise an error
+        # 3. If neither vectors nor documents are provided, raise an error
+        
+        if vectors:
+            # Vectors provided, use them directly without embedding
+            pass
+        elif documents:
+            # Vectors not provided but documents are provided, check for embedding_function
+            if embedding_function is not None:
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                try:
+                    vectors = embedding_function(documents)
+                    logger.info(f"✅ Successfully generated {len(vectors)} embeddings")
+                except Exception as e:
+                    logger.error(f"Failed to generate embeddings: {e}")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}")
+            else:
+                raise ValueError(
+                    "Documents provided but no vectors and no embedding function. "
+                    "Either:\n"
+                    "  1. Provide vectors directly when calling add(), or\n"
+                    "  2. Provide embedding_function to auto-generate vectors from documents."
+                )
+        else:
+            # Neither vectors nor documents provided, raise an error
+            raise ValueError(
+                "Neither vectors nor documents provided. "
+                "Please provide either:\n"
+                "  1. vectors directly, or\n"
+                "  2. documents with embedding_function to generate vectors."
+            )
         
         # Determine number of items
         num_items = 0
@@ -436,6 +683,7 @@ class BaseClient(BaseConnection, AdminAPI):
         vectors: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> None:
         """
@@ -448,6 +696,10 @@ class BaseClient(BaseConnection, AdminAPI):
             vectors: New vectors (optional)
             metadatas: New metadata (optional)
             documents: New documents (optional)
+            embedding_function: EmbeddingFunction instance to convert documents to vectors.
+                               Required if documents provided but vectors not provided.
+                               Must implement __call__ method that accepts Documents
+                               and returns Embeddings (List[List[float]]).
             **kwargs: Additional parameters
         """
         logger.info(f"Updating data in collection '{collection_name}'")
@@ -463,11 +715,48 @@ class BaseClient(BaseConnection, AdminAPI):
             if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
                 vectors = [vectors]
         
+        # Handle vector generation logic:
+        # 1. If vectors are provided, use them directly without embedding
+        # 2. If vectors are not provided but documents are provided:
+        #    - If embedding_function is provided, use it to generate vectors from documents
+        #    - If embedding_function is not provided, raise an error
+        # 3. If neither vectors nor documents are provided:
+        #    - If metadatas are provided, allow update (metadata-only update)
+        #    - If metadatas are not provided, raise an error
+        
+        if vectors:
+            # Vectors provided, use them directly without embedding
+            pass
+        elif documents:
+            # Vectors not provided but documents are provided, check for embedding_function
+            if embedding_function is not None:
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                try:
+                    vectors = embedding_function(documents)
+                    logger.info(f"✅ Successfully generated {len(vectors)} embeddings")
+                except Exception as e:
+                    logger.error(f"Failed to generate embeddings: {e}")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}")
+            else:
+                raise ValueError(
+                    "Documents provided but no vectors and no embedding function. "
+                    "Either:\n"
+                    "  1. Provide vectors directly when calling update(), or\n"
+                    "  2. Provide embedding_function to auto-generate vectors from documents."
+                )
+        elif not metadatas:
+            # Neither vectors nor documents nor metadatas provided, raise an error
+            raise ValueError(
+                "Neither vectors nor documents nor metadatas provided. "
+                "Please provide at least one of:\n"
+                "  1. vectors directly, or\n"
+                "  2. documents with embedding_function to generate vectors, or\n"
+                "  3. metadatas to update metadata only."
+            )
+        
         # Validate inputs
         if not ids:
             raise ValueError("ids must not be empty")
-        if not documents and not metadatas and not vectors:
-            raise ValueError("You must specify at least one column to update")
         
         # Validate lengths match
         if documents and len(documents) != len(ids):
@@ -529,6 +818,7 @@ class BaseClient(BaseConnection, AdminAPI):
         vectors: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> None:
         """
@@ -541,6 +831,10 @@ class BaseClient(BaseConnection, AdminAPI):
             vectors: Vectors (optional)
             metadatas: Metadata (optional)
             documents: Documents (optional)
+            embedding_function: EmbeddingFunction instance to convert documents to vectors.
+                               Required if documents provided but vectors not provided.
+                               Must implement __call__ method that accepts Documents
+                               and returns Embeddings (List[List[float]]).
             **kwargs: Additional parameters
         """
         logger.info(f"Upserting data in collection '{collection_name}'")
@@ -556,11 +850,48 @@ class BaseClient(BaseConnection, AdminAPI):
             if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
                 vectors = [vectors]
         
+        # Handle vector generation logic:
+        # 1. If vectors are provided, use them directly without embedding
+        # 2. If vectors are not provided but documents are provided:
+        #    - If embedding_function is provided, use it to generate vectors from documents
+        #    - If embedding_function is not provided, raise an error
+        # 3. If neither vectors nor documents are provided:
+        #    - If metadatas are provided, allow upsert (metadata-only upsert)
+        #    - If metadatas are not provided, raise an error
+        
+        if vectors:
+            # Vectors provided, use them directly without embedding
+            pass
+        elif documents:
+            # Vectors not provided but documents are provided, check for embedding_function
+            if embedding_function is not None:
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                try:
+                    vectors = embedding_function(documents)
+                    logger.info(f"✅ Successfully generated {len(vectors)} embeddings")
+                except Exception as e:
+                    logger.error(f"Failed to generate embeddings: {e}")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}")
+            else:
+                raise ValueError(
+                    "Documents provided but no vectors and no embedding function. "
+                    "Either:\n"
+                    "  1. Provide vectors directly when calling upsert(), or\n"
+                    "  2. Provide embedding_function to auto-generate vectors from documents."
+                )
+        elif not metadatas:
+            # Neither vectors nor documents nor metadatas provided, raise an error
+            raise ValueError(
+                "Neither vectors nor documents nor metadatas provided. "
+                "Please provide at least one of:\n"
+                "  1. vectors directly, or\n"
+                "  2. documents with embedding_function to generate vectors, or\n"
+                "  3. metadatas to update metadata only."
+            )
+        
         # Validate inputs
         if not ids:
             raise ValueError("ids must not be empty")
-        if not documents and not metadatas and not vectors:
-            raise ValueError("You must specify at least one column to upsert")
         
         # Validate lengths match
         if documents and len(documents) != len(ids):
@@ -762,6 +1093,7 @@ class BaseClient(BaseConnection, AdminAPI):
     def _embed_texts(
         self,
         texts: Union[str, List[str]],
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> List[List[float]]:
         """
@@ -769,20 +1101,30 @@ class BaseClient(BaseConnection, AdminAPI):
         
         Args:
             texts: Single text or list of texts
-            **kwargs: Additional parameters for embedding
+            embedding_function: EmbeddingFunction instance to convert texts to vectors.
+                               Must implement __call__ method that accepts Documents
+                               and returns Embeddings (List[List[float]]).
+                               If not provided, raises NotImplementedError.
+            **kwargs: Additional parameters for embedding (unused for now)
             
         Returns:
-            List of vectors
+            List of vectors (List[List[float]]), where each inner list is an embedding vector
             
-        Note:
-            This is a placeholder method. Subclasses should override this
-            to provide actual embedding functionality, or users should
-            provide query_embeddings directly.
+        Raises:
+            NotImplementedError: If embedding_function is not provided
         """
-        raise NotImplementedError(
-            "Text embedding is not implemented yet. "
-            "Please provide query_embeddings directly instead of query_texts."
-        )
+        if embedding_function is None:
+            raise NotImplementedError(
+                "Text embedding is not implemented. "
+                "Please provide query_embeddings directly or set embedding_function in collection."
+            )
+        
+        # Normalize texts to list
+        if isinstance(texts, str):
+            texts = [texts]
+        
+        # Use embedding function to generate embeddings
+        return embedding_function(texts)
     
     def _normalize_row(self, row: Any, cursor_description: Optional[Any] = None) -> Dict[str, Any]:
         """
@@ -1095,7 +1437,11 @@ class BaseClient(BaseConnection, AdminAPI):
             where: Metadata filter
             where_document: Document filter
             include: Fields to include
-            **kwargs: Additional parameters
+            **kwargs: Additional parameters, including:
+                embedding_function: EmbeddingFunction instance to convert query_texts to vectors.
+                                   Required if query_texts is provided and collection doesn't have
+                                   an embedding_function set. Must implement __call__ method that
+                                   accepts Documents and returns Embeddings (List[List[float]]).
             
         Returns:
             - If single vector/text provided: QueryResult object containing query results
@@ -1107,16 +1453,41 @@ class BaseClient(BaseConnection, AdminAPI):
         # Convert collection name to table name
         table_name = f"c$v1${collection_name}"
         
-        # Handle text embedding if query_texts provided
-        if query_texts is not None and query_embeddings is None:
-            logger.info("Embedding query texts...")
-            query_embeddings = self._embed_texts(query_texts, **kwargs)
+        # Handle vector generation logic:
+        # 1. If query_embeddings are provided, use them directly without embedding
+        # 2. If query_embeddings are not provided but query_texts are provided:
+        #    - If embedding_function is provided, use it to generate vectors from query_texts
+        #    - If embedding_function is not provided, raise an error
+        # 3. If neither query_embeddings nor query_texts are provided, raise an error
+        
+        embedding_function = kwargs.get('embedding_function')
+        
+        if query_embeddings is not None:
+            # Query embeddings provided, use them directly without embedding
+            pass
+        elif query_texts is not None:
+            # Query embeddings not provided but query_texts are provided, check for embedding_function
+            if embedding_function is not None:
+                logger.info("Embedding query texts...")
+                query_embeddings = self._embed_texts(query_texts, embedding_function=embedding_function)
+            else:
+                raise ValueError(
+                    "query_texts provided but no query_embeddings and no embedding_function. "
+                    "Either:\n"
+                    "  1. Provide query_embeddings directly, or\n"
+                    "  2. Provide embedding_function to auto-generate vectors from query_texts."
+                )
+        else:
+            # Neither query_embeddings nor query_texts provided, raise an error
+            raise ValueError(
+                "Neither query_embeddings nor query_texts provided. "
+                "Please provide either:\n"
+                "  1. query_embeddings directly, or\n"
+                "  2. query_texts with embedding_function to generate vectors."
+            )
         
         # Normalize query vectors to list of lists
         query_vectors = self._normalize_query_vectors(query_embeddings)
-        
-        if not query_vectors:
-            raise ValueError("Either query_embeddings or query_texts must be provided")
         
         # Check if multiple vectors provided
         is_multiple_vectors = len(query_vectors) > 1
@@ -1356,7 +1727,11 @@ class BaseClient(BaseConnection, AdminAPI):
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (optional)
-            **kwargs: Additional parameters
+            **kwargs: Additional parameters, including:
+                embedding_function: EmbeddingFunction instance to convert query_texts in knn to vectors.
+                                   Required if knn.query_texts is provided and collection doesn't have
+                                   an embedding_function set. Must implement __call__ method that
+                                   accepts Documents and returns Embeddings (List[List[float]]).
             
         Returns:
             Search results dictionary containing ids, distances, metadatas, documents, embeddings, etc.
@@ -1368,7 +1743,7 @@ class BaseClient(BaseConnection, AdminAPI):
         table_name = f"c$v1${collection_name}"
         
         # Build search_parm JSON
-        search_parm = self._build_search_parm(query, knn, rank, n_results)
+        search_parm = self._build_search_parm(query, knn, rank, n_results, **kwargs)
         
         # Convert search_parm to JSON string
         search_parm_json = json.dumps(search_parm, ensure_ascii=False)
@@ -1420,7 +1795,8 @@ class BaseClient(BaseConnection, AdminAPI):
         query: Optional[Dict[str, Any]],
         knn: Optional[Dict[str, Any]],
         rank: Optional[Dict[str, Any]],
-        n_results: int
+        n_results: int,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Build search_parm JSON from query, knn, and rank parameters
@@ -1430,6 +1806,10 @@ class BaseClient(BaseConnection, AdminAPI):
             knn: Vector search configuration dict
             rank: Ranking configuration dict
             n_results: Final number of results to return
+            **kwargs: Additional parameters, including:
+                embedding_function: EmbeddingFunction instance to convert query_texts in knn to vectors.
+                                   Required if knn.query_texts is provided. Must implement __call__
+                                   method that accepts Documents and returns Embeddings (List[List[float]]).
             
         Returns:
             search_parm dictionary
@@ -1444,7 +1824,7 @@ class BaseClient(BaseConnection, AdminAPI):
         
         # Build knn part (vector search)
         if knn:
-            knn_expr = self._build_knn_expression(knn)
+            knn_expr = self._build_knn_expression(knn, **kwargs)
             if knn_expr:
                 search_parm["knn"] = knn_expr
         
@@ -1679,12 +2059,20 @@ class BaseClient(BaseConnection, AdminAPI):
         
         return result
     
-    def _build_knn_expression(self, knn: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _build_knn_expression(self, knn: Dict[str, Any], **kwargs) -> Optional[Dict[str, Any]]:
         """
         Build knn expression from knn dict
         
         Args:
-            knn: Vector search configuration dict
+            knn: Vector search configuration dict with:
+                - query_texts: Query text(s) to be embedded (optional if query_embeddings provided)
+                - query_embeddings: Query vector(s) (optional if query_texts provided)
+                - where: Metadata filter conditions (optional)
+                - n_results: Number of results for vector search (optional)
+            **kwargs: Additional parameters, including:
+                embedding_function: EmbeddingFunction instance to convert query_texts to vectors.
+                                   Required if query_texts is provided. Must implement __call__
+                                   method that accepts Documents and returns Embeddings (List[List[float]]).
             
         Returns:
             knn expression dict with optional filter
@@ -1694,28 +2082,50 @@ class BaseClient(BaseConnection, AdminAPI):
         where = knn.get("where")
         n_results = knn.get("n_results", 10)
         
+        # Handle vector generation logic:
+        # 1. If query_embeddings are provided, use them directly without embedding
+        # 2. If query_embeddings are not provided but query_texts are provided:
+        #    - If embedding_function is provided, use it to generate vectors from query_texts
+        #    - If embedding_function is not provided, raise an error
+        # 3. If neither query_embeddings nor query_texts are provided, raise an error
+        
+        embedding_function = kwargs.get('embedding_function')
+        
         # Get query vector
         query_vector = None
         if query_embeddings:
-            # Use provided embeddings
+            # Query embeddings provided, use them directly without embedding
             if isinstance(query_embeddings, list) and len(query_embeddings) > 0:
                 if isinstance(query_embeddings[0], list):
                     query_vector = query_embeddings[0]  # Use first vector
                 else:
                     query_vector = query_embeddings
         elif query_texts:
-            # Convert text to embedding
-            try:
-                texts = query_texts if isinstance(query_texts, list) else [query_texts]
-                embeddings = self._embed_texts(texts[0] if len(texts) > 0 else texts)
-                if embeddings and len(embeddings) > 0:
-                    query_vector = embeddings[0]
-            except NotImplementedError:
-                logger.warning("Text embedding not implemented. Please provide query_embeddings directly.")
-                return None
+            # Query embeddings not provided but query_texts are provided, check for embedding_function
+            if embedding_function is not None:
+                try:
+                    texts = query_texts if isinstance(query_texts, list) else [query_texts]
+                    embeddings = self._embed_texts(texts[0] if len(texts) > 0 else texts, embedding_function=embedding_function)
+                    if embeddings and len(embeddings) > 0:
+                        query_vector = embeddings[0]
+                except Exception as e:
+                    logger.error(f"Failed to generate embeddings from query_texts: {e}")
+                    raise ValueError(f"Failed to generate embeddings from query_texts: {e}")
+            else:
+                raise ValueError(
+                    "knn.query_texts provided but no knn.query_embeddings and no embedding_function. "
+                    "Either:\n"
+                    "  1. Provide knn.query_embeddings directly, or\n"
+                    "  2. Provide embedding_function to auto-generate vectors from knn.query_texts."
+                )
         else:
-            logger.warning("knn requires either query_texts or query_embeddings")
-            return None
+            # Neither query_embeddings nor query_texts provided, raise an error
+            raise ValueError(
+                "knn requires either query_embeddings or query_texts. "
+                "Please provide either:\n"
+                "  1. knn.query_embeddings directly, or\n"
+                "  2. knn.query_texts with embedding_function to generate vectors."
+            )
         
         if not query_vector:
             return None

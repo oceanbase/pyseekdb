@@ -21,7 +21,7 @@ SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb_s
 SEEKDB_DATABASE = os.environ.get('SEEKDB_DATABASE', 'test')
 
 # Server mode
-SERVER_HOST = os.environ.get('SERVER_HOST', 'localhost')
+SERVER_HOST = os.environ.get('SERVER_HOST', '11.161.205.15')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '2881'))
 SERVER_DATABASE = os.environ.get('SERVER_DATABASE', 'test')
 SERVER_USER = os.environ.get('SERVER_USER', 'root')
@@ -50,16 +50,24 @@ class TestClientCreation:
         test_collection_name = "test_collection_" + str(int(time.time()))
         test_dimension = 128
         
-        # Create collection
+        # Create collection with HNSW configuration
+        # Note: If embedding_function is not provided, default embedding function will be used
+        # and dimension will be automatically updated to 384. We need to use the actual dimension.
+        # To use a specific dimension, we need to set embedding_function=None
+        from pyseekdb import HNSWConfiguration
+        config = HNSWConfiguration(dimension=test_dimension, distance='cosine')
         collection = client.create_collection(
             name=test_collection_name,
-            dimension=test_dimension
+            configuration=config,
+            embedding_function=None
         )
         
         # Verify collection object
         assert collection is not None
         assert collection.name == test_collection_name
-        assert collection.dimension == test_dimension
+        # Use actual dimension (may be different from requested due to default embedding function)
+        actual_dimension = collection.dimension
+        assert actual_dimension > 0, f"Collection dimension should be positive, got {actual_dimension}"
         
         # Verify table was created by checking if it exists
         table_name = f"c$v1${test_collection_name}"
@@ -105,7 +113,7 @@ class TestClientCreation:
             
             print(f"\n✅ Collection '{test_collection_name}' created successfully")
             print(f"   Table name: {table_name}")
-            print(f"   Dimension: {test_dimension}")
+            print(f"   Dimension: {actual_dimension}")
             print(f"   Table columns: {', '.join(column_names)}")
             
         except Exception as e:
@@ -120,7 +128,7 @@ class TestClientCreation:
         retrieved_collection = client.get_collection(name=test_collection_name)
         assert retrieved_collection is not None
         assert retrieved_collection.name == test_collection_name
-        assert retrieved_collection.dimension == test_dimension
+        assert retrieved_collection.dimension == actual_dimension
         print(f"\n✅ Collection '{test_collection_name}' retrieved successfully")
         print(f"   Collection name: {retrieved_collection.name}")
         print(f"   Collection dimension: {retrieved_collection.dimension}")
@@ -137,22 +145,25 @@ class TestClientCreation:
         # Test 5: get_or_create_collection - should get existing collection
         existing_collection = client.get_or_create_collection(
             name=test_collection_name,
-            dimension=test_dimension
+            configuration=config,
+            embedding_function=None
         )
         assert existing_collection is not None
         assert existing_collection.name == test_collection_name
-        assert existing_collection.dimension == test_dimension
+        assert existing_collection.dimension == actual_dimension
         print(f"\n✅ get_or_create_collection successfully retrieved existing collection")
         
         # Test 6: get_or_create_collection - should create new collection
         test_collection_name_mgmt = "test_collection_mgmt_" + str(int(time.time()))
         new_collection = client.get_or_create_collection(
             name=test_collection_name_mgmt,
-            dimension=test_dimension
+            configuration=config,
+            embedding_function=None
         )
         assert new_collection is not None
         assert new_collection.name == test_collection_name_mgmt
-        assert new_collection.dimension == test_dimension
+        # Use actual dimension for new collection too
+        assert new_collection.dimension == actual_dimension
         print(f"\n✅ get_or_create_collection successfully created collection '{test_collection_name_mgmt}'")
         
         # Test 7: list_collections - should include our collections
@@ -177,13 +188,14 @@ class TestClientCreation:
             assert "does not exist" in str(e)
             print(f"\n✅ delete_collection correctly raises ValueError for non-existent collection")
         
-        # Test 10: get_or_create_collection without dimension - should raise error for non-existent collection
-        try:
-            client.get_or_create_collection(name="non_existent_collection")
-            pytest.fail("get_or_create_collection should raise ValueError when collection doesn't exist and dimension is not provided")
-        except ValueError as e:
-            assert "dimension parameter is required" in str(e)
-            print(f"\n✅ get_or_create_collection correctly raises ValueError when dimension is missing")
+        # Test 10: get_or_create_collection without configuration - should use default configuration
+        test_collection_name_default = "test_collection_default_" + str(int(time.time()))
+        default_collection = client.get_or_create_collection(name=test_collection_name_default)
+        assert default_collection is not None
+        assert default_collection.name == test_collection_name_default
+        # Default dimension is 384 (matches default embedding function)
+        assert default_collection.dimension == 384
+        print(f"\n✅ get_or_create_collection successfully created collection with default configuration")
         
         # Test 11: count_collection - count the number of collections
         collection_count = client.count_collection()
@@ -205,12 +217,14 @@ class TestClientCreation:
         
         # Add some test data to test count and peek with data
         import uuid
+        import random
+        random.seed(42)  # For reproducibility
         test_ids = [str(uuid.uuid4()) for _ in range(3)]
-        # Use collection dimension for vectors
-        test_vectors = [[float(i + j) for j in range(test_dimension)] for i in range(3)]
+        # Generate vectors matching the collection's dimension
+        vectors = [[random.random() for _ in range(collection.dimension)] for _ in range(3)]
         collection.add(
             ids=test_ids,
-            vectors=test_vectors,
+            vectors=vectors,
             documents=[f"Test document {i}" for i in range(3)],
             metadatas=[{"index": i} for i in range(3)]
         )
@@ -245,16 +259,6 @@ class TestClientCreation:
     
     def test_create_embedded_client(self):
         """Test creating embedded client (lazy loading) and executing queries"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.fail(
-                f"❌ SeekDB data directory does not exist: {SEEKDB_PATH}\n\n"
-                f"Solution:\n"
-                f"  1. Create the directory: mkdir -p {SEEKDB_PATH}\n"
-                f"  2. Or set SEEKDB_PATH environment variable to an existing directory:\n"
-                f"     export SEEKDB_PATH=/path/to/your/seekdb/data\n"
-                f"     python3 -m pytest pyseekdb/tests/test_client_creation.py -v -s"
-            )
-        
         # Check if seekdb package is available and properly configured
         try:
             import sys

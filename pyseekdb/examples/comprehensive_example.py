@@ -52,24 +52,29 @@ collection_name = "comprehensive_example"
 dimension = 128
 
 # 2.1 Create a collection
+from pyseekdb import HNSWConfiguration
+config = HNSWConfiguration(dimension=dimension, distance='cosine')
 collection = client.get_or_create_collection(
     name=collection_name,
-    dimension=dimension
+    configuration=config,
+    embedding_function=None  # Explicitly set to None since we're using custom 128-dim vectors
 )
 
 # 2.2 Check if collection exists
 exists = client.has_collection(collection_name)
 
 # 2.3 Get collection object
-retrieved_collection = client.get_collection(collection_name)
+retrieved_collection = client.get_collection(collection_name, embedding_function=None)
 
 # 2.4 List all collections
 all_collections = client.list_collections()
 
 # 2.5 Get or create collection (creates if doesn't exist)
+config2 = HNSWConfiguration(dimension=64, distance='cosine')
 collection2 = client.get_or_create_collection(
     name="another_collection",
-    dimension=64
+    configuration=config2,
+    embedding_function=None  # Explicitly set to None since we're using custom 64-dim vectors
 )
 
 # ============================================================================
@@ -145,6 +150,7 @@ collection.update(
 collection.update(
     ids=ids[1:3],
     documents=["Updated document 1", "Updated document 2"],
+    vectors=[[random.random() for _ in range(dimension)] for _ in range(2)],
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True}
@@ -384,9 +390,6 @@ collection.delete(
 count = collection.count()
 print(f"Collection count: {count} items")
 
-# 10.2 Get collection description
-info = collection.describe()
-print(f"Collection info: {info}")
 
 # 10.3 Preview first few items in collection
 preview = collection.peek(limit=5)

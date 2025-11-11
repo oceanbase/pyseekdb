@@ -17,17 +17,17 @@ import pyseekdb
 
 # ==================== Environment Variable Configuration ====================
 # Embedded mode
-SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb"))
+SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb_store"))
 
 # Server mode (SeekDB Server)
-SERVER_HOST = os.environ.get('SERVER_HOST', '127.0.0.1')
+SERVER_HOST = os.environ.get('SERVER_HOST', '11.161.205.15')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '2881'))  # SeekDB Server port
 SERVER_USER = os.environ.get('SERVER_USER', 'root')
 SERVER_PASSWORD = os.environ.get('SERVER_PASSWORD', '')
 
 # OceanBase mode
 OB_HOST = os.environ.get('OB_HOST', '127.0.0.1')
-OB_PORT = int(os.environ.get('OB_PORT', '11402'))
+OB_PORT = int(os.environ.get('OB_PORT', '11202'))
 OB_TENANT = os.environ.get('OB_TENANT', 'mysql')
 OB_USER = os.environ.get('OB_USER', 'root')
 OB_PASSWORD = os.environ.get('OB_PASSWORD', '')
@@ -38,16 +38,6 @@ class TestAdminDatabaseManagement:
     
     def test_embedded_admin_database_operations(self):
         """Test embedded admin client database management: create, get, list, delete"""
-        if not os.path.exists(SEEKDB_PATH):
-            pytest.fail(
-                f"❌ SeekDB data directory does not exist: {SEEKDB_PATH}\n\n"
-                f"Solution:\n"
-                f"  1. Create the directory: mkdir -p {SEEKDB_PATH}\n"
-                f"  2. Or set SEEKDB_PATH environment variable to an existing directory:\n"
-                f"     export SEEKDB_PATH=/path/to/your/seekdb/data\n"
-                f"     python3 -m pytest pyseekdb/tests/test_admin_database_management.py -v -s"
-            )
-        
         # Check if seekdb package is available and properly configured
         try:
             import sys

@@ -35,6 +35,13 @@ class SeekdbEmbeddedClient(BaseClient):
             autocommit: whether to auto-commit
         """
         self.path = os.path.abspath(path)
+        # Create directory if it doesn't exist
+        if not os.path.exists(self.path):
+            os.makedirs(self.path, exist_ok=True)
+            logger.info(f"Created directory: {self.path}")
+        elif not os.path.isdir(self.path):
+            raise ValueError(f"Path exists but is not a directory: {self.path}")
+        
         self.database = database
         self.autocommit = autocommit
         self._connection = None

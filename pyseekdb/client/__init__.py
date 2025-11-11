@@ -22,7 +22,18 @@ import logging
 from typing import Optional, Union
 
 from .base_connection import BaseConnection
-from .client_base import BaseClient, ClientAPI
+from .client_base import (
+    BaseClient, 
+    ClientAPI, 
+    HNSWConfiguration,
+    DEFAULT_VECTOR_DIMENSION,
+    DEFAULT_DISTANCE_METRIC
+)
+from .embedding_function import (
+    EmbeddingFunction,
+    DefaultEmbeddingFunction,
+    get_default_embedding_function
+)
 from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import SeekdbServerClient
 from .client_oceanbase_server import OceanBaseServerClient
@@ -35,6 +46,12 @@ __all__ = [
     'BaseConnection',
     'BaseClient',
     'ClientAPI',
+    'HNSWConfiguration',
+    'DEFAULT_VECTOR_DIMENSION',
+    'DEFAULT_DISTANCE_METRIC',
+    'EmbeddingFunction',
+    'DefaultEmbeddingFunction',
+    'get_default_embedding_function',
     'SeekdbEmbeddedClient',
     'SeekdbServerClient',
     'OceanBaseServerClient',
