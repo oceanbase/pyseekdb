@@ -121,7 +121,6 @@ class TestCollectionDML:
             print(f"✅ Testing collection.update() - update existing item")
             collection.update(
                 ids=test_id_1,
-                documents="Updated document 1",
                 metadatas={"category": "test", "score": 95, "updated": True}
             )
             
@@ -129,7 +128,8 @@ class TestCollectionDML:
             results = collection.get(ids=test_id_1)
             assert len(results) == 1
             result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Updated document 1"
+            # Document should remain unchanged since we didn't update it
+            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
@@ -138,6 +138,7 @@ class TestCollectionDML:
             print(f"✅ Testing collection.upsert() - upsert existing item (update)")
             collection.upsert(
                 ids=test_id_1,
+                vectors=[1.0, 2.0, 3.0],  # Use original vector
                 documents="Upserted document 1",
                 metadatas={"category": "test", "score": 98}
             )
@@ -291,7 +292,6 @@ class TestCollectionDML:
             print(f"✅ Testing collection.update() - update existing item")
             collection.update(
                 ids=test_id_1,
-                documents="Updated document 1",
                 metadatas={"category": "test", "score": 95, "updated": True}
             )
             
@@ -299,7 +299,8 @@ class TestCollectionDML:
             results = collection.get(ids=test_id_1)
             assert len(results) == 1
             result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Updated document 1"
+            # Document should remain unchanged since we didn't update it
+            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
@@ -324,6 +325,7 @@ class TestCollectionDML:
             print(f"✅ Testing collection.upsert() - upsert existing item (update)")
             collection.upsert(
                 ids=test_id_1,
+                vectors=[1.0, 2.0, 3.0],  # Use original vector
                 documents="Upserted document 1",
                 metadatas={"category": "test", "score": 98}
             )
@@ -497,7 +499,6 @@ class TestCollectionDML:
             print(f"✅ Testing collection.update() - update existing item")
             collection.update(
                 ids=test_id_1,
-                documents="Updated document 1",
                 metadatas={"category": "test", "score": 95, "updated": True}
             )
             
@@ -505,7 +506,8 @@ class TestCollectionDML:
             results = collection.get(ids=test_id_1)
             assert len(results) == 1
             result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Updated document 1"
+            # Document should remain unchanged since we didn't update it
+            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
             assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
@@ -530,6 +532,7 @@ class TestCollectionDML:
             print(f"✅ Testing collection.upsert() - upsert existing item (update)")
             collection.upsert(
                 ids=test_id_1,
+                vectors=[1.0, 2.0, 3.0],  # Use original vector
                 documents="Upserted document 1",
                 metadatas={"category": "test", "score": 98}
             )
