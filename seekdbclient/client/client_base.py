@@ -6,18 +6,51 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from typing import List, Optional, Sequence, Dict, Any, Union, TYPE_CHECKING, Tuple, Callable
+from dataclasses import dataclass
 
 from .base_connection import BaseConnection
 from .admin_client import AdminAPI, DEFAULT_TENANT
 from .meta_info import CollectionNames, CollectionFieldNames
 from .query_result import QueryResult
 from .filters import FilterBuilder
+from .embedding_function import (
+    EmbeddingFunction,
+    DefaultEmbeddingFunction,
+    get_default_embedding_function,
+    Documents as EmbeddingDocuments,
+    Embeddings as EmbeddingVectors
+)
 
 from .collection import Collection
 
 from .database import Database
 
 logger = logging.getLogger(__name__)
+
+# Default configuration constants
+# Note: Default embedding function (DefaultEmbeddingFunction) produces 384-dim vectors
+# So we use 384 as the default dimension to match
+DEFAULT_VECTOR_DIMENSION = 384  # Matches DefaultEmbeddingFunction dimension
+DEFAULT_DISTANCE_METRIC = 'cosine'
+
+
+@dataclass
+class HNSWConfiguration:
+    """
+    HNSW (Hierarchical Navigable Small World) index configuration
+    
+    Args:
+        dimension: Vector dimension (number of elements in each vector)
+        distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
+    """
+    dimension: int
+    distance: str = 'l2'
+    
+    def __post_init__(self):
+        if self.dimension <= 0:
+            raise ValueError(f"dimension must be positive, got {self.dimension}")
+        if self.distance not in ['l2', 'cosine', 'inner_product']:
+            raise ValueError(f"distance must be one of ['l2', 'cosine', 'inner_product'], got {self.distance}")
 
 class ClientAPI(ABC):
     """
@@ -29,7 +62,8 @@ class ClientAPI(ABC):
     def create_collection(
         self,
         name: str,
-        dimension: Optional[int] = None,
+        configuration: Optional[HNSWConfiguration] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> "Collection":
         """Create collection"""
@@ -78,7 +112,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def create_collection(
         self,
         name: str,
-        dimension: Optional[int] = None,
+        configuration: Optional[HNSWConfiguration] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> "Collection":
         """
@@ -86,14 +121,82 @@ class BaseClient(BaseConnection, AdminAPI):
         
         Args:
             name: Collection name
-            dimension: Vector dimension
-            **kwargs: Additional parameters
+            configuration: HNSW index configuration (HNSWConfiguration)
+                          If None, uses default configuration (dimension=384, distance='cosine')
+            embedding_function: Embedding function to convert documents to vectors.
+                               If None, uses DefaultEmbeddingFunction (sentence-transformers).
+                               If provided, the dimension in configuration should match the
+                               embedding function's output dimension.
+            **kwargs: Additional parameters 
             
         Returns:
             Collection object
+            
+        Examples:
+            # Using default configuration and default embedding function
+            >>> collection = client.create_collection('my_collection')
+            
+            # Using HNSW configuration with cosine distance
+            >>> config = HNSWConfiguration(dimension=768, distance='cosine')
+            >>> collection = client.create_collection('my_collection', configuration=config)
+            
+            # Using custom embedding function
+            >>> from seekdbclient import DefaultEmbeddingFunction
+            >>> ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
+            >>> # Note: DefaultEmbeddingFunction produces 384-dim vectors
+            >>> config = HNSWConfiguration(dimension=384, distance='cosine')
+            >>> collection = client.create_collection(
+            ...     'my_collection',
+            ...     configuration=config,
+            ...     embedding_function=ef
+            ... )
+            
+            # Note: If you want to disable automatic embedding, you can still
+            # provide vectors manually when calling collection.add()
         """
-        if dimension is None:
-            raise ValueError("dimension parameter is required for creating a collection")
+        # Use default configuration if not provided
+        if configuration is None:
+            configuration = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
+        
+        # Validate configuration type
+        if not isinstance(configuration, HNSWConfiguration):
+            raise TypeError(f"configuration must be HNSWConfiguration, got {type(configuration)}")
+        
+        # Handle embedding function
+        # If None, use default embedding function
+        if embedding_function is None:
+            embedding_function = get_default_embedding_function()
+            # If using default embedding function, check if dimension matches
+            # Default embedding function produces 384-dim vectors
+            default_ef_dimension = embedding_function.dimension
+            if configuration.dimension != default_ef_dimension:
+                logger.warning(
+                    f"Configuration dimension ({configuration.dimension}) doesn't match "
+                    f"default embedding function dimension ({default_ef_dimension}). "
+                    f"Updating configuration dimension to {default_ef_dimension}."
+                )
+                # Update configuration to match embedding function dimension
+                configuration = HNSWConfiguration(
+                    dimension=default_ef_dimension,
+                    distance=configuration.distance
+                )
+        else:
+            # Validate embedding function dimension matches configuration
+            if hasattr(embedding_function, 'dimension'):
+                ef_dimension = embedding_function.dimension
+                if configuration.dimension != ef_dimension:
+                    raise ValueError(
+                        f"Embedding function dimension ({ef_dimension}) doesn't match "
+                        f"configuration dimension ({configuration.dimension}). "
+                        f"Please update configuration to use dimension={ef_dimension}."
+                    )
+        
+        # Extract dimension and distance from configuration
+        dimension = configuration.dimension
+        distance = configuration.distance
+        
+        # HNSW is the only supported index type
+        index_type = 'hnsw'
         
         # Construct table name: c$v1${name}
         table_name = CollectionNames.table_name(name)
@@ -104,12 +207,15 @@ class BaseClient(BaseConnection, AdminAPI):
             document string,
             embedding vector({dimension}),
             metadata json,
-            FULLTEXT INDEX idx1(document),
-            VECTOR INDEX idx2 (embedding) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts(document),
+            VECTOR INDEX idx_vec (embedding) with(distance={distance}, type={index_type}, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         
         # Execute SQL to create table
         self.execute(sql)
+        
+        # Store embedding function in kwargs to pass to Collection
+        kwargs['embedding_function'] = embedding_function
         
         # Create and return Collection object
         return Collection(client=self, name=name, dimension=dimension, **kwargs)
@@ -277,7 +383,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def get_or_create_collection(
         self,
         name: str,
-        dimension: Optional[int] = None,
+        configuration: Optional[HNSWConfiguration] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> "Collection":
         """
@@ -285,27 +392,29 @@ class BaseClient(BaseConnection, AdminAPI):
         
         Args:
             name: Collection name
-            dimension: Vector dimension (required if creating new collection)
+            configuration: HNSW index configuration (HNSWConfiguration)
+                          If None, uses default configuration (dimension=384, distance='cosine')
+            embedding_function: Embedding function to convert documents to vectors.
+                               If None, uses DefaultEmbeddingFunction.
             **kwargs: Additional parameters for create_collection
             
         Returns:
             Collection object
-            
-        Raises:
-            ValueError: If collection doesn't exist and dimension is not provided
         """
         # First, try to get the collection
         if self.has_collection(name):
+            # Collection exists, return it
+            # Note: get_collection doesn't accept embedding_function parameter
+            # The embedding_function is stored in the collection metadata, not passed here
             return self.get_collection(name)
         
-        # Collection doesn't exist, create it
-        if dimension is None:
-            raise ValueError(
-                f"Collection '{name}' does not exist and dimension parameter is required "
-                f"for creating a new collection"
-            )
-        
-        return self.create_collection(name=name, dimension=dimension, **kwargs)
+        # Collection doesn't exist, create it with provided or default configuration
+        return self.create_collection(
+            name=name,
+            configuration=configuration,
+            embedding_function=embedding_function,
+            **kwargs
+        )
     
     # ==================== Collection Internal Operations (Called by Collection) ====================
     # These methods are called by Collection objects, different clients implement different logic
@@ -320,6 +429,7 @@ class BaseClient(BaseConnection, AdminAPI):
         vectors: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
+        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
         **kwargs
     ) -> None:
         """
@@ -332,6 +442,7 @@ class BaseClient(BaseConnection, AdminAPI):
             vectors: Single vector or list of vectors (optional)
             metadatas: Single metadata dict or list of metadata dicts (optional)
             documents: Single document or list of documents (optional)
+            embedding_function: Embedding function to use if documents provided but vectors not provided
             **kwargs: Additional parameters
         """
         logger.info(f"Adding data to collection '{collection_name}'")
@@ -346,6 +457,24 @@ class BaseClient(BaseConnection, AdminAPI):
         if vectors is not None:
             if isinstance(vectors, list) and len(vectors) > 0 and not isinstance(vectors[0], list):
                 vectors = [vectors]
+        
+        # Auto-generate vectors from documents if documents provided but vectors not provided
+        if documents and not vectors:
+            if embedding_function is not None:
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                try:
+                    vectors = embedding_function(documents)
+                    logger.info(f"✅ Successfully generated {len(vectors)} embeddings")
+                except Exception as e:
+                    logger.error(f"Failed to generate embeddings: {e}")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}")
+            else:
+                raise ValueError(
+                    "Documents provided but no vectors and no embedding function. "
+                    "Either:\n"
+                    "  1. Provide vectors directly when calling add(), or\n"
+                    "  2. Create collection with embedding_function to auto-generate vectors from documents."
+                )
         
         # Validate inputs
         if not documents and not vectors and not metadatas:

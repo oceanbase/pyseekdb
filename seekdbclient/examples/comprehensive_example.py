@@ -52,9 +52,11 @@ collection_name = "comprehensive_example"
 dimension = 128
 
 # 2.1 Create a collection
+from seekdbclient import HNSWConfiguration
+config = HNSWConfiguration(dimension=dimension, distance='cosine')
 collection = client.get_or_create_collection(
     name=collection_name,
-    dimension=dimension
+    configuration=config
 )
 
 # 2.2 Check if collection exists
@@ -67,9 +69,10 @@ retrieved_collection = client.get_collection(collection_name)
 all_collections = client.list_collections()
 
 # 2.5 Get or create collection (creates if doesn't exist)
+config2 = HNSWConfiguration(dimension=64, distance='cosine')
 collection2 = client.get_or_create_collection(
     name="another_collection",
-    dimension=64
+    configuration=config2
 )
 
 # ============================================================================
@@ -384,9 +387,6 @@ collection.delete(
 count = collection.count()
 print(f"Collection count: {count} items")
 
-# 10.2 Get collection description
-info = collection.describe()
-print(f"Collection info: {info}")
 
 # 10.3 Preview first few items in collection
 preview = collection.peek(limit=5)

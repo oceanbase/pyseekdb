@@ -23,7 +23,7 @@ SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb_s
 SEEKDB_DATABASE = os.environ.get('SEEKDB_DATABASE', 'test')
 
 # Server mode
-SERVER_HOST = os.environ.get('SERVER_HOST', 'localhost')
+SERVER_HOST = os.environ.get('SERVER_HOST', '11.161.205.15')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '2881'))
 SERVER_DATABASE = os.environ.get('SERVER_DATABASE', 'test')
 SERVER_USER = os.environ.get('SERVER_USER', 'root')
@@ -76,8 +76,8 @@ class TestCollectionDML:
             {CollectionFieldNames.DOCUMENT} string,
             {CollectionFieldNames.EMBEDDING} vector({dimension}),
             {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx1({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx2 ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
+            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         client._server.execute(create_table_sql)
         
@@ -246,8 +246,8 @@ class TestCollectionDML:
             {CollectionFieldNames.DOCUMENT} string,
             {CollectionFieldNames.EMBEDDING} vector({dimension}),
             {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx1({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx2 ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
+            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         client._server.execute(create_table_sql)
         
@@ -452,8 +452,8 @@ class TestCollectionDML:
             {CollectionFieldNames.DOCUMENT} string,
             {CollectionFieldNames.EMBEDDING} vector({dimension}),
             {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx1({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx2 ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
+            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
+            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=l2, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         client._server.execute(create_table_sql)
         

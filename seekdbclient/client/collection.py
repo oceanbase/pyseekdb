@@ -7,7 +7,11 @@ Design Pattern:
 3. Different clients can have completely different underlying implementations
 4. User-facing interface is completely consistent
 """
-from typing import Any, List, Dict, Optional, Union
+from typing import Any, List, Dict, Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .embedding_function import EmbeddingFunction, Documents as EmbeddingDocuments
+
 from .query_result import QueryResult
 
 
@@ -28,6 +32,7 @@ class Collection:
         name: str,
         collection_id: Optional[str] = None,
         dimension: Optional[int] = None,
+        embedding_function: Optional["EmbeddingFunction[EmbeddingDocuments]"] = None,
         **metadata
     ):
         """
@@ -38,12 +43,14 @@ class Collection:
             name: Collection name
             collection_id: Collection unique identifier (some databases may need this)
             dimension: Vector dimension
+            embedding_function: Embedding function to convert documents to vectors
             **metadata: Other metadata
         """
         self._client = client  # Core: hold reference to the client
         self._name = name
         self._id = collection_id
         self._dimension = dimension
+        self._embedding_function = embedding_function
         self._metadata = metadata
     
     # ==================== Properties ====================
@@ -73,6 +80,11 @@ class Collection:
         """Collection metadata"""
         return self._metadata
     
+    @property
+    def embedding_function(self) -> Optional["EmbeddingFunction[EmbeddingDocuments]"]:
+        """Embedding function for this collection"""
+        return self._embedding_function
+    
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
     
@@ -92,20 +104,28 @@ class Collection:
         
         Args:
             ids: Single ID or list of IDs
-            vectors: Single vector or list of vectors (optional if documents provided)
+            vectors: Single vector or list of vectors (optional if documents provided and embedding_function is set)
             metadatas: Single metadata dict or list of metadata dicts (optional)
             documents: Single document or list of documents (optional)
+                       If provided without vectors, embedding_function will be used to generate vectors
             **kwargs: Additional parameters
             
         Examples:
-            # Add single item
+            # Add single item with vectors
             collection.add(ids="1", vectors=[0.1, 0.2, 0.3], metadatas={"tag": "A"})
             
-            # Add multiple items
+            # Add multiple items with vectors
             collection.add(
                 ids=["1", "2", "3"],
                 vectors=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
                 metadatas=[{"tag": "A"}, {"tag": "B"}, {"tag": "C"}]
+            )
+            
+            # Add items with documents (vectors will be auto-generated if embedding_function is set)
+            collection.add(
+                ids=["1", "2"],
+                documents=["Hello world", "How are you?"],
+                metadatas=[{"tag": "A"}, {"tag": "B"}]
             )
         """
         return self._client._collection_add(
@@ -115,6 +135,7 @@ class Collection:
             vectors=vectors,
             metadatas=metadatas,
             documents=documents,
+            embedding_function=self._embedding_function,
             **kwargs
         )
     

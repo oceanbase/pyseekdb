@@ -19,7 +19,7 @@ import seekdbclient
 
 # Server mode (connecting to remote SeekDB server)
 client = seekdbclient.Client(
-    host="127.0.0.1",
+    host="11.161.205.15",
     port=2881,
     database="test",
     user="root",
@@ -45,13 +45,11 @@ client = seekdbclient.Client(
 # ==================== Step 2: Create a Collection ====================
 # A collection is like a table that stores documents with vector embeddings
 collection_name = "my_simple_collection"
-dimension = 128  # Vector dimension (must match your embedding model)
+# Create collection with default configuration (dimension=128, distance='cosine')
+collection = client.create_collection(name=collection_name)
 
-# Create collection
-collection = client.create_collection(
-    name=collection_name,
-    dimension=dimension
-)
+# Get the dimension from the collection (default is 128)
+dimension = collection.dimension
 
 # ==================== Step 3: Add Data to Collection ====================
 # Generate some sample data
@@ -70,7 +68,7 @@ random.seed(42)  # For reproducibility
 
 vectors = []
 for i in range(len(documents)):
-    # Generate a random vector of dimension 128
+    # Generate a random vector of the collection's dimension
     vector = [random.random() for _ in range(dimension)]
     vectors.append(vector)
 
