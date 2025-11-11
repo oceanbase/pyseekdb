@@ -150,6 +150,7 @@ collection.update(
 collection.update(
     ids=ids[1:3],
     documents=["Updated document 1", "Updated document 2"],
+    vectors=[[random.random() for _ in range(dimension)] for _ in range(2)],
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True}
