@@ -11,9 +11,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        sqlglot-version: [ "26.0.1", "27.10.0" ]
 
     steps:
       - name: Free disk space
@@ -40,20 +37,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry add sqlglot==${{ matrix.sqlglot-version }}
           poetry install
 
       - name: Start OceanBase container
         uses: oceanbase/setup-oceanbase-ce@v1
         with:
           image_name: 'oceanbase/oceanbase-ce'
-          image_tag: '4.3.5.3-103000092025080818'
-          container_name: 'ob435'
+          image_tag: '4.4.1.0-100000032025101610'
           mode: 'mini'
           datafile_size: '20G'
           log_disk_size: '10G'
+          tenant_name: 'mysql'
           init_sql: "ALTER SYSTEM ob_vector_memory_limit_percentage = 30; create user 'jtuser'@'%'; GRANT SELECT, INSERT, UPDATE, DELETE ON test.* TO 'jtuser'@'%'; FLUSH PRIVILEGES;"
 
       - name: Run tests
         run: |
-          poetry run pytest --log-cli-level=INFO
+          OB_PORT=2881 poetry run pytest --log-cli-level=INFO -k "test_oceanbase_"

@@ -13,8 +13,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import seekdbclient
-from seekdbclient.client.meta_info import CollectionNames, CollectionFieldNames
+import pyseekdb
+from pyseekdb.client.meta_info import CollectionNames, CollectionFieldNames
 
 
 # ==================== Environment Variable Configuration ====================
@@ -56,14 +56,14 @@ class TestCollectionDML:
             pytest.skip("SeekDB embedded package is not installed")
         
         # Create embedded client
-        client = seekdbclient.Client(
+        client = pyseekdb.Client(
             path=SEEKDB_PATH,
             database=SEEKDB_DATABASE
         )
         
         assert client is not None
         assert hasattr(client, '_server')
-        assert isinstance(client._server, seekdbclient.SeekdbEmbeddedClient)
+        assert isinstance(client._server, pyseekdb.SeekdbEmbeddedClient)
         
         # Create test collection using execute
         collection_name = f"test_dml_{int(time.time())}"
@@ -216,7 +216,7 @@ class TestCollectionDML:
     def test_server_collection_dml(self):
         """Test collection DML operations with server client"""
         # Create server client
-        client = seekdbclient.Client(
+        client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
             database=SERVER_DATABASE,
@@ -226,7 +226,7 @@ class TestCollectionDML:
         
         assert client is not None
         assert hasattr(client, '_server')
-        assert isinstance(client._server, seekdbclient.SeekdbServerClient)
+        assert isinstance(client._server, pyseekdb.SeekdbServerClient)
         
         # Test connection
         try:
@@ -421,7 +421,7 @@ class TestCollectionDML:
     def test_oceanbase_collection_dml(self):
         """Test collection DML operations with OceanBase client"""
         # Create OceanBase client
-        client = seekdbclient.OBClient(
+        client = pyseekdb.OBClient(
             host=OB_HOST,
             port=OB_PORT,
             tenant=OB_TENANT,
@@ -432,7 +432,7 @@ class TestCollectionDML:
         
         assert client is not None
         assert hasattr(client, '_server')
-        assert isinstance(client._server, seekdbclient.OceanBaseServerClient)
+        assert isinstance(client._server, pyseekdb.OceanBaseServerClient)
         
         # Test connection
         try:

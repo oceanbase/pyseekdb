@@ -12,7 +12,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import seekdbclient
+import pyseekdb
 
 
 # ==================== Environment Variable Configuration ====================
@@ -252,7 +252,7 @@ class TestClientCreation:
                 f"  1. Create the directory: mkdir -p {SEEKDB_PATH}\n"
                 f"  2. Or set SEEKDB_PATH environment variable to an existing directory:\n"
                 f"     export SEEKDB_PATH=/path/to/your/seekdb/data\n"
-                f"     python3 -m pytest seekdbclient/tests/test_client_creation.py -v -s"
+                f"     python3 -m pytest pyseekdb/tests/test_client_creation.py -v -s"
             )
         
         # Check if seekdb package is available and properly configured
@@ -284,7 +284,7 @@ class TestClientCreation:
                 sys.path.insert(0, project_root_str)
         
         # Create client (returns _ClientProxy)
-        client = seekdbclient.Client(
+        client = pyseekdb.Client(
             path=SEEKDB_PATH,
             database=SEEKDB_DATABASE
         )
@@ -293,7 +293,7 @@ class TestClientCreation:
         assert client is not None
         # Client now returns a proxy
         assert hasattr(client, '_server')
-        assert isinstance(client._server, seekdbclient.SeekdbEmbeddedClient)
+        assert isinstance(client._server, pyseekdb.SeekdbEmbeddedClient)
         assert client._server.mode == "SeekdbEmbeddedClient"
         assert client._server.database == SEEKDB_DATABASE
         
@@ -319,7 +319,7 @@ class TestClientCreation:
     def test_create_server_client(self):
         """Test creating server client (lazy loading) and executing queries"""
         # Create client (returns _ClientProxy)
-        client = seekdbclient.Client(
+        client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
             database=SERVER_DATABASE,
@@ -330,7 +330,7 @@ class TestClientCreation:
         # Verify client type and properties
         assert client is not None
         assert hasattr(client, '_server')
-        assert isinstance(client._server, seekdbclient.SeekdbServerClient)
+        assert isinstance(client._server, pyseekdb.SeekdbServerClient)
         assert client._server.mode == "SeekdbServerClient"
         assert client._server.host == SERVER_HOST
         assert client._server.port == SERVER_PORT
@@ -365,7 +365,7 @@ class TestClientCreation:
     def test_create_oceanbase_client(self):
         """Test creating OceanBase client (lazy loading) and executing queries"""
         # Create client (returns _ClientProxy)
-        client = seekdbclient.OBClient(
+        client = pyseekdb.OBClient(
             host=OB_HOST,
             port=OB_PORT,
             tenant=OB_TENANT,
@@ -377,7 +377,7 @@ class TestClientCreation:
         # Verify client type and properties
         assert client is not None
         assert hasattr(client, '_server')
-        assert isinstance(client._server, seekdbclient.OceanBaseServerClient)
+        assert isinstance(client._server, pyseekdb.OceanBaseServerClient)
         assert client._server.mode == "OceanBaseServerClient"
         assert client._server.host == OB_HOST
         assert client._server.port == OB_PORT

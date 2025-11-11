@@ -13,20 +13,20 @@ This is a complete reference for all client capabilities.
 """
 import uuid
 import random
-import seekdbclient
+import pyseekdb
 
 # ============================================================================
 # PART 1: CLIENT CONNECTION
 # ============================================================================
 
 # Option 1: Embedded mode (local SeekDB)
-# client = seekdbclient.Client(
+# client = pyseekdb.Client(
 #     path="./seekdb",
 #     database="test"
 # )
 
 # Option 2: Server mode (remote SeekDB server)
-client = seekdbclient.Client(
+client = pyseekdb.Client(
     host="127.0.0.1",
     port=2881,
     database="test",
@@ -35,7 +35,7 @@ client = seekdbclient.Client(
 )
 
 # Option 3: OceanBase mode
-# ob_client = seekdbclient.OBClient(
+# ob_client = pyseekdb.OBClient(
 #     host="127.0.0.1",
 #     port=11402,
 #     tenant="mysql",

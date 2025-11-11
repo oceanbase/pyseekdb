@@ -12,7 +12,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import seekdbclient
+import pyseekdb
 
 
 # ==================== Environment Variable Configuration ====================
@@ -45,7 +45,7 @@ class TestAdminDatabaseManagement:
                 f"  1. Create the directory: mkdir -p {SEEKDB_PATH}\n"
                 f"  2. Or set SEEKDB_PATH environment variable to an existing directory:\n"
                 f"     export SEEKDB_PATH=/path/to/your/seekdb/data\n"
-                f"     python3 -m pytest seekdbclient/tests/test_admin_database_management.py -v -s"
+                f"     python3 -m pytest pyseekdb/tests/test_admin_database_management.py -v -s"
             )
         
         # Check if seekdb package is available and properly configured
@@ -77,14 +77,14 @@ class TestAdminDatabaseManagement:
                 sys.path.insert(0, project_root_str)
         
         # Create admin client (returns _AdminClientProxy)
-        admin = seekdbclient.AdminClient(
+        admin = pyseekdb.AdminClient(
             path=SEEKDB_PATH
         )
         
         # Verify admin client type
         assert admin is not None
         assert hasattr(admin, '_server')
-        assert isinstance(admin._server, seekdbclient.SeekdbEmbeddedClient)
+        assert isinstance(admin._server, pyseekdb.SeekdbEmbeddedClient)
         
         # Test database operations
         test_db_name = "test_embedded_db"
@@ -146,7 +146,7 @@ class TestAdminDatabaseManagement:
     def test_server_admin_database_operations(self):
         """Test server admin client database management: create, get, list, delete"""
         # Create admin client (returns _AdminClientProxy)
-        admin = seekdbclient.AdminClient(
+        admin = pyseekdb.AdminClient(
             host=SERVER_HOST,
             port=SERVER_PORT,
             user=SERVER_USER,
@@ -156,7 +156,7 @@ class TestAdminDatabaseManagement:
         # Verify admin client type
         assert admin is not None
         assert hasattr(admin, '_server')
-        assert isinstance(admin._server, seekdbclient.SeekdbServerClient)
+        assert isinstance(admin._server, pyseekdb.SeekdbServerClient)
         
         # Test database operations
         test_db_name = "test_server_db"
@@ -218,7 +218,7 @@ class TestAdminDatabaseManagement:
     def test_oceanbase_admin_database_operations(self):
         """Test OceanBase admin client database management: create, get, list, delete"""
         # Create admin client (returns _AdminClientProxy)
-        admin = seekdbclient.OBAdminClient(
+        admin = pyseekdb.OBAdminClient(
             host=OB_HOST,
             port=OB_PORT,
             tenant=OB_TENANT,
@@ -229,7 +229,7 @@ class TestAdminDatabaseManagement:
         # Verify admin client type
         assert admin is not None
         assert hasattr(admin, '_server')
-        assert isinstance(admin._server, seekdbclient.OceanBaseServerClient)
+        assert isinstance(admin._server, pyseekdb.OceanBaseServerClient)
         assert admin._server.tenant == OB_TENANT
         
         # Test database operations

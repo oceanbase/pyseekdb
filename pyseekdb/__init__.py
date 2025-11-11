@@ -9,13 +9,13 @@ Supports three modes:
 3. OceanBase mode - connecting to OceanBase via pymysql
 
 Examples:
-    >>> import seekdbclient
+    >>> import pyseekdb
 
     >>> # Embedded mode - Collection management
-    >>> client = seekdbclient.Client(path="./seekdb", database="test")
+    >>> client = pyseekdb.Client(path="./seekdb", database="test")
 
     >>> # Server mode - Collection management
-    >>> client = seekdbclient.Client(
+    >>> client = pyseekdb.Client(
     ...     host='localhost',
     ...     port=2881,
     ...     database="test",
@@ -24,7 +24,7 @@ Examples:
     ... )
 
     >>> # OceanBase mode - Collection management
-    >>> ob_client = seekdbclient.OBClient(
+    >>> ob_client = pyseekdb.OBClient(
     ...     host='localhost',
     ...     port=2881,
     ...     tenant="test",
@@ -34,7 +34,7 @@ Examples:
     ... )
 
     >>> # Admin client - Database management
-    >>> admin = seekdbclient.AdminClient(path="./seekdb")
+    >>> admin = pyseekdb.AdminClient(path="./seekdb")
     >>> admin.create_database("new_db")
     >>> databases = admin.list_databases()
 """
@@ -59,7 +59,7 @@ from .client.collection import Collection
 from .client.query_result import QueryResult
 
 try:
-  __version__ = importlib.metadata.version("seekdbclient")
+  __version__ = importlib.metadata.version("pyseekdb")
 except importlib.metadata.PackageNotFoundError:
   __version__ = "0.0.1.dev1"
 

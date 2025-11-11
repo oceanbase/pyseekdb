@@ -16,7 +16,7 @@ SeekDBClient is a unified Python client that wraps three database connection mod
 
 ```bash
 # install from pypi
-pip install seekdbclient
+pip install pyseekdb
 # install from source code
 poetry install
 ```
@@ -30,10 +30,10 @@ The `Client` class provides a unified interface for connecting to SeekDB in diff
 Connect to a local embedded SeekDB instance:
 
 ```python
-import seekdbclient
+import pyseekdb
 
 # Create embedded client
-client = seekdbclient.Client(
+client = pyseekdb.Client(
     path="./seekdb",      # Path to SeekDB data directory
     database="demo"        # Database name
 )
@@ -48,10 +48,10 @@ print(rows)
 Connect to a remote SeekDB server:
 
 ```python
-import seekdbclient
+import pyseekdb
 
 # Create server client
-client = seekdbclient.Client(
+client = pyseekdb.Client(
     host="127.0.0.1",      # Server host
     port=2881,              # Server port (default: 2881)
     database="demo",        # Database name
@@ -65,10 +65,10 @@ client = seekdbclient.Client(
 Connect to OceanBase database:
 
 ```python
-import seekdbclient
+import pyseekdb
 
 # Create OceanBase client
-client = seekdbclient.OBClient(
+client = pyseekdb.OBClient(
     host="127.0.0.1",       # Server host
     port=11402,             # OceanBase port
     tenant="mysql",         # Tenant name
@@ -103,13 +103,13 @@ The `AdminClient` class provides database management operations. It uses the sam
 ### 2.1 Embedded/Server AdminClient
 
 ```python
-import seekdbclient
+import pyseekdb
 
 # Embedded mode - Database management
-admin = seekdbclient.AdminClient(path="./seekdb")
+admin = pyseekdb.AdminClient(path="./seekdb")
 
 # Server mode - Database management
-admin = seekdbclient.AdminClient(
+admin = pyseekdb.AdminClient(
     host="127.0.0.1",
     port=2881,
     user="root",
@@ -117,7 +117,7 @@ admin = seekdbclient.AdminClient(
 )
 
 # Use context manager
-with seekdbclient.AdminClient(host="127.0.0.1", port=2881, user="root") as admin:
+with pyseekdb.AdminClient(host="127.0.0.1", port=2881, user="root") as admin:
     # Create database
     admin.create_database("my_database")
     
@@ -137,10 +137,10 @@ with seekdbclient.AdminClient(host="127.0.0.1", port=2881, user="root") as admin
 ### 2.2 OceanBase AdminClient
 
 ```python
-import seekdbclient
+import pyseekdb
 
 # OceanBase mode - Database management (multi-tenant)
-admin = seekdbclient.OBAdminClient(
+admin = pyseekdb.OBAdminClient(
     host="127.0.0.1",
     port=11402,
     tenant="mysql",        # Tenant name
@@ -149,7 +149,7 @@ admin = seekdbclient.OBAdminClient(
 )
 
 # Use context manager
-with seekdbclient.OBAdminClient(
+with pyseekdb.OBAdminClient(
     host="127.0.0.1",
     port=11402,
     tenant="mysql",
@@ -206,10 +206,10 @@ Collections are the primary data structures in SeekDBClient, similar to tables i
 ### 3.1 Creating a Collection
 
 ```python
-import seekdbclient
+import pyseekdb
 
 # Create a client
-client = seekdbclient.Client(host="127.0.0.1", port=2881, database="test")
+client = pyseekdb.Client(host="127.0.0.1", port=2881, database="test")
 
 # Create a collection with vector dimension
 collection = client.create_collection(
@@ -784,16 +784,16 @@ print(f"Database has {collection_count} collections")
 
 ```bash
 # Run all tests
-python3 -m pytest seekdbclient/tests/ -v
+python3 -m pytest pyseekdb/tests/ -v
 
 # Run tests with log output
-python3 -m pytest seekdbclient/tests/ -v -s
+python3 -m pytest pyseekdb/tests/ -v -s
 
 # Run specific test
-python3 -m pytest seekdbclient/tests/test_client_creation.py::TestClientCreation::test_create_server_client -v
+python3 -m pytest pyseekdb/tests/test_client_creation.py::TestClientCreation::test_create_server_client -v
 
 # Run specific test file
-python3 -m pytest seekdbclient/tests/test_client_creation.py -v
+python3 -m pytest pyseekdb/tests/test_client_creation.py -v
 ```
 
 ### Environment Variables (Optional)
