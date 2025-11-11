@@ -17,7 +17,7 @@ import seekdbclient
 
 # ==================== Environment Variable Configuration ====================
 # Embedded mode
-SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb"))
+SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb_store"))
 
 # Server mode (SeekDB Server)
 SERVER_HOST = os.environ.get('SERVER_HOST', '11.161.205.15')
@@ -27,7 +27,7 @@ SERVER_PASSWORD = os.environ.get('SERVER_PASSWORD', '')
 
 # OceanBase mode
 OB_HOST = os.environ.get('OB_HOST', '127.0.0.1')
-OB_PORT = int(os.environ.get('OB_PORT', '11402'))
+OB_PORT = int(os.environ.get('OB_PORT', '11202'))
 OB_TENANT = os.environ.get('OB_TENANT', 'mysql')
 OB_USER = os.environ.get('OB_USER', 'root')
 OB_PASSWORD = os.environ.get('OB_PASSWORD', '')

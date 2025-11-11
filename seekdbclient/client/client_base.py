@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 DEFAULT_VECTOR_DIMENSION = 384  # Matches DefaultEmbeddingFunction dimension
 DEFAULT_DISTANCE_METRIC = 'cosine'
 
+# Sentinel object to distinguish between "parameter not provided" and "explicitly set to None"
+class _NotProvided:
+    """Sentinel object to indicate a parameter was not provided"""
+    pass
+
+_NOT_PROVIDED = _NotProvided()
+
+# Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
+EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
+
 
 @dataclass
 class HNSWConfiguration:
@@ -52,6 +62,9 @@ class HNSWConfiguration:
         if self.distance not in ['l2', 'cosine', 'inner_product']:
             raise ValueError(f"distance must be one of ['l2', 'cosine', 'inner_product'], got {self.distance}")
 
+# Type alias for configuration parameter that can be HNSWConfiguration, None, or sentinel
+ConfigurationParam = Union[HNSWConfiguration, None, Any]
+
 class ClientAPI(ABC):
     """
     Client API interface for collection operations only.
@@ -62,8 +75,8 @@ class ClientAPI(ABC):
     def create_collection(
         self,
         name: str,
-        configuration: Optional[HNSWConfiguration] = None,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs
     ) -> "Collection":
         """
@@ -73,7 +86,8 @@ class ClientAPI(ABC):
             name: Collection name
             configuration: HNSW index configuration (HNSWConfiguration)
             embedding_function: Embedding function to convert documents to vectors.
-                               If None, uses DefaultEmbeddingFunction (sentence-transformers).
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
                                If provided, the dimension in configuration should match the
                                embedding function's output dimension.
             **kwargs: Additional parameters
@@ -84,7 +98,7 @@ class ClientAPI(ABC):
     def get_collection(
         self,
         name: str,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
     ) -> "Collection":
         """
         Get collection object
@@ -92,7 +106,8 @@ class ClientAPI(ABC):
         Args:
             name: Collection name
             embedding_function: Embedding function to convert documents to vectors.
-                               If None, collection will not have an embedding function.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
         """
         pass
     
@@ -134,8 +149,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def create_collection(
         self,
         name: str,
-        configuration: Optional[HNSWConfiguration] = None,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs
     ) -> "Collection":
         """
@@ -144,77 +159,118 @@ class BaseClient(BaseConnection, AdminAPI):
         Args:
             name: Collection name
             configuration: HNSW index configuration (HNSWConfiguration)
-                          If None, uses default configuration (dimension=384, distance='cosine')
+                          If not provided, uses default configuration (dimension=384, distance='cosine').
+                          If explicitly set to None, will try to calculate dimension from embedding_function.
+                          If embedding_function is also None, will raise an error.
             embedding_function: Embedding function to convert documents to vectors.
-                               If None, uses DefaultEmbeddingFunction (sentence-transformers).
-                               If provided, the dimension in configuration should match the
-                               embedding function's output dimension.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
+                               If provided, the actual dimension will be calculated by calling
+                               embedding_function.__call__("seekdb"), and this dimension will be used
+                               to create the table. If configuration.dimension is set and doesn't match
+                               the calculated dimension, a ValueError will be raised.
             **kwargs: Additional parameters 
             
         Returns:
             Collection object
             
+        Raises:
+            ValueError: If configuration is explicitly set to None and embedding_function is also None
+                       (cannot determine dimension), or if embedding_function is provided and
+                       configuration.dimension doesn't match the calculated dimension from embedding_function
+            
         Examples:
             # Using default configuration and default embedding function
             >>> collection = client.create_collection('my_collection')
             
-            # Using HNSW configuration with cosine distance
-            >>> config = HNSWConfiguration(dimension=768, distance='cosine')
-            >>> collection = client.create_collection('my_collection', configuration=config)
-            
-            # Using custom embedding function
+            # Using custom embedding function (dimension will be calculated automatically)
             >>> from seekdbclient import DefaultEmbeddingFunction
             >>> ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
-            >>> # Note: DefaultEmbeddingFunction produces 384-dim vectors
-            >>> config = HNSWConfiguration(dimension=384, distance='cosine')
+            >>> config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
             >>> collection = client.create_collection(
             ...     'my_collection',
             ...     configuration=config,
             ...     embedding_function=ef
             ... )
             
-            # Note: If you want to disable automatic embedding, you can still
-            # provide vectors manually when calling collection.add()
+            # Explicitly set configuration=None, use embedding function to determine dimension
+            >>> collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
+            
+            # Explicitly disable embedding function (use configuration dimension)
+            >>> config = HNSWConfiguration(dimension=128, distance='cosine')
+            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
         """
-        # Use default configuration if not provided
-        if configuration is None:
-            configuration = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
+        # Handle embedding function first
+        # If not provided (sentinel), use default embedding function
+        if embedding_function is _NOT_PROVIDED:
+            embedding_function = get_default_embedding_function()
+        
+        # Calculate actual dimension from embedding function if provided
+        actual_dimension = None
+        if embedding_function is not None:
+            try:
+                # Call embedding function with "seekdb" to get actual dimension
+                test_embeddings = embedding_function.__call__("seekdb")
+                if test_embeddings and len(test_embeddings) > 0:
+                    actual_dimension = len(test_embeddings[0])
+                    logger.info(f"Calculated embedding function dimension: {actual_dimension}")
+                else:
+                    raise ValueError("Embedding function returned empty result when called with 'seekdb'")
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to calculate dimension from embedding function: {e}. "
+                    f"Please ensure the embedding function can be called with a string input."
+                ) from e
+        
+        # Handle configuration
+        # If not provided (sentinel), use default configuration
+        if configuration is _NOT_PROVIDED:
+            # Use default configuration, but if embedding_function is provided, use its dimension
+            if actual_dimension is not None:
+                configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+            else:
+                configuration = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
+        elif configuration is None:
+            # Configuration is explicitly set to None
+            # Try to calculate dimension from embedding_function
+            if embedding_function is None:
+                raise ValueError(
+                    "Cannot create collection: configuration is explicitly set to None and "
+                    "embedding_function is also None. Cannot determine dimension without either a configuration "
+                    "or an embedding function. Please either:\n"
+                    "  1. Provide a configuration with dimension specified (e.g., HNSWConfiguration(dimension=128, distance='cosine')), or\n"
+                    "  2. Provide an embedding_function to calculate dimension automatically, or\n"
+                    "  3. Do not set configuration=None (use default configuration)."
+                )
+            
+            # Use calculated dimension from embedding function and default distance metric
+            if actual_dimension is not None:
+                configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+            else:
+                raise ValueError(
+                    "Failed to calculate dimension from embedding function. "
+                    "Please ensure the embedding function can be called with a string input."
+                )
         
         # Validate configuration type
         if not isinstance(configuration, HNSWConfiguration):
             raise TypeError(f"configuration must be HNSWConfiguration, got {type(configuration)}")
         
-        # Handle embedding function
-        # If None, use default embedding function
-        if embedding_function is None:
-            embedding_function = get_default_embedding_function()
-            # If using default embedding function, check if dimension matches
-            # Default embedding function produces 384-dim vectors
-            default_ef_dimension = embedding_function.dimension
-            if configuration.dimension != default_ef_dimension:
-                logger.warning(
+        # If embedding_function is provided, validate configuration dimension matches
+        if embedding_function is not None and actual_dimension is not None:
+            if configuration.dimension != actual_dimension:
+                raise ValueError(
                     f"Configuration dimension ({configuration.dimension}) doesn't match "
-                    f"default embedding function dimension ({default_ef_dimension}). "
-                    f"Updating configuration dimension to {default_ef_dimension}."
+                    f"embedding function dimension ({actual_dimension}). "
+                    f"Please update configuration to use dimension={actual_dimension} or remove dimension from configuration."
                 )
-                # Update configuration to match embedding function dimension
-                configuration = HNSWConfiguration(
-                    dimension=default_ef_dimension,
-                    distance=configuration.distance
-                )
+            # Use actual dimension from embedding function
+            dimension = actual_dimension
         else:
-            # Validate embedding function dimension matches configuration
-            if hasattr(embedding_function, 'dimension'):
-                ef_dimension = embedding_function.dimension
-                if configuration.dimension != ef_dimension:
-                    raise ValueError(
-                        f"Embedding function dimension ({ef_dimension}) doesn't match "
-                        f"configuration dimension ({configuration.dimension}). "
-                        f"Please update configuration to use dimension={ef_dimension}."
-                    )
+            # No embedding function, use configuration dimension
+            dimension = configuration.dimension
         
-        # Extract dimension and distance from configuration
-        dimension = configuration.dimension
+        # Extract distance from configuration
         distance = configuration.distance
         
         # HNSW is the only supported index type
@@ -245,7 +301,7 @@ class BaseClient(BaseConnection, AdminAPI):
     def get_collection(
         self,
         name: str,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
     ) -> "Collection":
         """
         Get a collection object (user-facing API)
@@ -253,7 +309,8 @@ class BaseClient(BaseConnection, AdminAPI):
         Args:
             name: Collection name
             embedding_function: Embedding function to convert documents to vectors.
-                               If None, collection will not have an embedding function.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
             
         Returns:
             Collection object
@@ -295,6 +352,11 @@ class BaseClient(BaseConnection, AdminAPI):
                 if match:
                     dimension = int(match.group(1))
                 break
+        
+        # Handle embedding function
+        # If not provided (sentinel), use default embedding function
+        if embedding_function is _NOT_PROVIDED:
+            embedding_function = get_default_embedding_function()
         
         # Create and return Collection object
         return Collection(client=self, name=name, dimension=dimension, embedding_function=embedding_function)
@@ -411,8 +473,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def get_or_create_collection(
         self,
         name: str,
-        configuration: Optional[HNSWConfiguration] = None,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs
     ) -> "Collection":
         """
@@ -421,18 +483,30 @@ class BaseClient(BaseConnection, AdminAPI):
         Args:
             name: Collection name
             configuration: HNSW index configuration (HNSWConfiguration)
-                          If None, uses default configuration (dimension=384, distance='cosine')
+                          If not provided, uses default configuration (dimension=384, distance='cosine').
+                          If explicitly set to None, will try to calculate dimension from embedding_function.
+                          If embedding_function is also None, will raise an error.
             embedding_function: Embedding function to convert documents to vectors.
-                               If None, uses DefaultEmbeddingFunction.
+                               Defaults to DefaultEmbeddingFunction.
+                               If explicitly set to None, collection will not have an embedding function.
+                               If provided when creating a new collection, the actual dimension will be
+                               calculated by calling embedding_function.__call__("seekdb"), and this
+                               dimension will be used to create the table. If configuration.dimension is
+                               set and doesn't match the calculated dimension, a ValueError will be raised.
             **kwargs: Additional parameters for create_collection
             
         Returns:
             Collection object
+            
+        Raises:
+            ValueError: If creating a new collection and configuration is explicitly set to None and
+                       embedding_function is also None (cannot determine dimension), or if embedding_function
+                       is provided and configuration.dimension doesn't match the calculated dimension
         """
         # First, try to get the collection
         if self.has_collection(name):
             # Collection exists, return it
-            # Pass embedding_function if provided, otherwise use None
+            # Pass embedding_function (could be _NOT_PROVIDED, None, or an EmbeddingFunction instance)
             return self.get_collection(name, embedding_function=embedding_function)
         
         # Collection doesn't exist, create it with provided or default configuration

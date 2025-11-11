@@ -82,7 +82,7 @@ class TestCollectionDML:
         client._server.execute(create_table_sql)
         
         # Get collection object
-        collection = client.get_collection(name=collection_name)
+        collection = client.get_collection(name=collection_name, embedding_function=None)
         
         try:
             # Test 1: collection.add - Add single item
@@ -252,7 +252,7 @@ class TestCollectionDML:
         client._server.execute(create_table_sql)
         
         # Get collection object
-        collection = client.get_collection(name=collection_name)
+        collection = client.get_collection(name=collection_name, embedding_function=None)
         
         try:
             # Test 1: collection.add - Add single item
@@ -458,7 +458,7 @@ class TestCollectionDML:
         client._server.execute(create_table_sql)
         
         # Get collection object
-        collection = client.get_collection(name=collection_name)
+        collection = client.get_collection(name=collection_name, embedding_function=None)
         
         try:
             # Test 1: collection.add - Add single item
