@@ -17,12 +17,12 @@ from pyseekdb import DefaultEmbeddingFunction
 # You can use embedded mode, server mode, or OceanBase mode
 # For this example, we'll use server mode (you can change to embedded or OceanBase)
 
-# Alternative: Embedded mode (local SeekDB)
+# Embedded mode (local SeekDB)
 client = pyseekdb.Client(
-    path="./seekdb",
+    path="./seekdb.db",
     database="test"
 )
-# Server mode (connecting to remote SeekDB server)
+# Alternative: Server mode (connecting to remote SeekDB server)
 # client = pyseekdb.Client(
 #     host="127.0.0.1",
 #     port=2881,

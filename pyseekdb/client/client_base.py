@@ -1639,7 +1639,7 @@ class BaseClient(BaseConnection, AdminAPI):
         
         if "embeddings" in include_fields:
             result["embeddings"] = all_embeddings
-        
+
         logger.info(f"✅ Query completed for '{collection_name}' with {len(query_embeddings)} vectors, returning {len(all_ids)} result lists")
         return result
     
