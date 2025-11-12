@@ -43,7 +43,7 @@ class Collection:
             name: Collection name
             collection_id: Collection unique identifier (some databases may need this)
             dimension: Vector dimension
-            embedding_function: Embedding function to convert documents to vectors
+            embedding_function: Embedding function to convert documents to embeddings
             **metadata: Other metadata
         """
         self._client = client  # Core: hold reference to the client
@@ -94,7 +94,7 @@ class Collection:
     def add(
         self,
         ids: Union[str, List[str]],
-        vectors: Optional[Union[List[float], List[List[float]]]] = None,
+        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
         **kwargs
@@ -104,24 +104,24 @@ class Collection:
         
         Args:
             ids: Single ID or list of IDs
-            vectors: Single vector or list of vectors (optional if documents provided and embedding_function is set)
+            embeddings: Single vector or list of embeddings (optional if documents provided and embedding_function is set)
             metadatas: Single metadata dict or list of metadata dicts (optional)
             documents: Single document or list of documents (optional)
-                       If provided without vectors, embedding_function will be used to generate vectors
+                       If provided without embeddings, embedding_function will be used to generate embeddings
             **kwargs: Additional parameters
             
         Examples:
-            # Add single item with vectors
-            collection.add(ids="1", vectors=[0.1, 0.2, 0.3], metadatas={"tag": "A"})
+            # Add single item with embeddings
+            collection.add(ids="1", embeddings=[0.1, 0.2, 0.3], metadatas={"tag": "A"})
             
-            # Add multiple items with vectors
+            # Add multiple items with embeddings
             collection.add(
                 ids=["1", "2", "3"],
-                vectors=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+                embeddings=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
                 metadatas=[{"tag": "A"}, {"tag": "B"}, {"tag": "C"}]
             )
             
-            # Add items with documents (vectors will be auto-generated if embedding_function is set)
+            # Add items with documents (embeddings will be auto-generated if embedding_function is set)
             collection.add(
                 ids=["1", "2"],
                 documents=["Hello world", "How are you?"],
@@ -132,7 +132,7 @@ class Collection:
             collection_id=self._id,
             collection_name=self._name,
             ids=ids,
-            vectors=vectors,
+            embeddings=embeddings,
             metadatas=metadatas,
             documents=documents,
             embedding_function=self._embedding_function,
@@ -142,7 +142,7 @@ class Collection:
     def update(
         self,
         ids: Union[str, List[str]],
-        vectors: Optional[Union[List[float], List[List[float]]]] = None,
+        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
         **kwargs
@@ -152,7 +152,7 @@ class Collection:
         
         Args:
             ids: Single ID or list of IDs to update
-            vectors: New vectors (optional)
+            embeddings: New embeddings (optional)
             metadatas: New metadata (optional)
             documents: New documents (optional)
             **kwargs: Additional parameters
@@ -167,14 +167,14 @@ class Collection:
             # Update multiple items
             collection.update(
                 ids=["1", "2"],
-                vectors=[[0.9, 0.8], [0.7, 0.6]]
+                embeddings=[[0.9, 0.8], [0.7, 0.6]]
             )
         """
         return self._client._collection_update(
             collection_id=self._id,
             collection_name=self._name,
             ids=ids,
-            vectors=vectors,
+            embeddings=embeddings,
             metadatas=metadatas,
             documents=documents,
             embedding_function=self._embedding_function,
@@ -184,7 +184,7 @@ class Collection:
     def upsert(
         self,
         ids: Union[str, List[str]],
-        vectors: Optional[Union[List[float], List[List[float]]]] = None,
+        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
         metadatas: Optional[Union[Dict, List[Dict]]] = None,
         documents: Optional[Union[str, List[str]]] = None,
         **kwargs
@@ -194,7 +194,7 @@ class Collection:
         
         Args:
             ids: Single ID or list of IDs
-            vectors: Vectors (optional if documents provided)
+            embeddings: embeddings (optional if documents provided)
             metadatas: Metadata (optional)
             documents: Documents (optional)
             **kwargs: Additional parameters
@@ -204,19 +204,19 @@ class Collection:
             
         Examples:
             # Upsert single item
-            collection.upsert(ids="1", vectors=[0.1, 0.2], metadatas={"tag": "A"})
+            collection.upsert(ids="1", embeddings=[0.1, 0.2], metadatas={"tag": "A"})
             
             # Upsert multiple items
             collection.upsert(
                 ids=["1", "2", "3"],
-                vectors=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
+                embeddings=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
             )
         """
         return self._client._collection_upsert(
             collection_id=self._id,
             collection_name=self._name,
             ids=ids,
-            vectors=vectors,
+            embeddings=embeddings,
             metadatas=metadatas,
             documents=documents,
             embedding_function=self._embedding_function,
@@ -293,7 +293,7 @@ class Collection:
             
         Returns:
             - If single vector/text provided: QueryResult object containing query results
-            - If multiple vectors/texts provided: List of QueryResult objects, one for each query vector
+            - If multiple embeddings/texts provided: List of QueryResult objects, one for each query vector
             Each QueryResult item contains:
             - _id: record ID (always included)
             - document: document text (if included)

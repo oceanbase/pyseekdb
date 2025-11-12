@@ -20,12 +20,13 @@ import pyseekdb
 # ============================================================================
 
 # Option 1: Embedded mode (local SeekDB)
-# client = pyseekdb.Client(
-#     path="./seekdb",
-#     database="test"
-# )
+client = pyseekdb.Client(
+    path="./seekdb",
+    database="test"
+)
 
 # Option 2: Server mode (remote SeekDB server)
+'''
 client = pyseekdb.Client(
     host="127.0.0.1",
     port=2881,
@@ -33,6 +34,7 @@ client = pyseekdb.Client(
     user="root",
     password=""
 )
+'''
 
 # Option 3: OceanBase mode
 # ob_client = pyseekdb.OBClient(
@@ -57,7 +59,7 @@ config = HNSWConfiguration(dimension=dimension, distance='cosine')
 collection = client.get_or_create_collection(
     name=collection_name,
     configuration=config,
-    embedding_function=None  # Explicitly set to None since we're using custom 128-dim vectors
+    embedding_function=None  # Explicitly set to None since we're using custom 128-dim embeddings
 )
 
 # 2.2 Check if collection exists
@@ -74,7 +76,7 @@ config2 = HNSWConfiguration(dimension=64, distance='cosine')
 collection2 = client.get_or_create_collection(
     name="another_collection",
     configuration=config2,
-    embedding_function=None  # Explicitly set to None since we're using custom 64-dim vectors
+    embedding_function=None  # Explicitly set to None since we're using custom 64-dim embeddings
 )
 
 # ============================================================================
@@ -94,11 +96,11 @@ documents = [
     "Computer vision enables machines to interpret visual information"
 ]
 
-# Generate vectors (in real usage, use an embedding model)
-vectors = []
+# Generate embeddings (in real usage, use an embedding model)
+embeddings = []
 for i in range(len(documents)):
     vector = [random.random() for _ in range(dimension)]
-    vectors.append(vector)
+    embeddings.append(vector)
 
 ids = [str(uuid.uuid4()) for _ in documents]
 
@@ -107,7 +109,7 @@ single_id = str(uuid.uuid4())
 collection.add(
     ids=single_id,
     documents="This is a single document",
-    vectors=[random.random() for _ in range(dimension)],
+    embeddings=[random.random() for _ in range(dimension)],
     metadatas={"type": "single", "category": "test"}
 )
 
@@ -115,7 +117,7 @@ collection.add(
 collection.add(
     ids=ids,
     documents=documents,
-    vectors=vectors,
+    embeddings=embeddings,
     metadatas=[
         {"category": "AI", "score": 95, "tag": "ml", "year": 2023},
         {"category": "Programming", "score": 88, "tag": "python", "year": 2022},
@@ -128,11 +130,11 @@ collection.add(
     ]
 )
 
-# 3.3 Add with only vectors (no documents)
+# 3.3 Add with only embeddings (no documents)
 vector_only_ids = [str(uuid.uuid4()) for _ in range(2)]
 collection.add(
     ids=vector_only_ids,
-    vectors=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
     metadatas=[{"type": "vector_only"}, {"type": "vector_only"}]
 )
 
@@ -150,18 +152,18 @@ collection.update(
 collection.update(
     ids=ids[1:3],
     documents=["Updated document 1", "Updated document 2"],
-    vectors=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True}
     ]
 )
 
-# 4.3 Update vectors
-new_vectors = [[random.random() for _ in range(dimension)] for _ in range(2)]
+# 4.3 Update embeddings
+new_embeddings = [[random.random() for _ in range(dimension)] for _ in range(2)]
 collection.update(
     ids=ids[2:4],
-    vectors=new_vectors
+    embeddings=new_embeddings
 )
 
 # ============================================================================
@@ -172,7 +174,7 @@ collection.update(
 collection.upsert(
     ids=ids[0],
     documents="Upserted document (was updated)",
-    vectors=[random.random() for _ in range(dimension)],
+    embeddings=[random.random() for _ in range(dimension)],
     metadatas={"category": "AI", "upserted": True}
 )
 
@@ -181,7 +183,7 @@ new_id = str(uuid.uuid4())
 collection.upsert(
     ids=new_id,
     documents="This is a new document from upsert",
-    vectors=[random.random() for _ in range(dimension)],
+    embeddings=[random.random() for _ in range(dimension)],
     metadatas={"category": "New", "upserted": True}
 )
 
@@ -190,7 +192,7 @@ upsert_ids = [ids[4], str(uuid.uuid4())]  # One existing, one new
 collection.upsert(
     ids=upsert_ids,
     documents=["Upserted doc 1", "Upserted doc 2"],
-    vectors=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
     metadatas=[{"upserted": True}, {"upserted": True}]
 )
 
@@ -199,7 +201,7 @@ collection.upsert(
 # ============================================================================
 
 # 6.1 Basic vector similarity query
-query_vector = vectors[0]  # Query with first document's vector
+query_vector = embeddings[0]  # Query with first document's vector
 results = collection.query(
     query_embeddings=query_vector,
     n_results=3
@@ -266,10 +268,10 @@ results = collection.query(
     n_results=5
 )
 
-# 6.9 Query with multiple vectors (batch query)
-batch_vectors = [vectors[0], vectors[1]]
+# 6.9 Query with multiple embeddings (batch query)
+batch_embeddings = [embeddings[0], embeddings[1]]
 batch_results = collection.query(
-    query_embeddings=batch_vectors,
+    query_embeddings=batch_embeddings,
     n_results=2
 )
 
@@ -352,7 +354,7 @@ hybrid_results = collection.hybrid_search(
         "n_results": 10
     },
     knn={
-        "query_embeddings": [vectors[0]],
+        "query_embeddings": [embeddings[0]],
         "where": {"year": {"$gte": 2022}},
         "n_results": 10
     },

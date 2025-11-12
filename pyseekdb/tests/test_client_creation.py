@@ -220,11 +220,11 @@ class TestClientCreation:
         import random
         random.seed(42)  # For reproducibility
         test_ids = [str(uuid.uuid4()) for _ in range(3)]
-        # Generate vectors matching the collection's dimension
-        vectors = [[random.random() for _ in range(collection.dimension)] for _ in range(3)]
+        # Generate embeddings matching the collection's dimension
+        embeddings = [[random.random() for _ in range(collection.dimension)] for _ in range(3)]
         collection.add(
             ids=test_ids,
-            vectors=vectors,
+            embeddings=embeddings,
             documents=[f"Test document {i}" for i in range(3)],
             metadatas=[{"index": i} for i in range(3)]
         )
@@ -265,7 +265,7 @@ class TestClientCreation:
             project_root_str = str(project_root)
             if project_root_str in sys.path:
                 sys.path.remove(project_root_str)
-            import pylibseekdb
+            import pylibseekdb as seekdb
             if not hasattr(seekdb, 'open') and not hasattr(seekdb, '_initialize_module'):
                 pytest.fail(
                     "❌ SeekDB embedded package is not properly installed!\n"
