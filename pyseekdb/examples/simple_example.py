@@ -17,22 +17,19 @@ from pyseekdb import DefaultEmbeddingFunction
 # You can use embedded mode, server mode, or OceanBase mode
 # For this example, we'll use server mode (you can change to embedded or OceanBase)
 
-# Server mode (connecting to remote SeekDB server)
-'''
-client = pyseekdb.Client(
-    host="127.0.0.1",
-    port=2881,
-    database="test",
-    user="root",
-    password=""
-)
-'''
-
 # Alternative: Embedded mode (local SeekDB)
 client = pyseekdb.Client(
     path="./seekdb",
     database="test"
 )
+# Server mode (connecting to remote SeekDB server)
+# client = pyseekdb.Client(
+#     host="127.0.0.1",
+#     port=2881,
+#     database="test",
+#     user="root",
+#     password=""
+# )
 
 # Alternative: OceanBase mode
 # client = pyseekdb.OBClient(
@@ -52,7 +49,7 @@ collection_name = "my_simple_collection"
 # The embedding function will automatically convert documents to embeddings
 collection = client.create_collection(
     name=collection_name,
-    embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
+    #embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
 )
 
 print(f"Created collection '{collection_name}' with dimension: {collection.dimension}")
@@ -101,15 +98,17 @@ results = collection.query(
 )
 
 print(f"\nQuery: '{query_text}'")
-print(f"Query results: {len(results)} items found")
+print(f"Query results: {len(results['ids'][0])} items found")
 
 # ==================== Step 5: Print Query Results ====================
-for i, item in enumerate(results, 1):
-    print(f"\nResult {i}:")
-    print(f"  ID: {item._id}")
-    print(f"  Distance: {item.distance:.4f}")
-    print(f"  Document: {item.document}")
-    print(f"  Metadata: {item.metadata}")
+for i in range(len(results['ids'][0])):
+    print(f"\nResult {i+1}:")
+    print(f"  ID: {results['ids'][0][i]}")
+    print(f"  Distance: {results['distances'][0][i]:.4f}")
+    if results.get('documents'):
+        print(f"  Document: {results['documents'][0][i]}")
+    if results.get('metadatas'):
+        print(f"  Metadata: {results['metadatas'][0][i]}")
 
 # ==================== Step 6: Cleanup ====================
 # Delete the collection

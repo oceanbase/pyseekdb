@@ -21,20 +21,18 @@ import pyseekdb
 
 # Option 1: Embedded mode (local SeekDB)
 client = pyseekdb.Client(
-    path="./seekdb",
-    database="test"
+    #path="./seekdb",
+    #database="test"
 )
 
 # Option 2: Server mode (remote SeekDB server)
-'''
-client = pyseekdb.Client(
-    host="127.0.0.1",
-    port=2881,
-    database="test",
-    user="root",
-    password=""
-)
-'''
+# client = pyseekdb.Client(
+#     host="127.0.0.1",
+#     port=2881,
+#     database="test",
+#     user="root",
+#     password=""
+# )
 
 # Option 3: OceanBase mode
 # ob_client = pyseekdb.OBClient(
@@ -206,7 +204,7 @@ results = collection.query(
     query_embeddings=query_vector,
     n_results=3
 )
-print(f"Query results: {len(results)} items")
+print(f"Query results: {len(results['ids'][0])} items")
 
 # 6.2 Query with metadata filter
 results = collection.query(
@@ -274,6 +272,8 @@ batch_results = collection.query(
     query_embeddings=batch_embeddings,
     n_results=2
 )
+# batch_results["ids"][0] contains results for first query
+# batch_results["ids"][1] contains results for second query
 
 # 6.10 Query with specific fields
 results = collection.query(
@@ -288,9 +288,13 @@ results = collection.query(
 
 # 7.1 Get by single ID
 result = collection.get(ids=ids[0])
+# result["ids"] contains [ids[0]]
+# result["documents"] contains document for ids[0]
 
 # 7.2 Get by multiple IDs
 results = collection.get(ids=ids[:3])
+# results["ids"] contains ids[:3]
+# results["documents"] contains documents for all IDs
 
 # 7.3 Get by metadata filter
 results = collection.get(
@@ -362,7 +366,9 @@ hybrid_results = collection.hybrid_search(
     n_results=5,
     include=["documents", "metadatas"]
 )
-print(f"Hybrid search: {len(hybrid_results.get('ids', []))} results")
+# hybrid_results["ids"][0] contains IDs for the hybrid search
+# hybrid_results["documents"][0] contains documents for the hybrid search
+print(f"Hybrid search: {len(hybrid_results.get('ids', [[]])[0])} results")
 
 # ============================================================================
 # PART 9: DML OPERATIONS - DELETE DATA
@@ -393,11 +399,12 @@ count = collection.count()
 print(f"Collection count: {count} items")
 
 
-# 10.3 Preview first few items in collection
+# 10.3 Preview first few items in collection (returns all columns by default)
 preview = collection.peek(limit=5)
-print(f"Preview: {len(preview)} items")
-for item in preview:
-    print(f"  ID: {item._id}, Document: {item.document}")
+print(f"Preview: {len(preview['ids'])} items")
+for i in range(len(preview['ids'])):
+    print(f"  ID: {preview['ids'][i]}, Document: {preview['documents'][i]}")
+    print(f"  Metadata: {preview['metadatas'][i]}, Embedding dim: {len(preview['embeddings'][i]) if preview['embeddings'][i] else 0}")
 
 # 10.4 Count collections in database
 collection_count = client.count_collection()

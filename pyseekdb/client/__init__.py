@@ -19,6 +19,7 @@ All factories use the underlying ServerAPI implementations:
 - OceanBaseServerClient - OceanBase via pymysql
 """
 import logging
+import os
 from typing import Optional, Union
 
 from .base_connection import BaseConnection
@@ -70,7 +71,7 @@ def Client(
     port: Optional[int] = None,
     database: str = "test",
     user: Optional[str] = None,
-    password: str = "",
+    password: str = "", # Can be retrieved from SEEKDB_PASSWORD environment variable
     **kwargs
 ) -> _ClientProxy:
     """
@@ -79,27 +80,32 @@ def Client(
     Automatically selects embedded or server mode based on parameters:
     - If path is provided, uses embedded mode
     - If host/port is provided, uses server mode
+    - If neither path nor host is provided, defaults to embedded mode with current working directory as path
     
     Returns a ClientProxy that only exposes collection operations.
     For database management, use AdminClient().
     
     Args:
-        path: seekdb data directory path (embedded mode)
+        path: seekdb data directory path (embedded mode). If not provided and host is also not provided, 
+              defaults to current working directory
         host: server address (server mode)
         port: server port (server mode)
         database: database name
         user: username (server mode)
-        password: password (server mode)
+        password: password (server mode). If not provided, will be retrieved from SEEKDB_PASSWORD environment variable
         **kwargs: other parameters
     
     Returns:
         _ClientProxy: A proxy that only exposes collection operations
     
     Examples:
-        >>> # Embedded mode
+        >>> # Embedded mode with explicit path
         >>> client = Client(path="/path/to/seekdb", database="db1")
         >>> client.create_collection("my_collection")  # ✅ Available
-        >>> # client.create_database("new_db")  # ❌ Not available
+        
+        >>> # Embedded mode (default, uses current working directory)
+        >>> client = Client(database="db1")
+        >>> client.create_collection("my_collection")  # ✅ Available
         
         >>> # Server mode
         >>> client = Client(
@@ -110,6 +116,10 @@ def Client(
         ...     password="pass"
         ... )
     """
+    # Get password from environment variable if not provided
+    if not password:
+        password = os.environ.get("SEEKDB_PASSWORD", "")
+    
     # Determine mode and create appropriate server
     if path is not None:
         # Embedded mode
@@ -140,8 +150,13 @@ def Client(
         )
     
     else:
-        raise ValueError(
-            "Must provide either path (embedded mode) or host (server mode) parameter"
+        # Default to embedded mode with current working directory as path
+        default_path = os.path.abspath("seekdb.db")
+        logger.info(f"Creating embedded client (default): path={default_path}, database={database}")
+        server = SeekdbEmbeddedClient(
+            path=default_path,
+            database=database,
+            **kwargs
         )
     
     # Return ClientProxy (only exposes collection operations)
@@ -154,7 +169,7 @@ def OBClient(
     tenant: str = "test",
     database: str = "test",
     user: str = "root",
-    password: str = "",
+    password: str = "", # Can be retrieved from OB_PASSWORD environment variable
     **kwargs
 ) -> _ClientProxy:
     """
@@ -169,7 +184,7 @@ def OBClient(
         tenant: tenant name
         database: database name
         user: username (without tenant suffix)
-        password: password
+        password: password. If not provided, will be retrieved from OB_PASSWORD environment variable
         **kwargs: other parameters
     
     Returns:
@@ -187,6 +202,10 @@ def OBClient(
         >>> client.create_collection("my_collection")  # ✅ Available
         >>> # client.create_database("new_db")  # ❌ Not available
     """
+    # Get password from environment variable if not provided
+    if not password:
+        password = os.environ.get("OB_PASSWORD", "")
+    
     logger.info(
         f"Creating OceanBase client: {user}@{tenant}@{host}:{port}/{database}"
     )
@@ -210,7 +229,7 @@ def AdminClient(
     host: Optional[str] = None,
     port: Optional[int] = None,
     user: Optional[str] = None,
-    password: str = "",
+    password: str = "", # Can be retrieved from SEEKDB_PASSWORD environment variable
     **kwargs
 ) -> _AdminClientProxy:
     """
@@ -228,7 +247,7 @@ def AdminClient(
         host: server address (server mode)
         port: server port (server mode)
         user: username (server mode)
-        password: password (server mode)
+        password: password (server mode). If not provided, will be retrieved from SEEKDB_PASSWORD environment variable
         **kwargs: other parameters
     
     Returns:
@@ -248,6 +267,10 @@ def AdminClient(
         ...     password="pass"
         ... )
     """
+    # Get password from environment variable if not provided
+    if not password:
+        password = os.environ.get("SEEKDB_PASSWORD", "")
+    
     # Determine mode and create appropriate server
     if path is not None:
         # Embedded mode
@@ -291,7 +314,7 @@ def OBAdminClient(
     port: int = 2881,
     tenant: str = "test",
     user: str = "root",
-    password: str = "",
+    password: str = "", # Can be retrieved from OB_PASSWORD environment variable
     **kwargs
 ) -> _AdminClientProxy:
     """
@@ -305,7 +328,7 @@ def OBAdminClient(
         port: server port (default 2881)
         tenant: tenant name
         user: username (without tenant suffix)
-        password: password
+        password: password. If not provided, will be retrieved from OB_PASSWORD environment variable
         **kwargs: other parameters
     
     Returns:
@@ -322,6 +345,10 @@ def OBAdminClient(
         >>> admin.create_database("new_db")  # ✅ Available
         >>> # admin.create_collection("coll")  # ❌ Not available
     """
+    # Get password from environment variable if not provided
+    if not password:
+        password = os.environ.get("OB_PASSWORD", "")
+    
     logger.info(
         f"Creating OceanBase admin client: {user}@{tenant}@{host}:{port}"
     )

@@ -91,11 +91,10 @@ class TestCollectionDML:
             
             # Verify using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.ID) == test_id_1
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('category') == "test"
+            assert len(results["ids"]) == 1
+            assert results["ids"][0] == test_id_1
+            assert results["documents"][0] == "This is test document 1"
+            assert results["metadatas"][0].get('category') == "test"
             print(f"   Successfully added and verified item with ID: {test_id_1}")
             
             # Test 2: collection.add - Add multiple items
@@ -114,8 +113,8 @@ class TestCollectionDML:
             
             # Verify using collection.get
             results = collection.get(ids=test_ids)
-            assert len(results) == 3
-            print(f"   Successfully added and verified {len(results)} items")
+            assert len(results["ids"]) == 3
+            print(f"   Successfully added and verified {len(results['ids'])} items")
             
             # Test 3: collection.update - Update existing item
             print(f"✅ Testing collection.update() - update existing item")
@@ -126,12 +125,11 @@ class TestCollectionDML:
             
             # Verify update using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
+            assert len(results["ids"]) == 1
             # Document should remain unchanged since we didn't update it
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
+            assert results["documents"][0] == "This is test document 1"
+            assert results["metadatas"][0].get('score') == 95
+            assert results["metadatas"][0].get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
             
             # Test 4: collection.upsert - Upsert existing item (should update)
@@ -145,10 +143,9 @@ class TestCollectionDML:
             
             # Verify upsert using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Upserted document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 98
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == "Upserted document 1"
+            assert results["metadatas"][0].get('score') == 98
             print(f"   Successfully upserted (update) and verified item with ID: {test_id_1}")
             
             # Test 5: collection.upsert - Upsert new item (should insert)
@@ -163,10 +160,9 @@ class TestCollectionDML:
             
             # Verify upsert using collection.get
             results = collection.get(ids=test_id_new)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "New upserted document"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('category') == "new"
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == "New upserted document"
+            assert results["metadatas"][0].get('category') == "new"
             print(f"   Successfully upserted (insert) and verified item with ID: {test_id_new}")
             
             # Test 6: collection.delete - Delete by ID
@@ -176,12 +172,12 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(ids=test_ids[0])
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted item with ID: {test_ids[0]}")
             
             # Verify other items still exist
             results = collection.get(ids=test_ids[1:])
-            assert len(results) == 2
+            assert len(results["ids"]) == 2
             print(f"   Verified other items still exist")
             
             # Test 7: collection.delete - Delete by metadata filter
@@ -191,14 +187,14 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(where={"category": {"$eq": "demo"}})
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted items with category='demo'")
             
             # Test 8: Verify final state using collection.get
             print(f"✅ Testing final state verification")
             all_results = collection.get(limit=100)
-            print(f"   Final collection count: {len(all_results)} items")
-            assert len(all_results) > 0
+            print(f"   Final collection count: {len(all_results['ids'])} items")
+            assert len(all_results["ids"]) > 0
             
         finally:
             # Cleanup
@@ -262,11 +258,10 @@ class TestCollectionDML:
             
             # Verify using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.ID) == test_id_1
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('category') == "test"
+            assert len(results["ids"]) == 1
+            assert results["ids"][0] == test_id_1
+            assert results["documents"][0] == "This is test document 1"
+            assert results["metadatas"][0].get('category') == "test"
             print(f"   Successfully added and verified item with ID: {test_id_1}")
             
             # Test 2: collection.add - Add multiple items
@@ -285,8 +280,8 @@ class TestCollectionDML:
             
             # Verify using collection.get
             results = collection.get(ids=test_ids)
-            assert len(results) == 3
-            print(f"   Successfully added and verified {len(results)} items")
+            assert len(results["ids"]) == 3
+            print(f"   Successfully added and verified {len(results['ids'])} items")
             
             # Test 3: collection.update - Update existing item
             print(f"✅ Testing collection.update() - update existing item")
@@ -297,12 +292,11 @@ class TestCollectionDML:
             
             # Verify update using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
+            assert len(results["ids"]) == 1
             # Document should remain unchanged since we didn't update it
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
+            assert results["documents"][0] == "This is test document 1"
+            assert results["metadatas"][0].get('score') == 95
+            assert results["metadatas"][0].get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
             
             # Test 4: collection.update - Update multiple items
@@ -318,7 +312,7 @@ class TestCollectionDML:
             
             # Verify update using collection.get
             results = collection.get(ids=test_ids[:2])
-            assert len(results) == 2
+            assert len(results["ids"]) == 2
             print(f"   Successfully updated and verified {len(results)} items")
             
             # Test 5: collection.upsert - Upsert existing item (should update)
@@ -332,10 +326,9 @@ class TestCollectionDML:
             
             # Verify upsert using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Upserted document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 98
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == "Upserted document 1"
+            assert results["metadatas"][0].get('score') == 98
             print(f"   Successfully upserted (update) and verified item with ID: {test_id_1}")
             
             # Test 6: collection.upsert - Upsert new item (should insert)
@@ -350,10 +343,9 @@ class TestCollectionDML:
             
             # Verify upsert using collection.get
             results = collection.get(ids=test_id_new)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "New upserted document"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('category') == "new"
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == "New upserted document"
+            assert results["metadatas"][0].get('category') == "new"
             print(f"   Successfully upserted (insert) and verified item with ID: {test_id_new}")
             
             # Test 7: collection.delete - Delete by ID
@@ -363,12 +355,12 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(ids=test_ids[0])
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted item with ID: {test_ids[0]}")
             
             # Verify other items still exist
             results = collection.get(ids=test_ids[1:])
-            assert len(results) == 2
+            assert len(results["ids"]) == 2
             print(f"   Verified other items still exist")
             
             # Test 8: collection.delete - Delete by metadata filter
@@ -378,7 +370,7 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(where={"category": {"$eq": "demo"}})
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted items with category='demo'")
             
             # Test 9: collection.delete - Delete by document filter
@@ -397,7 +389,7 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(where_document={"$contains": "Delete this"})
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted items by document filter")
             
             # Test 10: Verify final state using collection.get
@@ -469,11 +461,10 @@ class TestCollectionDML:
             
             # Verify using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.ID) == test_id_1
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('category') == "test"
+            assert len(results["ids"]) == 1
+            assert results["ids"][0] == test_id_1
+            assert results["documents"][0] == "This is test document 1"
+            assert results["metadatas"][0].get('category') == "test"
             print(f"   Successfully added and verified item with ID: {test_id_1}")
             
             # Test 2: collection.add - Add multiple items
@@ -492,8 +483,8 @@ class TestCollectionDML:
             
             # Verify using collection.get
             results = collection.get(ids=test_ids)
-            assert len(results) == 3
-            print(f"   Successfully added and verified {len(results)} items")
+            assert len(results["ids"]) == 3
+            print(f"   Successfully added and verified {len(results['ids'])} items")
             
             # Test 3: collection.update - Update existing item
             print(f"✅ Testing collection.update() - update existing item")
@@ -504,12 +495,11 @@ class TestCollectionDML:
             
             # Verify update using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
+            assert len(results["ids"]) == 1
             # Document should remain unchanged since we didn't update it
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "This is test document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 95
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('updated') is True
+            assert results["documents"][0] == "This is test document 1"
+            assert results["metadatas"][0].get('score') == 95
+            assert results["metadatas"][0].get('updated') is True
             print(f"   Successfully updated and verified item with ID: {test_id_1}")
             
             # Test 4: collection.update - Update multiple items with embeddings
@@ -539,10 +529,9 @@ class TestCollectionDML:
             
             # Verify upsert using collection.get
             results = collection.get(ids=test_id_1)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "Upserted document 1"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('score') == 98
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == "Upserted document 1"
+            assert results["metadatas"][0].get('score') == 98
             print(f"   Successfully upserted (update) and verified item with ID: {test_id_1}")
             
             # Test 6: collection.upsert - Upsert new item (should insert)
@@ -557,10 +546,9 @@ class TestCollectionDML:
             
             # Verify upsert using collection.get
             results = collection.get(ids=test_id_new)
-            assert len(results) == 1
-            result_dict = results[0].to_dict() if hasattr(results[0], 'to_dict') else results[0]
-            assert result_dict.get(CollectionFieldNames.DOCUMENT) == "New upserted document"
-            assert result_dict.get(CollectionFieldNames.METADATA, {}).get('category') == "new"
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == "New upserted document"
+            assert results["metadatas"][0].get('category') == "new"
             print(f"   Successfully upserted (insert) and verified item with ID: {test_id_new}")
             
             # Test 7: collection.delete - Delete by ID
@@ -570,12 +558,12 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(ids=test_ids[0])
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted item with ID: {test_ids[0]}")
             
             # Verify other items still exist
             results = collection.get(ids=test_ids[1:])
-            assert len(results) == 2
+            assert len(results["ids"]) == 2
             print(f"   Verified other items still exist")
             
             # Test 8: collection.delete - Delete by metadata filter with comparison operator
@@ -594,7 +582,7 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(where={"score": {"$gte": 99}})
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted items with score >= 99")
             
             # Test 9: collection.delete - Delete by document filter
@@ -613,18 +601,18 @@ class TestCollectionDML:
             
             # Verify deletion using collection.get
             results = collection.get(where_document={"$contains": "Delete this"})
-            assert len(results) == 0
+            assert len(results["ids"]) == 0
             print(f"   Successfully deleted items by document filter")
             
             # Test 10: Verify final state using collection.get with filters
             print(f"✅ Testing final state verification")
             all_results = collection.get(limit=100)
-            print(f"   Final collection count: {len(all_results)} items")
-            assert len(all_results) > 0
+            print(f"   Final collection count: {len(all_results['ids'])} items")
+            assert len(all_results["ids"]) > 0
             
             # Verify by category filter
             test_results = collection.get(where={"category": {"$eq": "test"}})
-            print(f"   Items with category='test': {len(test_results)}")
+            print(f"   Items with category='test': {len(test_results['ids'])}")
             
         finally:
             # Cleanup

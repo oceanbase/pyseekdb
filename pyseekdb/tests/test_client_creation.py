@@ -212,8 +212,9 @@ class TestClientCreation:
         # Test 13: collection.peek() - preview items in empty collection
         preview = collection.peek(limit=5)
         assert preview is not None
-        assert len(preview) == 0  # Empty collection
-        print(f"\n✅ collection.peek() successfully returned preview: {len(preview)} items")
+        assert "ids" in preview
+        assert len(preview["ids"]) == 0  # Empty collection
+        print(f"\n✅ collection.peek() successfully returned preview: {len(preview['ids'])} items")
         
         # Add some test data to test count and peek with data
         import uuid
@@ -237,18 +238,21 @@ class TestClientCreation:
         # Test 15: collection.peek() - preview items with data
         preview_with_data = collection.peek(limit=2)
         assert preview_with_data is not None
-        assert len(preview_with_data) == 2  # Limited to 2 items
+        assert "ids" in preview_with_data
+        assert "documents" in preview_with_data
+        assert "metadatas" in preview_with_data
+        assert "embeddings" in preview_with_data
+        assert len(preview_with_data["ids"]) == 2  # Limited to 2 items
         # Verify preview items have expected fields
-        for item in preview_with_data:
-            assert hasattr(item, '_id')
-            assert hasattr(item, 'document')
-            assert hasattr(item, 'metadata')
-        print(f"\n✅ collection.peek() with data returned {len(preview_with_data)} items")
+        assert len(preview_with_data["ids"]) == len(preview_with_data["documents"])
+        assert len(preview_with_data["ids"]) == len(preview_with_data["metadatas"])
+        assert len(preview_with_data["ids"]) == len(preview_with_data["embeddings"])
+        print(f"\n✅ collection.peek() with data returned {len(preview_with_data['ids'])} items")
         
         # Test 16: collection.peek() with different limit
         preview_all = collection.peek(limit=10)
-        assert len(preview_all) == 3  # All 3 items
-        print(f"\n✅ collection.peek(limit=10) returned {len(preview_all)} items")
+        assert len(preview_all["ids"]) == 3  # All 3 items
+        print(f"\n✅ collection.peek(limit=10) returned {len(preview_all['ids'])} items")
         
         # Clean up: delete the test collection table
         try:

@@ -173,16 +173,18 @@ class TestCollectionGet:
             print(f"\n✅ Testing get by single ID for embedded client")
             results = collection.get(ids=inserted_ids[0])
             assert results is not None
-            assert len(results) == 1
-            print(f"   Found {len(results)} result for ID={inserted_ids[0]}")
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Found {len(results['ids'])} result for ID={inserted_ids[0]}")
             
             # Test 2: Get by multiple IDs
             print(f"✅ Testing get by multiple IDs")
             if len(inserted_ids) >= 2:
                 results = collection.get(ids=inserted_ids[:2])
                 assert results is not None
-                assert len(results) <= 2
-                print(f"   Found {len(results)} results for IDs={inserted_ids[:2]}")
+                assert "ids" in results
+                assert len(results["ids"]) <= 2
+                print(f"   Found {len(results['ids'])} results for IDs={inserted_ids[:2]}")
             
             # Test 3: Get by metadata filter
             print(f"✅ Testing get with metadata filter")
@@ -191,8 +193,9 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            assert len(results) > 0
-            print(f"   Found {len(results)} results with category='AI'")
+            assert "ids" in results
+            assert len(results["ids"]) > 0
+            print(f"   Found {len(results['ids'])} results with category='AI'")
             
             # Test 4: Get by document filter
             print(f"✅ Testing get with document filter")
@@ -201,7 +204,8 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results containing 'machine learning'")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'])} results containing 'machine learning'")
             
             # Test 5: Get with include parameter
             print(f"✅ Testing get with include parameter")
@@ -210,42 +214,39 @@ class TestCollectionGet:
                 include=["documents", "metadatas"]
             )
             assert results is not None
-            assert isinstance(results, list), "Multiple IDs should return List[QueryResult]"
-            assert len(results) == 2, f"Expected 2 QueryResult objects, got {len(results)}"
-            for i, result in enumerate(results):
-                assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                if len(result) > 0:
-                    for item in result:
-                        result_dict = item.to_dict() if hasattr(item, 'to_dict') else item
-                        assert '_id' in result_dict
-                    print(f"   QueryResult {i} keys: {list(result[0].to_dict().keys()) if len(result) > 0 else 'empty'}")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            assert "documents" in results
+            assert "metadatas" in results
+            assert len(results["ids"]) == 2
+            print(f"   Found {len(results['ids'])} results with documents and metadatas")
             
             # Test 6: Get all data with limit
             print(f"✅ Testing get all data with limit")
             results = collection.get(limit=3)
             assert results is not None
-            assert len(results) <= 3
-            print(f"   Found {len(results)} results (limit=3)")
+            assert "ids" in results
+            assert len(results["ids"]) <= 3
+            print(f"   Found {len(results['ids'])} results (limit=3)")
             
-            # Test 7: Get by multiple IDs (should return List[QueryResult])
-            print(f"✅ Testing get by multiple IDs (returns List[QueryResult])")
+            # Test 7: Get by multiple IDs (should return dict with all IDs)
+            print(f"✅ Testing get by multiple IDs (returns dict)")
             if len(inserted_ids) >= 3:
                 results = collection.get(ids=inserted_ids[:3])
                 assert results is not None
-                assert isinstance(results, list), "Multiple IDs should return List[QueryResult]"
-                assert len(results) == 3, f"Expected 3 QueryResult objects, got {len(results)}"
-                for i, result in enumerate(results):
-                    assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                    assert len(result) >= 0, f"QueryResult {i} should exist (may be empty if ID not found)"
-                    print(f"   QueryResult {i} for ID {inserted_ids[i]}: {len(result)} items")
+                assert isinstance(results, dict), "Should return dict"
+                assert "ids" in results
+                assert len(results["ids"]) <= 3
+                print(f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs")
             
-            # Test 8: Single ID still returns single QueryResult (backward compatibility)
-            print(f"✅ Testing single ID returns single QueryResult (backward compatibility)")
+            # Test 8: Single ID returns dict format
+            print(f"✅ Testing single ID returns dict format")
             results = collection.get(ids=inserted_ids[0])
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Single ID should return QueryResult, not list"
-            assert len(results) == 1
-            print(f"   Single QueryResult with {len(results)} item")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Single result with {len(results['ids'])} item")
             
         finally:
             # Cleanup
@@ -300,16 +301,16 @@ class TestCollectionGet:
             print(f"\n✅ Testing get by single ID for server client")
             results = collection.get(ids=inserted_ids[0])
             assert results is not None
-            assert len(results) == 1
-            print(f"   Found {len(results)} result for ID={inserted_ids[0]}")
+            assert len(results["ids"]) == 1
+            print(f"   Found {len(results['ids'])} result for ID={inserted_ids[0]}")
             
             # Test 2: Get by multiple IDs
             print(f"✅ Testing get by multiple IDs")
             if len(inserted_ids) >= 3:
                 results = collection.get(ids=inserted_ids[:3])
                 assert results is not None
-                assert len(results) <= 3
-                print(f"   Found {len(results)} results for IDs={inserted_ids[:3]}")
+                assert len(results["ids"]) <= 3
+                print(f"   Found {len(results['ids'])} results for IDs={inserted_ids[:3]}")
             
             # Test 3: Get by metadata filter with comparison operator
             print(f"✅ Testing get with metadata filter ($gte)")
@@ -318,8 +319,8 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            assert len(results) > 0
-            print(f"   Found {len(results)} results with score >= 90")
+            assert len(results["ids"]) > 0
+            print(f"   Found {len(results['ids'])} results with score >= 90")
             
             # Test 4: Get by combined metadata filters
             print(f"✅ Testing get with combined metadata filters")
@@ -328,7 +329,7 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results with category='AI' and score >= 90")
+            print(f"   Found {len(results['ids'])} results with category='AI' and score >= 90")
             
             # Test 5: Get by document filter
             print(f"✅ Testing get with document filter")
@@ -337,7 +338,7 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results containing 'Python'")
+            print(f"   Found {len(results['ids'])} results containing 'Python'")
             
             # Test 6: Get with $in operator
             print(f"✅ Testing get with $in operator")
@@ -346,14 +347,14 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results with tag in ['ml', 'python']")
+            print(f"   Found {len(results['ids'])} results with tag in ['ml', 'python']")
             
             # Test 7: Get with limit and offset
             print(f"✅ Testing get with limit and offset")
             results = collection.get(limit=2, offset=1)
             assert results is not None
-            assert len(results) <= 2
-            print(f"   Found {len(results)} results (limit=2, offset=1)")
+            assert len(results["ids"]) <= 2
+            print(f"   Found {len(results['ids'])} results (limit=2, offset=1)")
             
             # Test 8: Get with include parameter
             print(f"✅ Testing get with include parameter")
@@ -362,45 +363,43 @@ class TestCollectionGet:
                 include=["documents", "metadatas", "embeddings"]
             )
             assert results is not None
-            assert isinstance(results, list), "Multiple IDs should return List[QueryResult]"
-            assert len(results) == 2, f"Expected 2 QueryResult objects, got {len(results)}"
-            for i, result in enumerate(results):
-                assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                if len(result) > 0:
-                    for item in result:
-                        result_dict = item.to_dict() if hasattr(item, 'to_dict') else item
-                        assert '_id' in result_dict
-                    print(f"   QueryResult {i} keys: {list(result[0].to_dict().keys()) if len(result) > 0 else 'empty'}")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            assert "documents" in results
+            assert "metadatas" in results
+            assert "embeddings" in results
+            assert len(results["ids"]) == 2
+            print(f"   Found {len(results['ids'])} results with all fields")
             
-            # Test 9: Get by multiple IDs (should return List[QueryResult])
-            print(f"✅ Testing get by multiple IDs (returns List[QueryResult])")
+            # Test 9: Get by multiple IDs (should return dict)
+            print(f"✅ Testing get by multiple IDs (returns dict)")
             if len(inserted_ids) >= 3:
                 results = collection.get(ids=inserted_ids[:3])
                 assert results is not None
-                assert isinstance(results, list), "Multiple IDs should return List[QueryResult]"
-                assert len(results) == 3, f"Expected 3 QueryResult objects, got {len(results)}"
-                for i, result in enumerate(results):
-                    assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                    assert len(result) >= 0, f"QueryResult {i} should exist (may be empty if ID not found)"
-                    print(f"   QueryResult {i} for ID {inserted_ids[i]}: {len(result)} items")
+                assert isinstance(results, dict), "Should return dict"
+                assert "ids" in results
+                assert len(results["ids"]) <= 3
+                print(f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs")
             
-            # Test 10: Single ID still returns single QueryResult (backward compatibility)
-            print(f"✅ Testing single ID returns single QueryResult (backward compatibility)")
+            # Test 10: Single ID returns dict format
+            print(f"✅ Testing single ID returns dict format")
             results = collection.get(ids=inserted_ids[0])
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Single ID should return QueryResult, not list"
-            assert len(results) == 1
-            print(f"   Single QueryResult with {len(results)} item")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Single result with {len(results['ids'])} item")
             
-            # Test 11: Get with filters still returns single QueryResult (not multiple)
-            print(f"✅ Testing get with filters returns single QueryResult")
+            # Test 11: Get with filters returns dict format
+            print(f"✅ Testing get with filters returns dict format")
             results = collection.get(
                 where={"category": {"$eq": "AI"}},
                 limit=10
             )
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Get with filters should return QueryResult, not list"
-            print(f"   Single QueryResult with {len(results)} items matching filter")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            print(f"   Found {len(results['ids'])} items matching filter")
             
         finally:
             # Cleanup
@@ -456,16 +455,16 @@ class TestCollectionGet:
             print(f"\n✅ Testing get by single ID for OceanBase client")
             results = collection.get(ids=inserted_ids[0])
             assert results is not None
-            assert len(results) == 1
-            print(f"   Found {len(results)} result for ID={inserted_ids[0]}")
+            assert len(results["ids"]) == 1
+            print(f"   Found {len(results['ids'])} result for ID={inserted_ids[0]}")
             
             # Test 2: Get by multiple IDs
             print(f"✅ Testing get by multiple IDs")
             if len(inserted_ids) >= 3:
                 results = collection.get(ids=inserted_ids[:3])
                 assert results is not None
-                assert len(results) <= 3
-                print(f"   Found {len(results)} results for IDs={inserted_ids[:3]}")
+                assert len(results["ids"]) <= 3
+                print(f"   Found {len(results['ids'])} results for IDs={inserted_ids[:3]}")
             
             # Test 3: Get by metadata filter
             print(f"✅ Testing get with metadata filter")
@@ -475,7 +474,7 @@ class TestCollectionGet:
             )
             assert results is not None
             assert len(results) > 0
-            print(f"   Found {len(results)} results with category='AI'")
+            print(f"   Found {len(results['ids'])} results with category='AI'")
             
             # Test 4: Get by logical operators ($or)
             print(f"✅ Testing get with logical operators ($or)")
@@ -489,7 +488,7 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results with $or condition")
+            print(f"   Found {len(results['ids'])} results with $or condition")
             
             # Test 5: Get by document filter
             print(f"✅ Testing get with document filter")
@@ -498,7 +497,7 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results containing 'machine'")
+            print(f"   Found {len(results['ids'])} results containing 'machine'")
             
             # Test 6: Get with combined filters (where + where_document)
             print(f"✅ Testing get with combined filters")
@@ -508,21 +507,21 @@ class TestCollectionGet:
                 limit=10
             )
             assert results is not None
-            print(f"   Found {len(results)} results matching all filters")
+            print(f"   Found {len(results['ids'])} results matching all filters")
             
             # Test 7: Get with limit and offset
             print(f"✅ Testing get with limit and offset")
             results = collection.get(limit=2, offset=2)
             assert results is not None
-            assert len(results) <= 2
-            print(f"   Found {len(results)} results (limit=2, offset=2)")
+            assert len(results["ids"]) <= 2
+            print(f"   Found {len(results['ids'])} results (limit=2, offset=2)")
             
             # Test 8: Get all data without filters
             print(f"✅ Testing get all data without filters")
             results = collection.get(limit=100)
             assert results is not None
-            assert len(results) > 0
-            print(f"   Found {len(results)} total results")
+            assert len(results["ids"]) > 0
+            print(f"   Found {len(results['ids'])} total results")
             
             # Test 9: Get with include parameter
             print(f"✅ Testing get with include parameter")
@@ -531,45 +530,43 @@ class TestCollectionGet:
                 include=["documents", "metadatas", "embeddings"]
             )
             assert results is not None
-            assert isinstance(results, list), "Multiple IDs should return List[QueryResult]"
-            assert len(results) == 2, f"Expected 2 QueryResult objects, got {len(results)}"
-            for i, result in enumerate(results):
-                assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                if len(result) > 0:
-                    for item in result:
-                        result_dict = item.to_dict() if hasattr(item, 'to_dict') else item
-                        assert '_id' in result_dict
-                    print(f"   QueryResult {i} keys: {list(result[0].to_dict().keys()) if len(result) > 0 else 'empty'}")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            assert "documents" in results
+            assert "metadatas" in results
+            assert "embeddings" in results
+            assert len(results["ids"]) == 2
+            print(f"   Found {len(results['ids'])} results with all fields")
             
-            # Test 10: Get by multiple IDs (should return List[QueryResult])
-            print(f"✅ Testing get by multiple IDs (returns List[QueryResult])")
+            # Test 10: Get by multiple IDs (should return dict)
+            print(f"✅ Testing get by multiple IDs (returns dict)")
             if len(inserted_ids) >= 3:
                 results = collection.get(ids=inserted_ids[:3])
                 assert results is not None
-                assert isinstance(results, list), "Multiple IDs should return List[QueryResult]"
-                assert len(results) == 3, f"Expected 3 QueryResult objects, got {len(results)}"
-                for i, result in enumerate(results):
-                    assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                    assert len(result) >= 0, f"QueryResult {i} should exist (may be empty if ID not found)"
-                    print(f"   QueryResult {i} for ID {inserted_ids[i]}: {len(result)} items")
+                assert isinstance(results, dict), "Should return dict"
+                assert "ids" in results
+                assert len(results["ids"]) <= 3
+                print(f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs")
             
-            # Test 11: Single ID still returns single QueryResult (backward compatibility)
-            print(f"✅ Testing single ID returns single QueryResult (backward compatibility)")
+            # Test 11: Single ID returns dict format
+            print(f"✅ Testing single ID returns dict format")
             results = collection.get(ids=inserted_ids[0])
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Single ID should return QueryResult, not list"
-            assert len(results) == 1
-            print(f"   Single QueryResult with {len(results)} item")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Single result with {len(results['ids'])} item")
             
-            # Test 12: Get with filters still returns single QueryResult (not multiple)
-            print(f"✅ Testing get with filters returns single QueryResult")
+            # Test 12: Get with filters returns dict format
+            print(f"✅ Testing get with filters returns dict format")
             results = collection.get(
                 where={"category": {"$eq": "AI"}},
                 limit=10
             )
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Get with filters should return QueryResult, not list"
-            print(f"   Single QueryResult with {len(results)} items matching filter")
+            assert isinstance(results, dict), "Should return dict"
+            assert "ids" in results
+            print(f"   Found {len(results['ids'])} items matching filter")
             
         finally:
             # Cleanup

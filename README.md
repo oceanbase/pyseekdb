@@ -33,10 +33,16 @@ Connect to a local embedded SeekDB instance:
 ```python
 import pyseekdb
 
-# Create embedded client
+# Create embedded client with explicit path
 client = pyseekdb.Client(
     path="./seekdb",      # Path to SeekDB data directory
     database="demo"        # Database name
+)
+
+# Create embedded client with default path (current working directory)
+# If path is not provided, uses seekdb.db in the current process working directory
+client = pyseekdb.Client(
+    database="demo"        # Database name (path defaults to current working directory/seekdb.db)
 )
 
 # Execute SQL queries
@@ -57,7 +63,24 @@ client = pyseekdb.Client(
     port=2881,              # Server port (default: 2881)
     database="demo",        # Database name
     user="root",            # Username (default: "root")
-    password=""             # Password
+    password=""             # Password (can be retrieved from SEEKDB_PASSWORD environment variable)
+)
+```
+
+**Note:** If the `password` parameter is not provided (empty string), the client will automatically retrieve it from the `SEEKDB_PASSWORD` environment variable. This is useful for keeping passwords out of your code:
+
+```bash
+export SEEKDB_PASSWORD="your_password"
+```
+
+```python
+# Password will be automatically retrieved from SEEKDB_PASSWORD environment variable
+client = pyseekdb.Client(
+    host="127.0.0.1",
+    port=2881,
+    database="demo",
+    user="root"
+    # password parameter omitted - will use SEEKDB_PASSWORD from environment
 )
 ```
 
@@ -75,7 +98,25 @@ client = pyseekdb.Client(
     tenant="mysql",         # Tenant name
     database="test",        # Database name
     user="root",            # Username
-    password=""             # Password
+    password=""             # Password (can be retrieved from OB_PASSWORD environment variable)
+)
+```
+
+**Note:** If the `password` parameter is not provided (empty string), the client will automatically retrieve it from the `OB_PASSWORD` environment variable. This is useful for keeping passwords out of your code:
+
+```bash
+export OB_PASSWORD="your_password"
+```
+
+```python
+# Password will be automatically retrieved from OB_PASSWORD environment variable
+client = pyseekdb.OBClient(
+    host="127.0.0.1",
+    port=11402,
+    tenant="mysql",
+    database="test",
+    user="root"
+    # password parameter omitted - will use OB_PASSWORD from environment
 )
 ```
 
@@ -114,7 +155,7 @@ admin = pyseekdb.AdminClient(
     host="127.0.0.1",
     port=2881,
     user="root",
-    password=""
+    password=""  # Can be retrieved from SEEKDB_PASSWORD environment variable
 )
 
 # Use context manager
@@ -146,7 +187,7 @@ admin = pyseekdb.OBAdminClient(
     port=11402,
     tenant="mysql",        # Tenant name
     user="root",
-    password=""
+    password=""  # Can be retrieved from OB_PASSWORD environment variable
 )
 
 # Use context manager
@@ -335,7 +376,7 @@ The `add()` method inserts new records into a collection. If a record with the s
 
 **Behavior with Embedding Function:**
 
-1. **If `embeddings` are provided:** embeddings are used directly, `embedding_function` is NOT called (even if provided)
+1. **If `embeddings` are provided:** Embeddings are used directly, `embedding_function` is NOT called (even if provided)
 2. **If `embeddings` are NOT provided but `documents` are provided:**
    - If collection has an `embedding_function` (set during creation or retrieval), it will automatically generate embeddings from documents
    - If collection does NOT have an `embedding_function`, a `ValueError` will be raised
@@ -388,7 +429,7 @@ collection.add(
 
 **Parameters:**
 - `ids` (str or List[str]): Single ID or list of IDs (required)
-- `embeddings` (List[float] or List[List[float]], optional): Single vector or list of embeddings
+- `embeddings` (List[float] or List[List[float]], optional): Single embedding or list of embeddings
   - If provided, used directly (embedding_function is ignored)
   - If not provided, must provide `documents` and collection must have `embedding_function`
 - `documents` (str or List[str], optional): Single document or list of documents
@@ -403,7 +444,7 @@ The `update()` method updates existing records in a collection. Records must exi
 
 **Behavior with Embedding Function:**
 
-1. **If `embeddings` are provided:** embeddings are used directly, `embedding_function` is NOT called
+1. **If `embeddings` are provided:** Embeddings are used directly, `embedding_function` is NOT called
 2. **If `embeddings` are NOT provided but `documents` are provided:**
    - If collection has an `embedding_function`, it will automatically generate embeddings from documents
    - If collection does NOT have an `embedding_function`, a `ValueError` will be raised
@@ -427,7 +468,7 @@ collection.update(
 # Requires: collection must have embedding_function set
 collection.update(
     ids="item1",
-    documents="New document text",  # embeddings will be auto-generated
+    documents="New document text",  # Embeddings will be auto-generated
     metadatas={"category": "AI"}
 )
 
@@ -455,7 +496,7 @@ The `upsert()` method inserts new records or updates existing ones. If a record 
 
 **Behavior with Embedding Function:**
 
-1. **If `embeddings` are provided:** embeddings are used directly, `embedding_function` is NOT called
+1. **If `embeddings` are provided:** Embeddings are used directly, `embedding_function` is NOT called
 2. **If `embeddings` are NOT provided but `documents` are provided:**
    - If collection has an `embedding_function`, it will automatically generate embeddings from documents
    - If collection does NOT have an `embedding_function`, a `ValueError` will be raised
@@ -498,7 +539,7 @@ collection.upsert(
 
 **Parameters:**
 - `ids` (str or List[str]): Single ID or list of IDs (required)
-- `embeddings` (List[float] or List[List[float]], optional): embeddings
+- `embeddings` (List[float] or List[List[float]], optional): Embeddings
   - If provided, used directly (embedding_function is ignored)
   - If not provided, can provide `documents` to auto-generate embeddings
 - `documents` (str or List[str], optional): Documents
@@ -565,10 +606,12 @@ results = collection.query(
 )
 
 # Iterate over results
-for item in results:
-    print(f"ID: {item._id}, Distance: {item.distance}")
-    print(f"Document: {item.document}")
-    print(f"Metadata: {item.metadata}")
+for i in range(len(results["ids"][0])):
+    print(f"ID: {results['ids'][0][i]}, Distance: {results['distances'][0][i]}")
+    if results.get("documents"):
+        print(f"Document: {results['documents'][0][i]}")
+    if results.get("metadatas"):
+        print(f"Metadata: {results['metadatas'][0][i]}")
 
 # Query by texts - embeddings auto-generated by embedding_function
 # Requires: collection must have embedding_function set
@@ -583,9 +626,9 @@ results = collection.query(
     query_texts=["query text 1", "query text 2"],
     n_results=5
 )
-# Returns List[QueryResult], one for each query text
-for i, result in enumerate(results):
-    print(f"Query {i}: {len(result)} results")
+# Returns dict with lists of lists, one list per query text
+for i in range(len(results["ids"])):
+    print(f"Query {i}: {len(results['ids'][i])} results")
 
 # Query with metadata filter (using query_texts)
 results = collection.query(
@@ -621,9 +664,9 @@ results = collection.query(
     query_embeddings=[[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]],
     n_results=2
 )
-# Returns List[QueryResult], one for each query vector
-for i, result in enumerate(results):
-    print(f"Query {i}: {len(result)} results")
+# Returns dict with lists of lists, one list per query embedding
+for i in range(len(results["ids"])):
+    print(f"Query {i}: {len(results['ids'][i])} results")
 
 # Query with specific fields
 results = collection.query(
@@ -634,7 +677,7 @@ results = collection.query(
 ```
 
 **Parameters:**
-- `query_embeddings` (List[float] or List[List[float]], optional): Single vector or list of embeddings for batch queries
+- `query_embeddings` (List[float] or List[List[float]], optional): Single embedding or list of embeddings for batch queries
   - If provided, used directly (embedding_function is ignored)
   - If not provided, must provide `query_texts` and collection must have `embedding_function`
 - `query_texts` (str or List[str], optional): Query text(s) to be embedded
@@ -645,18 +688,26 @@ results = collection.query(
 - `include` (List[str], optional): List of fields to include: `["documents", "metadatas", "embeddings"]`
 
 **Returns:**
-- If single vector/text provided: `QueryResult` object containing query results
-- If multiple embeddings/texts provided: `List[QueryResult]` objects, one for each query vector
+Dict with keys (chromadb-compatible format):
+- `ids`: `List[List[str]]` - List of ID lists, one list per query
+- `documents`: `Optional[List[List[str]]]` - List of document lists, one list per query (if included)
+- `metadatas`: `Optional[List[List[Dict]]]` - List of metadata lists, one list per query (if included)
+- `embeddings`: `Optional[List[List[List[float]]]]` - List of embedding lists, one list per query (if included)
+- `distances`: `Optional[List[List[float]]]` - List of distance lists, one list per query
 
-**QueryResult Object:**
-- Iterable: `for item in results: ...`
-- Indexable: `results[0]` to get first item
-- Each item has:
-  - `_id`: Record ID (always included)
-  - `document`: Document text (if included)
-  - `embedding`: Vector embedding (if included)
-  - `metadata`: Metadata dictionary (if included)
-  - `distance`: Similarity distance (always included for query)
+**Usage:**
+```python
+# Single query
+results = collection.query(query_embeddings=[0.1, 0.2, 0.3], n_results=5)
+# results["ids"][0] contains IDs for the query
+# results["documents"][0] contains documents for the query
+# results["distances"][0] contains distances for the query
+
+# Multiple queries
+results = collection.query(query_embeddings=[[0.1, 0.2], [0.3, 0.4]], n_results=5)
+# results["ids"][0] contains IDs for first query
+# results["ids"][1] contains IDs for second query
+```
 
 **Note:** The `embedding_function` used is the one associated with the collection. You cannot override it per-query.
 
@@ -735,9 +786,29 @@ results = collection.get(limit=100)
 - `include` (List[str], optional): List of fields to include: `["documents", "metadatas", "embeddings"]`
 
 **Returns:**
-- If single ID provided: `QueryResult` object containing get results for that ID
-- If multiple IDs provided: `List[QueryResult]` objects, one for each ID
-- If filters provided (no IDs): `QueryResult` object containing all matching results
+Dict with keys (chromadb-compatible format):
+- `ids`: `List[str]` - List of IDs
+- `documents`: `Optional[List[str]]` - List of documents (if included)
+- `metadatas`: `Optional[List[Dict]]` - List of metadata dictionaries (if included)
+- `embeddings`: `Optional[List[List[float]]]` - List of embeddings (if included)
+
+**Usage:**
+```python
+# Get by single ID
+results = collection.get(ids="123")
+# results["ids"] contains ["123"]
+# results["documents"] contains document for ID "123"
+
+# Get by multiple IDs
+results = collection.get(ids=["1", "2", "3"])
+# results["ids"] contains ["1", "2", "3"]
+# results["documents"] contains documents for all IDs
+
+# Get by filter
+results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
+# results["ids"] contains all matching IDs
+# results["documents"] contains all matching documents
+```
 
 **Note:** If no parameters provided, returns all data (up to limit).
 
@@ -818,7 +889,26 @@ results = collection.hybrid_search(
 - `include` (List[str], optional): Fields to include in results
 
 **Returns:**
-Search results dictionary containing ids, distances, metadatas, documents, embeddings, etc.
+Dict with keys (query-compatible format):
+- `ids`: `List[List[str]]` - List of ID lists (one list for hybrid search result)
+- `documents`: `Optional[List[List[str]]]` - List of document lists (if included)
+- `metadatas`: `Optional[List[List[Dict]]]` - List of metadata lists (if included)
+- `embeddings`: `Optional[List[List[List[float]]]]` - List of embedding lists (if included)
+- `distances`: `Optional[List[List[float]]]` - List of distance lists
+
+**Usage:**
+```python
+# Hybrid search returns results in query-compatible format
+results = collection.hybrid_search(
+    query={"where_document": {"$contains": "machine learning"}},
+    knn={"query_texts": ["AI research"]},
+    rank={"rrf": {}},
+    n_results=5
+)
+# results["ids"][0] contains IDs for the hybrid search
+# results["documents"][0] contains documents for the hybrid search
+# results["distances"][0] contains distances for the hybrid search
+```
 
 **Note:** The `embedding_function` used is the one associated with the collection. You cannot override it per-search.
 
@@ -929,10 +1019,11 @@ print(f"Collection has {count} items")
 info = collection.describe()
 print(f"Name: {info['name']}, Dimension: {info['dimension']}")
 
-# Preview first few items in collection
+# Preview first few items in collection (returns all columns by default)
 preview = collection.peek(limit=5)
-for item in preview:
-    print(f"ID: {item._id}, Document: {item.document}")
+for i in range(len(preview["ids"])):
+    print(f"ID: {preview['ids'][i]}, Document: {preview['documents'][i]}")
+    print(f"Metadata: {preview['metadatas'][i]}, Embedding: {preview['embeddings'][i]}")
 
 # Count collections in database
 collection_count = client.count_collection()
@@ -1262,7 +1353,7 @@ collection = client.get_collection("my_collection", embedding_function=ef)
 # Use the collection - documents will be automatically embedded
 collection.add(
     ids=["doc1", "doc2"],
-    documents=["Document 1", "Document 2"],  # embeddings auto-generated
+    documents=["Document 1", "Document 2"],  # Embeddings auto-generated
     metadatas=[{"tag": "A"}, {"tag": "B"}]
 )
 
@@ -1290,6 +1381,23 @@ python3 -m pytest pyseekdb/tests/test_client_creation.py -v
 ```
 
 ### Environment Variables (Optional)
+
+#### Password Environment Variables
+
+For security purposes, you can set passwords via environment variables instead of passing them directly in code:
+
+- **`SEEKDB_PASSWORD`**: Password for SeekDB server connections (used by `Client()` and `AdminClient()` when `password` parameter is not provided or is empty)
+- **`OB_PASSWORD`**: Password for OceanBase connections (used by `OBClient()` and `OBAdminClient()` when `password` parameter is not provided or is empty)
+
+```bash
+# Set password for SeekDB server connections
+export SEEKDB_PASSWORD="your_seekdb_password"
+
+# Set password for OceanBase connections
+export OB_PASSWORD="your_oceanbase_password"
+```
+
+#### Test Configuration Environment Variables
 
 `test_client_creation.py` honors the following overrides:
 

@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from .base_connection import BaseConnection
 from .admin_client import AdminAPI, DEFAULT_TENANT
 from .meta_info import CollectionNames, CollectionFieldNames
-from .query_result import QueryResult
 from .filters import FilterBuilder
 from .embedding_function import (
     EmbeddingFunction,
@@ -292,11 +291,15 @@ class BaseClient(BaseConnection, AdminAPI):
         # Execute SQL to create table
         self.execute(sql)
         
-        # Store embedding function in kwargs to pass to Collection
-        kwargs['embedding_function'] = embedding_function
-        
         # Create and return Collection object
-        return Collection(client=self, name=name, dimension=dimension, **kwargs)
+        return Collection(
+            client=self,
+            name=name,
+            dimension=dimension,
+            embedding_function=embedding_function,
+            distance=distance,
+            **kwargs
+        )
     
     def get_collection(
         self,
@@ -353,13 +356,48 @@ class BaseClient(BaseConnection, AdminAPI):
                     dimension = int(match.group(1))
                 break
         
+        # Extract distance from CREATE TABLE statement
+        distance = None
+        try:
+            create_table_result = self.execute(f"SHOW CREATE TABLE `{table_name}`")
+            if create_table_result and len(create_table_result) > 0:
+                # Handle both dict and tuple formats
+                if isinstance(create_table_result[0], dict):
+                    create_stmt = create_table_result[0].get('Create Table', create_table_result[0].get('create table', ''))
+                elif isinstance(create_table_result[0], (tuple, list)):
+                    # CREATE TABLE statement is usually in the second column
+                    create_stmt = create_table_result[0][1] if len(create_table_result[0]) > 1 else ''
+                else:
+                    create_stmt = str(create_table_result[0])
+                
+                # Extract distance from VECTOR INDEX ... with(distance=..., ...)
+                # Pattern: VECTOR INDEX ... with(distance=l2, ...) or with(distance='l2', ...)
+                # Match: with(distance=value, ...) where value can be l2, cosine, inner_product, or ip
+                distance_match = re.search(r'with\s*\([^)]*distance\s*=\s*([\'"]?)(\w+)\1', create_stmt, re.IGNORECASE)
+                if distance_match:
+                    distance = distance_match.group(2).lower()
+                    # Normalize distance values
+                    if distance == 'l2':
+                        distance = 'l2'
+                    elif distance == 'cosine':
+                        distance = 'cosine'
+                    elif distance == 'inner_product' or distance == 'ip':
+                        distance = 'inner_product'
+                    else:
+                        # Unknown distance, default to None
+                        logger.warning(f"Unknown distance value '{distance}' in CREATE TABLE statement, defaulting to None")
+                        distance = None
+        except Exception as e:
+            # If SHOW CREATE TABLE fails, log warning but continue
+            logger.warning(f"Failed to get CREATE TABLE statement for '{table_name}': {e}")
+        
         # Handle embedding function
         # If not provided (sentinel), use default embedding function
         if embedding_function is _NOT_PROVIDED:
             embedding_function = get_default_embedding_function()
         
         # Create and return Collection object
-        return Collection(client=self, name=name, dimension=dimension, embedding_function=embedding_function)
+        return Collection(client=self, name=name, dimension=dimension, embedding_function=embedding_function, distance=distance)
     
     def delete_collection(self, name: str) -> None:
         """
@@ -925,12 +963,11 @@ class BaseClient(BaseConnection, AdminAPI):
             meta_val = metadatas[i] if metadatas else None
             vec_val = embeddings[i] if embeddings else None
             
-            if existing and len(existing) > 0:
+            if existing and len(existing.get("ids", [])) > 0:
                 # Update existing record - only update provided fields
-                existing_item = existing[0]
-                existing_doc = existing_item.document if hasattr(existing_item, 'document') else None
-                existing_meta = existing_item.metadata if hasattr(existing_item, 'metadata') else None
-                existing_vec = existing_item.embedding if hasattr(existing_item, 'embedding') else None
+                existing_doc = existing.get("documents", [None])[0] if existing.get("documents") else None
+                existing_meta = existing.get("metadatas", [None])[0] if existing.get("metadatas") else None
+                existing_vec = existing.get("embeddings", [None])[0] if existing.get("embeddings") else None
                 
                 # Use provided values or keep existing values
                 final_document = doc_val if doc_val is not None else existing_doc
@@ -1424,7 +1461,7 @@ class BaseClient(BaseConnection, AdminAPI):
         where_document: Optional[Dict[str, Any]] = None,
         include: Optional[List[str]] = None,
         **kwargs
-    ) -> Union[QueryResult, List[QueryResult]]:
+    ) -> Dict[str, Any]:
         """
         [Internal] Query collection by vector similarity - Common SQL-based implementation
         
@@ -1442,10 +1479,16 @@ class BaseClient(BaseConnection, AdminAPI):
                                    Required if query_texts is provided and collection doesn't have
                                    an embedding_function set. Must implement __call__ method that
                                    accepts Documents and returns Embeddings (List[List[float]]).
+                distance: Distance metric to use for similarity calculation (e.g., 'l2', 'cosine', 'inner_product').
+                         Defaults to 'l2' if not provided.
             
         Returns:
-            - If single embedding/text provided: QueryResult object containing query results
-            - If multiple embeddings/texts provided: List of QueryResult objects, one for each query vector
+            Dict with keys:
+            - ids: List[List[str]] - List of ID lists, one list per query
+            - documents: Optional[List[List[str]]] - List of document lists, one list per query
+            - metadatas: Optional[List[List[Dict]]] - List of metadata lists, one list per query
+            - embeddings: Optional[List[List[List[float]]]] - List of embedding lists, one list per query
+            - distances: Optional[List[List[float]]] - List of distance lists, one list per query
         """
         logger.info(f"Querying collection '{collection_name}' with n_results={n_results}")
         conn = self._ensure_connection()
@@ -1501,10 +1544,30 @@ class BaseClient(BaseConnection, AdminAPI):
         # Build WHERE clause from filters
         where_clause, params = self._build_where_clause(where, where_document)
         
+        # Get distance metric from kwargs, default to 'l2' if not provided
+        distance = kwargs.get('distance', 'l2')
+        
+        # Map distance metric to SQL function name
+        distance_function_map = {
+            'l2': 'l2_distance',
+            'cosine': 'cosine_distance',
+            'inner_product': 'inner_product'
+        }
+        
+        # Get the distance function name, default to 'l2_distance' if distance is not recognized
+        distance_func = distance_function_map.get(distance, 'l2_distance')
+        
+        if distance not in distance_function_map:
+            logger.warning(f"Unknown distance metric '{distance}', defaulting to 'l2_distance'")
+        
         use_context_manager = self._use_context_manager_for_cursor()
         
         # Collect results for each query vector separately
-        query_results = []
+        all_ids = []
+        all_documents = []
+        all_metadatas = []
+        all_embeddings = []
+        all_distances = []
         
         for query_vector in query_embeddings:
             # Convert vector to string format for SQL
@@ -1513,12 +1576,13 @@ class BaseClient(BaseConnection, AdminAPI):
             # Build SQL query with vector distance calculation
             # Reference: SELECT id, vec FROM t2 ORDER BY l2_distance(vec, '[0.1, 0.2, 0.3]') APPROXIMATE LIMIT 5;
             # Need to include distance in SELECT for result processing
+            # Use the appropriate distance function based on the index configuration
             sql = f"""
                 SELECT {select_clause}, 
-                       l2_distance(embedding, '{vector_str}') AS distance
+                       {distance_func}(embedding, '{vector_str}') AS distance
                 FROM `{table_name}`
                 {where_clause}
-                ORDER BY l2_distance(embedding, '{vector_str}')
+                ORDER BY {distance_func}(embedding, '{vector_str}')
                 APPROXIMATE
                 LIMIT %s
             """
@@ -1530,27 +1594,54 @@ class BaseClient(BaseConnection, AdminAPI):
             
             rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
             
-            # Create QueryResult for this vector
-            query_result = QueryResult()
+            # Collect results for this query vector
+            query_ids = []
+            query_documents = []
+            query_metadatas = []
+            query_embeddings = []
+            query_distances = []
+            
             for row in rows:
                 result_item = self._process_query_row(row, include_fields)
-                query_result.add_item(
-                    id=result_item.get("_id"),
-                    document=result_item.get("document"),
-                    embedding=result_item.get("embedding"),
-                    metadata=result_item.get("metadata"),
-                    distance=result_item.get("distance")
-                )
+                query_ids.append(result_item.get("_id"))
+                
+                if "documents" in include_fields or include is None:
+                    query_documents.append(result_item.get("document"))
+                
+                if "metadatas" in include_fields or include is None:
+                    query_metadatas.append(result_item.get("metadata") or {})
+                
+                if "embeddings" in include_fields:
+                    query_embeddings.append(result_item.get("embedding"))
+                
+                query_distances.append(result_item.get("distance"))
             
-            query_results.append(query_result)
+            all_ids.append(query_ids)
+            if "documents" in include_fields or include is None:
+                all_documents.append(query_documents)
+            if "metadatas" in include_fields or include is None:
+                all_metadatas.append(query_metadatas)
+            if "embeddings" in include_fields:
+                all_embeddings.append(query_embeddings)
+            all_distances.append(query_distances)
         
-        # Return single QueryResult if only one vector, otherwise return list
-        if is_multiple_embeddings:
-            logger.info(f"✅ Query completed for '{collection_name}' with {len(query_embeddings)} embeddings, returning {len(query_results)} QueryResult objects")
-            return query_results
-        else:
-            logger.info(f"✅ Query completed for '{collection_name}', found {len(query_results[0])} results")
-            return query_results[0]
+        # Build result dictionary in chromadb format
+        result = {
+            "ids": all_ids,
+            "distances": all_distances
+        }
+        
+        if "documents" in include_fields or include is None:
+            result["documents"] = all_documents
+        
+        if "metadatas" in include_fields or include is None:
+            result["metadatas"] = all_metadatas
+        
+        if "embeddings" in include_fields:
+            result["embeddings"] = all_embeddings
+        
+        logger.info(f"✅ Query completed for '{collection_name}' with {len(query_embeddings)} vectors, returning {len(all_ids)} result lists")
+        return result
     
     def _collection_get(
         self,
@@ -1563,7 +1654,7 @@ class BaseClient(BaseConnection, AdminAPI):
         offset: Optional[int] = None,
         include: Optional[List[str]] = None,
         **kwargs
-    ) -> Union[QueryResult, List[QueryResult]]:
+    ) -> Dict[str, Any]:
         """
         [Internal] Get data from collection by IDs or filters - Common SQL-based implementation
         
@@ -1579,9 +1670,11 @@ class BaseClient(BaseConnection, AdminAPI):
             **kwargs: Additional parameters
             
         Returns:
-            - If single ID provided: QueryResult object containing get results for that ID
-            - If multiple IDs provided (and no filters): List of QueryResult objects, one for each ID
-            - If filters provided (no IDs or multiple IDs with filters): QueryResult object containing all matching results
+            Dict with keys:
+            - ids: List[str] - List of IDs
+            - documents: Optional[List[str]] - List of documents
+            - metadatas: Optional[List[Dict]] - List of metadata dictionaries
+            - embeddings: Optional[List[List[float]]] - List of embeddings
         """
         logger.info(f"Getting data from collection '{collection_name}'")
         conn = self._ensure_connection()
@@ -1606,7 +1699,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 id_list = ids
                 is_single_id = len(id_list) == 1
         
-        # Check if we should return multiple QueryResults (multiple IDs and no filters)
+        # Note: get() now returns dict format (not QueryResult)
         has_filters = where is not None or where_document is not None
         is_multiple_ids = id_list is not None and len(id_list) > 1
         should_return_multiple = is_multiple_ids and not has_filters
@@ -1619,79 +1712,59 @@ class BaseClient(BaseConnection, AdminAPI):
         
         use_context_manager = self._use_context_manager_for_cursor()
         
-        # If multiple IDs and no filters, get each ID separately
-        if should_return_multiple:
-            query_results = []
-            for single_id in id_list:
-                # Build WHERE clause for this single ID
-                where_clause, params = self._build_where_clause(where, where_document, [single_id])
-                
-                # Build SQL query
-                sql = f"""
-                    SELECT {select_clause}
-                    FROM `{table_name}`
-                    {where_clause}
-                    LIMIT %s OFFSET %s
-                """
-                
-                # Execute query
-                query_params = params + [limit, offset]
-                logger.debug(f"Executing SQL: {sql}")
-                logger.debug(f"Parameters: {query_params}")
-                
-                rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
-                
-                # Build QueryResult for this ID
-                query_result = QueryResult()
-                for row in rows:
-                    processed_row = self._process_get_row(row, include_fields)
-                    query_result.add_item(
-                        id=processed_row["id"],
-                        document=processed_row["document"],
-                        embedding=processed_row["embedding"],
-                        metadata=processed_row["metadata"]
-                    )
-                
-                query_results.append(query_result)
+        # Build WHERE clause from filters
+        where_clause, params = self._build_where_clause(where, where_document, id_list)
+        
+        # Build SQL query
+        sql = f"""
+            SELECT {select_clause}
+            FROM `{table_name}`
+            {where_clause}
+            LIMIT %s OFFSET %s
+        """
+        
+        # Execute query
+        query_params = params + [limit, offset]
+        logger.debug(f"Executing SQL: {sql}")
+        logger.debug(f"Parameters: {query_params}")
+        
+        rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
+        
+        # Build result dictionary in chromadb format
+        result_ids = []
+        result_documents = []
+        result_metadatas = []
+        result_embeddings = []
+        
+        for row in rows:
+            processed_row = self._process_get_row(row, include_fields)
+            result_ids.append(processed_row["id"])
             
-            logger.info(f"✅ Get completed for '{collection_name}' with {len(id_list)} IDs, returning {len(query_results)} QueryResult objects")
-            return query_results
-        else:
-            # Single ID or filters: return single QueryResult
-            # Build WHERE clause from filters
-            where_clause, params = self._build_where_clause(where, where_document, id_list)
+            if "documents" in include_fields or include is None:
+                result_documents.append(processed_row["document"])
             
-            # Build SQL query
-            sql = f"""
-                SELECT {select_clause}
-                FROM `{table_name}`
-                {where_clause}
-                LIMIT %s OFFSET %s
-            """
+            if "metadatas" in include_fields or include is None:
+                result_metadatas.append(processed_row["metadata"] or {})
             
-            # Execute query
-            query_params = params + [limit, offset]
-            logger.debug(f"Executing SQL: {sql}")
-            logger.debug(f"Parameters: {query_params}")
-            
-            rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
-            
-            # Build QueryResult
-            query_result = QueryResult()
-            
-            for row in rows:
-                # Process row
-                processed_row = self._process_get_row(row, include_fields)
-                
-                query_result.add_item(
-                    id=processed_row["id"],
-                    document=processed_row["document"],
-                    embedding=processed_row["embedding"],
-                    metadata=processed_row["metadata"]
-                )
-            
-            logger.info(f"✅ Get completed for '{collection_name}', found {len(query_result)} results")
-            return query_result
+            if "embeddings" in include_fields:
+                result_embeddings.append(processed_row["embedding"])
+        
+        # Build result dictionary
+        result = {
+            "ids": result_ids
+        }
+        
+        if "documents" in include_fields or include is None:
+            result["documents"] = result_documents
+        
+        if "metadatas" in include_fields or include is None:
+            result["metadatas"] = result_metadatas
+        
+        if "embeddings" in include_fields:
+            result["embeddings"] = result_embeddings
+        
+        logger.info(f"✅ Get completed for '{collection_name}', found {len(result_ids)} results")
+        return result
     
     def _collection_hybrid_search(
         self,
@@ -1734,7 +1807,12 @@ class BaseClient(BaseConnection, AdminAPI):
                                    accepts Documents and returns Embeddings (List[List[float]]).
             
         Returns:
-            Search results dictionary containing ids, distances, metadatas, documents, embeddings, etc.
+            Dict with keys (query-compatible format):
+            - ids: List[List[str]] - List of ID lists (one list for hybrid search result)
+            - documents: Optional[List[List[str]]] - List of document lists (if included)
+            - metadatas: Optional[List[List[Dict]]] - List of metadata lists (if included)
+            - embeddings: Optional[List[List[List[float]]]] - List of embedding lists (if included)
+            - distances: Optional[List[List[float]]] - List of distance lists
         """
         logger.info(f"Hybrid search in collection '{collection_name}' with n_results={n_results}")
         conn = self._ensure_connection()
@@ -1769,11 +1847,11 @@ class BaseClient(BaseConnection, AdminAPI):
         if not rows or not rows[0].get("query_sql"):
             logger.warning(f"No SQL query returned from GET_SQL")
             return {
-                "ids": [],
-                "distances": [],
-                "metadatas": [],
-                "documents": [],
-                "embeddings": []
+                "ids": [[]],
+                "distances": [[]],
+                "metadatas": [[]],
+                "documents": [[]],
+                "embeddings": [[]]
             }
         
         # Get the SQL query string
@@ -2165,7 +2243,7 @@ class BaseClient(BaseConnection, AdminAPI):
     
     def _transform_sql_result(self, result_rows: List[Dict[str, Any]], include: Optional[List[str]]) -> Dict[str, Any]:
         """
-        Transform SQL query results to standard format
+        Transform SQL query results to standard format (query-compatible format)
         
         Args:
             result_rows: List of row dictionaries from SQL query
@@ -2173,14 +2251,15 @@ class BaseClient(BaseConnection, AdminAPI):
             
         Returns:
             Standard format dictionary with ids, distances, metadatas, documents, embeddings
+            in query-compatible format (List[List[...]] for consistency with query method)
         """
         if not result_rows:
             return {
-                "ids": [],
-                "distances": [],
-                "metadatas": [],
-                "documents": [],
-                "embeddings": []
+                "ids": [[]],
+                "distances": [[]],
+                "metadatas": [[]],
+                "documents": [[]],
+                "embeddings": [[]]
             }
         
         ids = []
@@ -2209,7 +2288,7 @@ class BaseClient(BaseConnection, AdminAPI):
                         metadata = json.loads(metadata)
                     except (json.JSONDecodeError, TypeError):
                         pass
-                metadatas.append(metadata)
+                metadatas.append(metadata or {})
             else:
                 metadatas.append(None)
             
@@ -2233,13 +2312,22 @@ class BaseClient(BaseConnection, AdminAPI):
             else:
                 embeddings.append(None)
         
-        return {
-            "ids": ids,
-            "distances": distances,
-            "metadatas": metadatas,
-            "documents": documents,
-            "embeddings": embeddings
+        # Return in query-compatible format (List[List[...]])
+        result = {
+            "ids": [ids],
+            "distances": [distances]
         }
+        
+        if include is None or "documents" in include or "document" in include:
+            result["documents"] = [documents]
+        
+        if include is None or "metadatas" in include or "metadata" in include:
+            result["metadatas"] = [metadatas]
+        
+        if include and ("embeddings" in include or "embedding" in include):
+            result["embeddings"] = [embeddings]
+        
+        return result
     
     def _transform_search_result(self, search_result: Dict[str, Any], include: Optional[List[str]]) -> Dict[str, Any]:
         """Transform OceanBase search result to standard format"""

@@ -238,10 +238,11 @@ class TestCollectionHybridSearch:
             assert "documents" in results
             assert "metadatas" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
             # Verify results contain "machine learning"
-            for doc in results["documents"]:
+            for doc in results["documents"][0]:
                 if doc:
                     assert "machine" in doc.lower() or "learning" in doc.lower()
             
@@ -294,12 +295,13 @@ class TestCollectionHybridSearch:
             assert "ids" in results
             assert "distances" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
             # Verify distances are reasonable
             # Note: APPROXIMATE ordering may not be perfectly sorted, so we only check
             # that distances are non-negative and reasonable
-            distances = results["distances"]
+            distances = results["distances"][0]
             assert len(distances) > 0
             # All distances should be non-negative
             for dist in distances:
@@ -368,7 +370,8 @@ class TestCollectionHybridSearch:
             assert results is not None
             assert "ids" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results after RRF ranking")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results after RRF ranking")
             
         finally:
             # Cleanup
@@ -436,12 +439,13 @@ class TestCollectionHybridSearch:
             
             assert results is not None
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with metadata filters")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results with metadata filters")
             
             # Verify metadata filters are applied
             # Note: In hybrid search with RRF ranking, results may include records from both
             # full-text and vector search, so we check that all results meet at least one set of filters
-            for metadata in results["metadatas"]:
+            for metadata in results["metadatas"][0]:
                 if metadata:
                     # Results should have category "AI" (common to both query and knn filters)
                     assert metadata.get("category") == "AI"
@@ -514,10 +518,11 @@ class TestCollectionHybridSearch:
             
             assert results is not None
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with logical operators")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results with logical operators")
             
             # Verify logical operators are applied
-            for metadata in results["metadatas"]:
+            for metadata in results["metadatas"][0]:
                 if metadata and "tag" in metadata:
                     assert metadata["tag"] in ["ml", "python"]
             
@@ -575,10 +580,11 @@ class TestCollectionHybridSearch:
             assert "documents" in results
             assert "metadatas" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
             # Verify results contain "machine learning"
-            for doc in results["documents"]:
+            for doc in results["documents"][0]:
                 if doc:
                     assert "machine" in doc.lower() or "learning" in doc.lower()
             
@@ -641,7 +647,8 @@ class TestCollectionHybridSearch:
             assert results is not None
             assert "ids" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results after RRF ranking")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results after RRF ranking")
             
         finally:
             # Cleanup
@@ -694,7 +701,7 @@ class TestCollectionHybridSearch:
             print(f"   Found {len(results['ids'])} results")
             
             # Verify distances are reasonable
-            distances = results["distances"]
+            distances = results["distances"][0]
             assert len(distances) > 0
             for dist in distances:
                 assert dist >= 0, f"Distance should be non-negative, got {dist}"
@@ -766,10 +773,11 @@ class TestCollectionHybridSearch:
             
             assert results is not None
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with metadata filters")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results with metadata filters")
             
             # Verify metadata filters are applied
-            for metadata in results["metadatas"]:
+            for metadata in results["metadatas"][0]:
                 if metadata:
                     assert metadata.get("category") == "AI"
             
@@ -838,10 +846,11 @@ class TestCollectionHybridSearch:
             
             assert results is not None
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with logical operators")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results with logical operators")
             
             # Verify logical operators are applied
-            for metadata in results["metadatas"]:
+            for metadata in results["metadatas"][0]:
                 if metadata and "tag" in metadata:
                     assert metadata["tag"] in ["ml", "python"]
             
@@ -896,10 +905,11 @@ class TestCollectionHybridSearch:
             assert "documents" in results
             assert "metadatas" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
             # Verify results contain "machine learning"
-            for doc in results["documents"]:
+            for doc in results["documents"][0]:
                 if doc:
                     assert "machine" in doc.lower() or "learning" in doc.lower()
             
@@ -950,7 +960,7 @@ class TestCollectionHybridSearch:
             print(f"   Found {len(results['ids'])} results")
             
             # Verify distances are reasonable
-            distances = results["distances"]
+            distances = results["distances"][0]
             assert len(distances) > 0
             for dist in distances:
                 assert dist >= 0, f"Distance should be non-negative, got {dist}"
@@ -1012,7 +1022,8 @@ class TestCollectionHybridSearch:
             assert results is not None
             assert "ids" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results after RRF ranking")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results after RRF ranking")
             
         finally:
             # Cleanup
@@ -1075,10 +1086,11 @@ class TestCollectionHybridSearch:
             
             assert results is not None
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with metadata filters")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results with metadata filters")
             
             # Verify metadata filters are applied
-            for metadata in results["metadatas"]:
+            for metadata in results["metadatas"][0]:
                 if metadata:
                     assert metadata.get("category") == "AI"
             
@@ -1143,10 +1155,11 @@ class TestCollectionHybridSearch:
             
             assert results is not None
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with logical operators")
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results with logical operators")
             
             # Verify logical operators are applied
-            for metadata in results["metadatas"]:
+            for metadata in results["metadatas"][0]:
                 if metadata and "tag" in metadata:
                     assert metadata["tag"] in ["ml", "python"]
             

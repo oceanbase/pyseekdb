@@ -290,15 +290,16 @@ class TestUserDefinedEmbeddingFunction:
             )
             
             assert results is not None
-            assert len(results) > 0
+            assert len(results["ids"]) > 0
+            assert len(results["ids"][0]) > 0
             print(f"   ✅ Query completed: '{query_text}'")
-            print(f"   Found {len(results)} results")
+            print(f"   Found {len(results['ids'][0])} results")
             
-            for i, result in enumerate(results, 1):
-                assert result._id is not None
-                assert result.document is not None
-                assert result.distance is not None
-                print(f"   Result {i}: ID={result._id}, Distance={result.distance:.6f}")
+            for i in range(len(results["ids"][0])):
+                assert results["ids"][0][i] is not None
+                assert results["documents"][0][i] is not None
+                assert results["distances"][0][i] is not None
+                print(f"   Result {i+1}: ID={results['ids'][0][i]}, Distance={results['distances'][0][i]:.6f}")
             
             # Test 3: Verify collection count
             count = collection.count()
@@ -398,15 +399,16 @@ class TestUserDefinedEmbeddingFunction:
             )
             
             assert results is not None
-            assert len(results) > 0
+            assert len(results["ids"]) > 0
+            assert len(results["ids"][0]) > 0
             print(f"   ✅ Query completed: '{query_text}'")
-            print(f"   Found {len(results)} results")
+            print(f"   Found {len(results['ids'][0])} results")
             
-            for i, result in enumerate(results, 1):
-                assert result._id is not None
-                assert result.document is not None
-                assert result.distance is not None
-                print(f"   Result {i}: ID={result._id}, Distance={result.distance:.6f}")
+            for i in range(len(results["ids"][0])):
+                assert results["ids"][0][i] is not None
+                assert results["documents"][0][i] is not None
+                assert results["distances"][0][i] is not None
+                print(f"   Result {i+1}: ID={results['ids'][0][i]}, Distance={results['distances'][0][i]:.6f}")
             
             # Test 3: Verify collection count
             count = collection.count()

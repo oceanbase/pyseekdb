@@ -12,7 +12,6 @@ from typing import Any, List, Dict, Optional, Union, TYPE_CHECKING
 if TYPE_CHECKING:
     from .embedding_function import EmbeddingFunction, Documents as EmbeddingDocuments
 
-from .query_result import QueryResult
 
 
 class Collection:
@@ -33,6 +32,7 @@ class Collection:
         collection_id: Optional[str] = None,
         dimension: Optional[int] = None,
         embedding_function: Optional["EmbeddingFunction[EmbeddingDocuments]"] = None,
+        distance: Optional[str] = None,
         **metadata
     ):
         """
@@ -44,6 +44,7 @@ class Collection:
             collection_id: Collection unique identifier (some databases may need this)
             dimension: Vector dimension
             embedding_function: Embedding function to convert documents to embeddings
+            distance: Distance metric used by the index (e.g., 'l2', 'cosine', 'inner_product')
             **metadata: Other metadata
         """
         self._client = client  # Core: hold reference to the client
@@ -51,6 +52,7 @@ class Collection:
         self._id = collection_id
         self._dimension = dimension
         self._embedding_function = embedding_function
+        self._distance = distance
         self._metadata = metadata
     
     # ==================== Properties ====================
@@ -85,6 +87,11 @@ class Collection:
         """Embedding function for this collection"""
         return self._embedding_function
     
+    @property
+    def distance(self) -> Optional[str]:
+        """Distance metric used by the index (e.g., 'l2', 'cosine', 'inner_product')"""
+        return self._distance
+    
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
     
@@ -104,7 +111,7 @@ class Collection:
         
         Args:
             ids: Single ID or list of IDs
-            embeddings: Single vector or list of embeddings (optional if documents provided and embedding_function is set)
+            embeddings: Single embedding or list of embeddings (optional if documents provided and embedding_function is set)
             metadatas: Single metadata dict or list of metadata dicts (optional)
             documents: Single document or list of documents (optional)
                        If provided without embeddings, embedding_function will be used to generate embeddings
@@ -181,6 +188,7 @@ class Collection:
             **kwargs
         )
     
+    # 修改为upsert语法
     def upsert(
         self,
         ids: Union[str, List[str]],
@@ -272,7 +280,7 @@ class Collection:
         where_document: Optional[Dict[str, Any]] = None,
         include: Optional[List[str]] = None,
         **kwargs
-    ) -> Union[QueryResult, List[QueryResult]]:
+    ) -> Dict[str, Any]:
         """
         Query collection by vector similarity
         
@@ -292,28 +300,30 @@ class Collection:
             **kwargs: Additional parameters
             
         Returns:
-            - If single vector/text provided: QueryResult object containing query results
-            - If multiple embeddings/texts provided: List of QueryResult objects, one for each query vector
-            Each QueryResult item contains:
-            - _id: record ID (always included)
-            - document: document text (if included)
-            - embedding: vector embedding (if included)
-            - metadata: metadata dictionary (if included)
-            - distance: similarity distance (always included for query)
+            Dict with keys (chromadb-compatible format):
+            - ids: List[List[str]] - List of ID lists, one list per query
+            - documents: Optional[List[List[str]]] - List of document lists, one list per query (if included)
+            - metadatas: Optional[List[List[Dict]]] - List of metadata lists, one list per query (if included)
+            - embeddings: Optional[List[List[List[float]]]] - List of embedding lists, one list per query (if included)
+            - distances: Optional[List[List[float]]] - List of distance lists, one list per query
             
         Examples:
-            # Query by single embedding (returns QueryResult)
+            # Query by single embedding
             results = collection.query(
                 query_embeddings=[0.1, 0.2, 0.3],
                 n_results=5
             )
+            # results["ids"][0] contains IDs for the query
+            # results["documents"][0] contains documents for the query
+            # results["distances"][0] contains distances for the query
             
-            # Query by multiple embeddings (returns List[QueryResult])
+            # Query by multiple embeddings
             results = collection.query(
                 query_embeddings=[[11.1, 12.1, 13.1], [1.1, 2.3, 3.2]],
                 n_results=5
             )
-            # results[0] is QueryResult for first vector, results[1] for second vector
+            # results["ids"][0] contains IDs for first query
+            # results["ids"][1] contains IDs for second query
             
             # Query with filters
             results = collection.query(
@@ -329,7 +339,7 @@ class Collection:
                 n_results=10
             )
             
-            # Query by multiple texts (returns List[QueryResult])
+            # Query by multiple texts
             results = collection.query(
                 query_texts=["text1", "text2"],
                 n_results=10
@@ -345,6 +355,7 @@ class Collection:
             where_document=where_document,
             include=include,
             embedding_function=self._embedding_function,
+            distance=self._distance,
             **kwargs
         )
     
@@ -357,7 +368,7 @@ class Collection:
         offset: Optional[int] = None,
         include: Optional[List[str]] = None,
         **kwargs
-    ) -> Union[QueryResult, List[QueryResult]]:
+    ) -> Dict[str, Any]:
         """
         Get data from collection by IDs or filters
         
@@ -371,26 +382,33 @@ class Collection:
             **kwargs: Additional parameters
             
         Returns:
-            - If single ID provided: QueryResult object containing get results for that ID
-            - If multiple IDs provided: List of QueryResult objects, one for each ID
-            - If filters provided (no IDs): QueryResult object containing all matching results
+            Dict with keys (chromadb-compatible format):
+            - ids: List[str] - List of IDs
+            - documents: Optional[List[str]] - List of documents (if included)
+            - metadatas: Optional[List[Dict]] - List of metadata dictionaries (if included)
+            - embeddings: Optional[List[List[float]]] - List of embeddings (if included)
             
         Note:
             If no parameters provided, returns all data (up to limit)
             
         Examples:
-            # Get by single ID (returns QueryResult)
+            # Get by single ID
             results = collection.get(ids="1")
+            # results["ids"] contains ["1"]
+            # results["documents"] contains document for ID "1"
             
-            # Get by multiple IDs (returns List[QueryResult])
+            # Get by multiple IDs
             results = collection.get(ids=["1", "2", "3"])
-            # results[0] is QueryResult for ID "1", results[1] for ID "2", etc.
+            # results["ids"] contains ["1", "2", "3"]
+            # results["documents"] contains documents for all IDs
             
-            # Get by filter (returns QueryResult)
+            # Get by filter
             results = collection.get(
                 where={"tag": "A"},
                 limit=10
             )
+            # results["ids"] contains all matching IDs
+            # results["documents"] contains all matching documents
             
             # Get all data
             results = collection.get(limit=100)
@@ -435,7 +453,12 @@ class Collection:
             **kwargs: Additional parameters
             
         Returns:
-            Search results dictionary containing ids, distances, metadatas, documents, embeddings, etc.
+            Dict with keys (query-compatible format):
+            - ids: List[List[str]] - List of ID lists (one list for hybrid search result)
+            - documents: Optional[List[List[str]]] - List of document lists (if included)
+            - metadatas: Optional[List[List[Dict]]] - List of metadata lists (if included)
+            - embeddings: Optional[List[List[List[float]]]] - List of embedding lists (if included)
+            - distances: Optional[List[List[float]]] - List of distance lists
             
         Examples:
             # Hybrid search with both full-text and vector search
@@ -454,6 +477,9 @@ class Collection:
                 n_results=5,
                 include=["documents", "metadatas", "embeddings"]
             )
+            # results["ids"][0] contains IDs for the hybrid search
+            # results["documents"][0] contains documents for the hybrid search
+            # results["distances"][0] contains distances for the hybrid search
         """
         return self._client._collection_hybrid_search(
             collection_id=self._id,
@@ -485,7 +511,7 @@ class Collection:
             collection_name=self._name
         )
     
-    def peek(self, limit: int = 10) -> QueryResult:
+    def peek(self, limit: int = 10) -> Dict[str, Any]:
         """
         Quickly preview the first few items in the collection
         
@@ -493,13 +519,18 @@ class Collection:
             limit: Number of items to preview (default: 10)
             
         Returns:
-            QueryResult object containing the first limit items
+            Dict with keys (chromadb-compatible format):
+            - ids: List[str] - List of IDs
+            - documents: List[str] - List of documents (always included)
+            - metadatas: List[Dict] - List of metadata dictionaries (always included)
+            - embeddings: List[List[float]] - List of embeddings (always included)
             
         Examples:
-            # Preview first 5 items
+            # Preview first 5 items (returns all columns by default)
             preview = collection.peek(limit=5)
-            for item in preview:
-                print(f"ID: {item._id}, Document: {item.document}")
+            for i in range(len(preview["ids"])):
+                print(f"ID: {preview['ids'][i]}, Document: {preview['documents'][i]}")
+                print(f"Metadata: {preview['metadatas'][i]}, Embedding: {preview['embeddings'][i]}")
         """
         return self._client._collection_get(
             collection_id=self._id,

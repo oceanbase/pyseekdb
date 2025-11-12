@@ -112,12 +112,12 @@ class TestDefaultEmbeddingFunction:
             
             # Verify data was inserted
             results = collection.get(ids=test_ids[0], include=["documents", "metadatas", "embeddings"])
-            assert len(results) == 1
-            assert results[0].document == test_documents[0]
+            assert len(results["ids"]) == 1
+            assert results["documents"][0] == test_documents[0]
             # Note: embedding might not be returned by default, so we check if it exists
-            if results[0].embedding is not None:
-                assert len(results[0].embedding) == collection.dimension
-                print(f"   Verified: document and embedding (dim={len(results[0].embedding)}) stored correctly")
+            if results.get("embeddings") and results["embeddings"][0] is not None:
+                assert len(results["embeddings"][0]) == collection.dimension
+                print(f"   Verified: document and embedding (dim={len(results['embeddings'][0])}) stored correctly")
             else:
                 print(f"   Verified: document stored correctly (embedding not included in get results)")
             

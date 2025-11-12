@@ -11,7 +11,6 @@ from .client_base import BaseClient
 from .collection import Collection
 from .database import Database
 from .admin_client import DEFAULT_TENANT
-from .query_result import QueryResult, QueryResultItem
 
 logger = logging.getLogger(__name__)
 

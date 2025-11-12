@@ -159,8 +159,10 @@ class TestCollectionQuery:
                 n_results=3
             )
             assert results is not None
-            assert len(results) > 0
-            print(f"   Found {len(results)} results")
+            assert "ids" in results
+            assert len(results["ids"]) > 0
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
             # Test 2: Query with metadata filter
             print(f"✅ Testing query with metadata filter")
@@ -170,7 +172,8 @@ class TestCollectionQuery:
                 n_results=5
             )
             assert results is not None
-            print(f"   Found {len(results)} results with category='AI'")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results with category='AI'")
             
             # Test 3: Query with document filter
             print(f"✅ Testing query with document filter")
@@ -180,7 +183,8 @@ class TestCollectionQuery:
                 n_results=5
             )
             assert results is not None
-            print(f"   Found {len(results)} results containing 'machine learning'")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results containing 'machine learning'")
             
             # Test 4: Query with include parameter
             print(f"✅ Testing query with include parameter")
@@ -190,13 +194,16 @@ class TestCollectionQuery:
                 n_results=3
             )
             assert results is not None
-            if len(results) > 0:
+            assert "ids" in results
+            if len(results["ids"][0]) > 0:
                 # Check that results have the expected fields
-                for item in results:
-                    assert hasattr(item, '_id') or '_id' in item.to_dict()
+                assert "documents" in results
+                assert "metadatas" in results
+                assert len(results["ids"][0]) == len(results["documents"][0])
+                assert len(results["ids"][0]) == len(results["metadatas"][0])
             
-            # Test 5: Query with multiple vectors (should return List[QueryResult])
-            print(f"✅ Testing query with multiple vectors (returns List[QueryResult])")
+            # Test 5: Query with multiple vectors (should return dict with lists of lists)
+            print(f"✅ Testing query with multiple vectors (returns dict with lists of lists)")
             query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
             query_vector2 = query_vector2[:actual_dimension]
             results = collection.query(
@@ -204,23 +211,25 @@ class TestCollectionQuery:
                 n_results=2
             )
             assert results is not None
-            assert isinstance(results, list), "Multiple vectors should return List[QueryResult]"
-            assert len(results) == 2, f"Expected 2 QueryResult objects, got {len(results)}"
-            for i, result in enumerate(results):
-                assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                assert len(result) > 0, f"QueryResult {i} should have at least one item"
-                print(f"   QueryResult {i}: {len(result)} items")
+            assert isinstance(results, dict), "Multiple vectors should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 2, f"Expected 2 ID lists, got {len(results['ids'])}"
+            for i in range(len(results["ids"])):
+                assert len(results["ids"][i]) > 0, f"ID list {i} should have at least one item"
+                print(f"   Query {i}: {len(results['ids'][i])} items")
             
-            # Test 6: Single vector still returns single QueryResult (backward compatibility)
-            print(f"✅ Testing single vector returns single QueryResult (backward compatibility)")
+            # Test 6: Single vector returns dict with single list in lists
+            print(f"✅ Testing single vector returns dict format")
             results = collection.query(
                 query_embeddings=query_vector,
                 n_results=2
             )
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Single vector should return QueryResult, not list"
-            assert len(results) > 0
-            print(f"   Single QueryResult with {len(results)} items")
+            assert isinstance(results, dict), "Single vector should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 1, "Single query should have one ID list"
+            assert len(results["ids"][0]) > 0
+            print(f"   Single query with {len(results['ids'][0])} items")
             
         finally:
             # Cleanup
@@ -274,8 +283,10 @@ class TestCollectionQuery:
                 n_results=3
             )
             assert results is not None
-            assert len(results) > 0
-            print(f"   Found {len(results)} results")
+            assert "ids" in results
+            assert len(results["ids"]) > 0
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
             # Test 2: Query with metadata filter using comparison operators
             print(f"✅ Testing query with metadata filter ($gte)")
@@ -285,7 +296,8 @@ class TestCollectionQuery:
                 n_results=5
             )
             assert results is not None
-            print(f"   Found {len(results)} results with score >= 90")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results with score >= 90")
             
             # Test 3: Query with combined filters
             print(f"✅ Testing query with combined filters")
@@ -296,7 +308,8 @@ class TestCollectionQuery:
                 n_results=5
             )
             assert results is not None
-            print(f"   Found {len(results)} results matching all filters")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results matching all filters")
             
             # Test 4: Query with $in operator
             print(f"✅ Testing query with $in operator")
@@ -306,10 +319,11 @@ class TestCollectionQuery:
                 n_results=5
             )
             assert results is not None
-            print(f"   Found {len(results)} results with tag in ['ml', 'python']")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results with tag in ['ml', 'python']")
             
-            # Test 5: Query with multiple vectors (should return List[QueryResult])
-            print(f"✅ Testing query with multiple vectors (returns List[QueryResult])")
+            # Test 5: Query with multiple vectors (should return dict with lists of lists)
+            print(f"✅ Testing query with multiple vectors (returns dict with lists of lists)")
             query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
             query_vector2 = query_vector2[:actual_dimension]
             query_vector3 = [1.1, 2.1, 3.1] * ((actual_dimension // 3) + 1)
@@ -319,23 +333,25 @@ class TestCollectionQuery:
                 n_results=2
             )
             assert results is not None
-            assert isinstance(results, list), "Multiple vectors should return List[QueryResult]"
-            assert len(results) == 3, f"Expected 3 QueryResult objects, got {len(results)}"
-            for i, result in enumerate(results):
-                assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                assert len(result) > 0, f"QueryResult {i} should have at least one item"
-                print(f"   QueryResult {i}: {len(result)} items")
+            assert isinstance(results, dict), "Multiple vectors should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 3, f"Expected 3 ID lists, got {len(results['ids'])}"
+            for i in range(len(results["ids"])):
+                assert len(results["ids"][i]) > 0, f"ID list {i} should have at least one item"
+                print(f"   Query {i}: {len(results['ids'][i])} items")
             
-            # Test 6: Single vector still returns single QueryResult (backward compatibility)
-            print(f"✅ Testing single vector returns single QueryResult (backward compatibility)")
+            # Test 6: Single vector returns dict format
+            print(f"✅ Testing single vector returns dict format")
             results = collection.query(
                 query_embeddings=query_vector,
                 n_results=2
             )
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Single vector should return QueryResult, not list"
-            assert len(results) > 0
-            print(f"   Single QueryResult with {len(results)} items")
+            assert isinstance(results, dict), "Single vector should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 1, "Single query should have one ID list"
+            assert len(results["ids"][0]) > 0
+            print(f"   Single query with {len(results['ids'][0])} items")
             
         finally:
             # Cleanup
@@ -390,11 +406,13 @@ class TestCollectionQuery:
                 n_results=3
             )
             assert results is not None
-            assert len(results) > 0
-            print(f"   Found {len(results)} results")
+            assert "ids" in results
+            assert len(results["ids"]) > 0
+            assert len(results["ids"][0]) > 0
+            print(f"   Found {len(results['ids'][0])} results")
             
-            # Test 2: Query with multiple vectors (should return List[QueryResult])
-            print(f"✅ Testing query with multiple vectors (returns List[QueryResult])")
+            # Test 2: Query with multiple vectors (should return dict with lists of lists)
+            print(f"✅ Testing query with multiple vectors (returns dict with lists of lists)")
             query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
             query_vector2 = query_vector2[:actual_dimension]
             results = collection.query(
@@ -402,12 +420,12 @@ class TestCollectionQuery:
                 n_results=2
             )
             assert results is not None
-            assert isinstance(results, list), "Multiple vectors should return List[QueryResult]"
-            assert len(results) == 2, f"Expected 2 QueryResult objects, got {len(results)}"
-            for i, result in enumerate(results):
-                assert isinstance(result, pyseekdb.QueryResult), f"Result {i} should be QueryResult"
-                assert len(result) > 0, f"QueryResult {i} should have at least one item"
-                print(f"   QueryResult {i}: {len(result)} items")
+            assert isinstance(results, dict), "Multiple vectors should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 2, f"Expected 2 ID lists, got {len(results['ids'])}"
+            for i in range(len(results["ids"])):
+                assert len(results["ids"][i]) > 0, f"ID list {i} should have at least one item"
+                print(f"   Query {i}: {len(results['ids'][i])} items")
             
             # Test 3: Query with logical operators
             print(f"✅ Testing query with logical operators ($or)")
@@ -422,7 +440,8 @@ class TestCollectionQuery:
                 n_results=5
             )
             assert results is not None
-            print(f"   Found {len(results)} results with $or condition")
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results with $or condition")
             
             # Test 4: Query with include parameter to get specific fields
             print(f"✅ Testing query with include parameter")
@@ -432,23 +451,27 @@ class TestCollectionQuery:
                 n_results=3
             )
             assert results is not None
-            if len(results) > 0:
+            assert "ids" in results
+            if len(results["ids"][0]) > 0:
                 # Verify result structure
-                for item in results:
-                    result_dict = item.to_dict() if hasattr(item, 'to_dict') else item
-                    assert '_id' in result_dict
-                    print(f"   Result keys: {list(result_dict.keys())}")
+                assert "documents" in results
+                assert "metadatas" in results
+                assert "embeddings" in results
+                assert len(results["ids"][0]) == len(results["documents"][0])
+                print(f"   Result has all expected fields")
             
-            # Test 5: Single vector still returns single QueryResult (backward compatibility)
-            print(f"✅ Testing single vector returns single QueryResult (backward compatibility)")
+            # Test 5: Single vector returns dict format
+            print(f"✅ Testing single vector returns dict format")
             results = collection.query(
                 query_embeddings=query_vector,
                 n_results=2
             )
             assert results is not None
-            assert isinstance(results, pyseekdb.QueryResult), "Single vector should return QueryResult, not list"
-            assert len(results) > 0
-            print(f"   Single QueryResult with {len(results)} items")
+            assert isinstance(results, dict), "Single vector should return dict"
+            assert "ids" in results
+            assert len(results["ids"]) == 1, "Single query should have one ID list"
+            assert len(results["ids"][0]) > 0
+            print(f"   Single query with {len(results['ids'][0])} items")
             
         finally:
             # Cleanup
