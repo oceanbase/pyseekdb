@@ -5,7 +5,7 @@ import os
 import logging
 from typing import Any, List, Optional, Sequence, Dict, Union
 
-import seekdb  # type: ignore
+import pylibseekdb as seekdb  # type: ignore
 
 from .client_base import BaseClient
 from .collection import Collection

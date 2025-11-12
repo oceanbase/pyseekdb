@@ -400,7 +400,7 @@ class TestCollectionEmbeddingFunction:
             )
         
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         

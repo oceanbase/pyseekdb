@@ -123,7 +123,7 @@ class TestCollectionQuery:
         """Test collection.query() with embedded client"""
         # Check if seekdb package is available
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         

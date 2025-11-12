@@ -854,7 +854,7 @@ class TestCollectionHybridSearch:
         """Test hybrid_search with only full-text search (query) using SeekdbEmbedded"""
         # Check if seekdb package is available
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         
@@ -911,7 +911,7 @@ class TestCollectionHybridSearch:
         """Test hybrid_search with only vector search (knn) using SeekdbEmbedded"""
         # Check if seekdb package is available
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         
@@ -965,7 +965,7 @@ class TestCollectionHybridSearch:
         """Test hybrid_search with both full-text and vector search using SeekdbEmbedded"""
         # Check if seekdb package is available
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         
@@ -1022,7 +1022,7 @@ class TestCollectionHybridSearch:
         """Test hybrid_search with metadata filters using SeekdbEmbedded"""
         # Check if seekdb package is available
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         
@@ -1090,7 +1090,7 @@ class TestCollectionHybridSearch:
         """Test hybrid_search with logical operators in metadata filters using SeekdbEmbedded"""
         # Check if seekdb package is available
         try:
-            import seekdb
+            import pylibseekdb
         except ImportError:
             pytest.skip("SeekDB embedded package is not installed")
         

@@ -15,7 +15,7 @@ repository = "https://github.com/oceanbase/pyseekdb/"
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
 pymysql = "^1.1.1"
-seekdb = "*"
+pylibseekdb = "*"
 sentence-transformers = {version = "*", optional = true}
 
 [tool.poetry.extras]

@@ -265,7 +265,7 @@ class TestClientCreation:
             project_root_str = str(project_root)
             if project_root_str in sys.path:
                 sys.path.remove(project_root_str)
-            import seekdb
+            import pylibseekdb
             if not hasattr(seekdb, 'open') and not hasattr(seekdb, '_initialize_module'):
                 pytest.fail(
                     "❌ SeekDB embedded package is not properly installed!\n"
