@@ -16,10 +16,10 @@ SeekDBClient is a unified Python client that wraps three database connection mod
 ## Installation
 
 ```bash
-# install from pypi
-pip install pyseekdb
-# install from source code
-poetry install
+# install pyseekdb and all dependencies
+pip install -U pyseekdb[all]
+# install pyseekdb (no default embedding support)
+pip install -U pyseekdb
 ```
 
 ## 1. Client Connection
