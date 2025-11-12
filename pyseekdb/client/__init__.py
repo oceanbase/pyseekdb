@@ -147,7 +147,7 @@ def Client(
     
     else:
         # Default to embedded mode with current working directory as path
-        default_path = os.path.join(os.getcwd(), "seekdb.db")
+        default_path = os.path.abspath("seekdb.db")
         logger.info(f"Creating embedded client (default): path={default_path}, database={database}")
         server = SeekdbEmbeddedClient(
             path=default_path,

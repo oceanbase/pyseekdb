@@ -33,10 +33,16 @@ Connect to a local embedded SeekDB instance:
 ```python
 import pyseekdb
 
-# Create embedded client
+# Create embedded client with explicit path
 client = pyseekdb.Client(
     path="./seekdb",      # Path to SeekDB data directory
     database="demo"        # Database name
+)
+
+# Create embedded client with default path (current working directory)
+# If path is not provided, uses seekdb.db in the current process working directory
+client = pyseekdb.Client(
+    database="demo"        # Database name (path defaults to current working directory/seekdb.db)
 )
 
 # Execute SQL queries
