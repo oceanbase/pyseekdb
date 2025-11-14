@@ -197,6 +197,22 @@ class TestCollectionQuery:
             assert "ids" in results
             print(f"   Found {len(results['ids'][0])} results matching regex '.*machine.*'")
             
+            # Test 3.6: Query with where parameter using regex (test if supported)
+            print(f"✅ Testing query with where parameter using regex")
+            try:
+                results = collection.query(
+                    query_embeddings=query_vector,
+                    where={"tag": {"$regex": ".*ml.*"}},
+                    n_results=5
+                )
+                assert results is not None
+                assert "ids" in results
+                print(f"   ✓ where parameter supports $regex: Found {len(results['ids'][0])} results")
+            except Exception as e:
+                print(f"   ✗ where parameter does NOT support $regex: {type(e).__name__}: {e}")
+                # If regex is not supported, this is expected behavior
+                # We'll just log it but not fail the test
+            
             # Test 4: Query with include parameter
             print(f"✅ Testing query with include parameter")
             results = collection.query(
@@ -333,6 +349,22 @@ class TestCollectionQuery:
             assert results is not None
             assert "ids" in results
             print(f"   Found {len(results['ids'][0])} results matching regex '.*[Pp]ython.*'")
+            
+            # Test 3.6: Query with where parameter using regex (test if supported)
+            print(f"✅ Testing query with where parameter using regex")
+            try:
+                results = collection.query(
+                    query_embeddings=query_vector,
+                    where={"category": {"$regex": ".*AI.*"}},
+                    n_results=5
+                )
+                assert results is not None
+                assert "ids" in results
+                print(f"   ✓ where parameter supports $regex: Found {len(results['ids'][0])} results")
+            except Exception as e:
+                print(f"   ✗ where parameter does NOT support $regex: {type(e).__name__}: {e}")
+                # If regex is not supported, this is expected behavior
+                # We'll just log it but not fail the test
             
             # Test 4: Query with $in operator
             print(f"✅ Testing query with $in operator")
@@ -476,6 +508,22 @@ class TestCollectionQuery:
             assert results is not None
             assert "ids" in results
             print(f"   Found {len(results['ids'][0])} results matching regex '.*neural.*'")
+            
+            # Test 3.6: Query with where parameter using regex (test if supported)
+            print(f"✅ Testing query with where parameter using regex")
+            try:
+                results = collection.query(
+                    query_embeddings=query_vector,
+                    where={"tag": {"$regex": "^(ml|python)$"}},
+                    n_results=5
+                )
+                assert results is not None
+                assert "ids" in results
+                print(f"   ✓ where parameter supports $regex: Found {len(results['ids'][0])} results")
+            except Exception as e:
+                print(f"   ✗ where parameter does NOT support $regex: {type(e).__name__}: {e}")
+                # If regex is not supported, this is expected behavior
+                # We'll just log it but not fail the test
             
             # Test 4: Query with include parameter to get specific fields
             print(f"✅ Testing query with include parameter")

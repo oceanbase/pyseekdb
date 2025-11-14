@@ -290,6 +290,7 @@ class Collection:
             n_results: Number of results to return (default: 10)
             where: Filter condition on metadata supporting:
                    - Comparison operators: $eq, $lt, $gt, $lte, $gte, $ne, $in, $nin
+                   - Pattern matching: $regex (regular expression)
                    - Logical operators: $or, $and, $not
             where_document: Filter condition on documents supporting:
                    - $contains: full-text search

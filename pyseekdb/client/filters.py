@@ -2,7 +2,7 @@
 Filter builder utilities for metadata and document filtering
 
 Supports:
-- Metadata filters: $eq, $lt, $gt, $lte, $gte, $ne, $in, $nin
+- Metadata filters: $eq, $lt, $gt, $lte, $gte, $ne, $in, $nin, $regex
 - Logical operators: $or, $and, $not
 - Document filters: $contains, $regex
 """
@@ -38,7 +38,7 @@ class FilterBuilder:
         Build WHERE clause for metadata filtering
         
         Args:
-            where: Filter dictionary with operators like $eq, $lt, $gt, $lte, $gte, $ne, $in, $nin, $and, $or, $not
+            where: Filter dictionary with operators like $eq, $lt, $gt, $lte, $gte, $ne, $in, $nin, $regex, $and, $or, $not
             metadata_column: Name of metadata column (default: "metadata")
             
         Returns:
@@ -133,6 +133,11 @@ class FilterBuilder:
                         placeholders = ", ".join(["%s"] * len(op_value))
                         clauses.append(f"JSON_EXTRACT({metadata_column}, '$.{key}') NOT IN ({placeholders})")
                         params.extend(op_value)
+                    
+                    elif op == "$regex":
+                        # Regular expression matching for metadata fields
+                        clauses.append(f"JSON_EXTRACT({metadata_column}, '$.{key}') REGEXP %s")
+                        params.append(op_value)
             
             else:
                 # Direct equality comparison

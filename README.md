@@ -867,6 +867,11 @@ results = collection.hybrid_search(
   where={"category": {"$eq": "AI"}}
   ```
 
+  - `$regex`: Pattern matching (regular expression) 
+  ```python
+  where={"tag": {"$regex": ".*ml.*"}}
+  ```
+
 - `$ne`: Not equal to
   ```python
   where={"status": {"$ne": "deleted"}}
