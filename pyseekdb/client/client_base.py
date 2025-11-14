@@ -284,7 +284,7 @@ class BaseClient(BaseConnection, AdminAPI):
             document string,
             embedding vector({dimension}),
             metadata json,
-            FULLTEXT INDEX idx_fts(document),
+            FULLTEXT INDEX idx_fts(document) WITH PARSER ik,
             VECTOR INDEX idx_vec (embedding) with(distance={distance}, type={index_type}, lib=vsag)
         ) ORGANIZATION = HEAP;"""
         
