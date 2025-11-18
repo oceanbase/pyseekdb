@@ -39,24 +39,23 @@ jobs:
         run: |
           poetry install
 
-      - name: Start OceanBase container
-        uses: oceanbase/setup-oceanbase-ce@v1
-        with:
-          image_name: 'oceanbase/oceanbase-ce'
-          image_tag: '4.4.1.0-100000032025101610'
-          mode: 'mini'
-          sql_port: 10000
-          datafile_size: '20G'
-          log_disk_size: '10G'
-          tenant_name: 'mysql'
-          init_sql: "ALTER SYSTEM ob_vector_memory_limit_percentage = 30; create user 'jtuser'@'%'; GRANT SELECT, INSERT, UPDATE, DELETE ON test.* TO 'jtuser'@'%'; FLUSH PRIVILEGES;"
+          #- name: Start OceanBase container
+          #  uses: oceanbase/setup-oceanbase-ce@v1
+          #  with:
+          #    image_name: 'oceanbase/oceanbase-ce'
+          #    image_tag: '4.4.1.0-100000032025101610'
+          #    mode: 'mini'
+          #    sql_port: 10000
+          #    datafile_size: '20G'
+          #    log_disk_size: '10G'
+          #    tenant_name: 'mysql'
+          #    init_sql: "ALTER SYSTEM ob_vector_memory_limit_percentage = 30; create user 'jtuser'@'%'; GRANT SELECT, INSERT, UPDATE, DELETE ON test.* TO 'jtuser'@'%'; FLUSH PRIVILEGES;"
 
       - name: Start seekdb container
         shell: bash
         run: |
           docker run --name seekdb-server -p 2881:2881 -d oceanbase/seekdb:latest
           sleep 15 
-          ls -l /var/lib/oceanbase/etc/
           docker logs seekdb-server
 
       - name: Run tests
