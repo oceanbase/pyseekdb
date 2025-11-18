@@ -20,7 +20,7 @@ import pyseekdb
 SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb_store"))
 
 # Server mode (SeekDB Server)
-SERVER_HOST = os.environ.get('SERVER_HOST', '11.161.205.15')
+SERVER_HOST = os.environ.get('SERVER_HOST', '127.0.0.1')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', '2881'))  # SeekDB Server port
 SERVER_USER = os.environ.get('SERVER_USER', 'root')
 SERVER_PASSWORD = os.environ.get('SERVER_PASSWORD', '')
