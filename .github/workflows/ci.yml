@@ -44,7 +44,7 @@ jobs:
           poetry install
 
       - name: Start OceanBase container
-        if: ${{ matrix.test_mode }} == 'oceanbase'
+        if: matrix.test_mode == 'oceanbase'
         uses: oceanbase/setup-oceanbase-ce@v1
         with:
           image_name: 'oceanbase/oceanbase-ce'
@@ -57,7 +57,7 @@ jobs:
           init_sql: "ALTER SYSTEM ob_vector_memory_limit_percentage = 30; create user 'jtuser'@'%'; GRANT SELECT, INSERT, UPDATE, DELETE ON test.* TO 'jtuser'@'%'; FLUSH PRIVILEGES;"
 
       - name: Start seekdb container
-        if: ${{ matrix.test_mode }} == 'server'
+        if: matrix.test_mode == 'server'
         shell: bash
         run: |
           docker run --name seekdb-server -p 2881:2881 -d oceanbase/seekdb:latest
