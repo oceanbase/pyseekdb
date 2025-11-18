@@ -93,7 +93,7 @@ client = pyseekdb.Client(
 )
 ```
 
-### 1.4 Client Methods and Properties
+### 1.3 Client Methods and Properties
 
 | Method / Property     | Description                                                    |
 |-----------------------|----------------------------------------------------------------|
