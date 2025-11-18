@@ -54,7 +54,9 @@ jobs:
       - name: Start seekdb container
         shell: bash
         run: |
-          docker run -d oceanbase/seekdb:latest
+          docker run --name seekdb-server -p 2881:2881 -d oceanbase/seekdb:latest
+          sleep 5
+          docker logs seekdb-server
 
       - name: Run tests
         run: |
