@@ -45,11 +45,17 @@ jobs:
           image_name: 'oceanbase/oceanbase-ce'
           image_tag: '4.4.1.0-100000032025101610'
           mode: 'mini'
+          sql_port: 10000
           datafile_size: '20G'
           log_disk_size: '10G'
           tenant_name: 'mysql'
           init_sql: "ALTER SYSTEM ob_vector_memory_limit_percentage = 30; create user 'jtuser'@'%'; GRANT SELECT, INSERT, UPDATE, DELETE ON test.* TO 'jtuser'@'%'; FLUSH PRIVILEGES;"
 
+      - name: Start seekdb container
+        shell: bash
+        run: |
+          docker run -d oceanbase/seekdb:latest
+
       - name: Run tests
         run: |
-          OB_PORT=2881 poetry run pytest --log-cli-level=INFO -k "test_oceanbase_"
+          SEEKDB_PATH=$HOME/seekdb.db OB_PORT=10000 SERVER_PORT=2881 poetry run pytest --log-cli-level=INFO
