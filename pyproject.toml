@@ -6,7 +6,7 @@ authors = ["OceanBase <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
 license = "Apache-2.0"
 
-packages = [{include="src"}]
+packages = [{include = "pyseekdb", from = "src"}]
 homepage = "https://github.com/oceanbase/pyseekdb/"
 repository = "https://github.com/oceanbase/pyseekdb/"
 
