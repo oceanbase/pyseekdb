@@ -17,7 +17,9 @@ All factories use the underlying ServerAPI implementations:
 """
 import logging
 import os
-from typing import Optional, Union
+from typing import Any, Optional, Union
+
+from sqlalchemy.engine import Engine
 
 from .base_connection import BaseConnection
 from .client_base import (
@@ -36,6 +38,7 @@ from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
 from .admin_client import AdminAPI, _AdminClientProxy, _ClientProxy
 from .database import Database
+from .sqlalchemy_client import SQLAlchemyClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ __all__ = [
     'get_default_embedding_function',
     'SeekdbEmbeddedClient',
     'RemoteServerClient',
+    'SQLAlchemyClient',
     'Client',
     'AdminAPI',
     'AdminClient',
@@ -66,12 +70,16 @@ def Client(
     database: str = "test",
     user: Optional[str] = None,
     password: str = "", # Can be retrieved from SEEKDB_PASSWORD environment variable
+    sqlalchemy_engine: Optional[Union[str, Engine]] = None,
+    sqlalchemy_schema: Optional[str] = None,
+    sqlalchemy_engine_kwargs: Optional[dict[str, Any]] = None,
     **kwargs
 ) -> _ClientProxy:
     """
     Smart client factory function (returns ClientProxy for collection operations only)
     
     Automatically selects embedded or remote server mode based on parameters:
+    - If sqlalchemy_engine is provided, uses SQLAlchemy/pgvector mode
     - If path is provided, uses embedded mode
     - If host/port is provided, uses remote server mode (supports both seekdb Server and OceanBase Server)
     - If neither path nor host is provided, defaults to embedded mode with current working directory as path
@@ -88,6 +96,9 @@ def Client(
         database: database name
         user: username (remote server mode, without tenant suffix)
         password: password (remote server mode). If not provided, will be retrieved from SEEKDB_PASSWORD environment variable
+        sqlalchemy_engine: SQLAlchemy Engine instance or database URL
+        sqlalchemy_schema: Optional schema when using SQLAlchemy mode
+        sqlalchemy_engine_kwargs: Optional kwargs when creating an Engine from URL in SQLAlchemy mode
         **kwargs: other parameters
     
     Returns:
@@ -126,8 +137,16 @@ def Client(
     if not password:
         password = os.environ.get("SEEKDB_PASSWORD", "")
     
-    # Determine mode and create appropriate server
-    if path is not None:
+    # SQLAlchemy mode has highest priority if engine/url provided
+    if sqlalchemy_engine is not None:
+        logger.info("Creating SQLAlchemy client")
+        server = SQLAlchemyClient(
+            engine=sqlalchemy_engine,
+            schema=sqlalchemy_schema,
+            engine_kwargs=sqlalchemy_engine_kwargs,
+            **kwargs
+        )
+    elif path is not None:
         # Embedded mode
         logger.info(f"Creating embedded client: path={path}, database={database}")
         server = SeekdbEmbeddedClient(

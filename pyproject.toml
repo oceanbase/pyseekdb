@@ -22,6 +22,7 @@ httpx = "*"
 tqdm = "*"
 tenacity = "*"
 numpy = ">=1.26,<1.27"
+sqlalchemy = ">=2.0,<3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
