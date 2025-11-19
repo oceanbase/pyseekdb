@@ -1,13 +1,18 @@
 [tool.poetry]
 name = "pyseekdb"
-version = "0.1.0.dev5"
+version = "1.0.0.b3"
 description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase."
 authors = ["OceanBase <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
 license = "Apache-2.0"
 
+packages = [{include="src"}]
 homepage = "https://github.com/oceanbase/pyseekdb/"
 repository = "https://github.com/oceanbase/pyseekdb/"
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+]
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/oceanbase/pyseekdb/issues"
