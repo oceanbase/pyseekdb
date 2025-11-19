@@ -138,7 +138,7 @@ class TestCollectionGet:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.skip("SeekDB embedded package is not installed")
+            pytest.fail("SeekDB embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(
@@ -277,7 +277,7 @@ class TestCollectionGet:
             result = client._server.execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
-            pytest.skip(f"Server connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
+            pytest.fail(f"Server connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
         
         # Create test collection
         collection_name = f"test_get_{int(time.time())}"
@@ -431,7 +431,7 @@ class TestCollectionGet:
             result = client._server.execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
-            pytest.skip(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
+            pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
         
         # Create test collection
         collection_name = f"test_get_{int(time.time())}"
