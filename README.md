@@ -1,6 +1,12 @@
-# SeekDBClient
+# pyseekdb
 
-SeekDBClient is a unified Python client that wraps three database connection modes—embedded SeekDB, remote SeekDB servers, and OceanBase—behind a single, concise API.
+pyseekdb aims to provide developers with simple and easy-to-use APIs, reducing the learning curve and entry barriers. Compared to relational databases, database systems like MongoDB, ES, and Milvus simplify their main operations into KV operations in their Client APIs, making them more beginner-friendly. This SDK provides efficient and easy-to-use APIs for applications to access SeekDB and OceanBase's AI-related features. Advanced users can still use MySQL-compatible drivers to directly manipulate database objects in SeekDB and OceanBase through SQL statements.
+
+To achieve the above design goals, this SDK follows the following design principles:
+1. Fixed data model with schema-free interfaces. For beginners and application prototype development, users do not need to explicitly define relational table structures
+2. The main data managed is text (or text fragments) and their attributes
+3. All data operations are single Collection operations, cross-collection operations are not supported
+4. Each record stores and manages **one** text
 
 ## Table of Contents
 
@@ -58,7 +64,6 @@ import pyseekdb
 client = pyseekdb.Client(
     host="127.0.0.1",      # Server host
     port=2881,              # Server port (default: 2881)
-    tenant="sys",          # Tenant name (default: "sys" for SeekDB Server)
     database="demo",        # Database name
     user="root",            # Username (default: "root")
     password=""             # Password (can be retrieved from SEEKDB_PASSWORD environment variable)
@@ -68,7 +73,7 @@ client = pyseekdb.Client(
 client = pyseekdb.Client(
     host="127.0.0.1",      # Server host
     port=2881,              # Server port (default: 2881)
-    tenant="test",         # Tenant name
+    tenant="sys",          # Tenant name (default: sys)
     database="demo",       # Database name
     user="root",           # Username (default: "root")
     password=""             # Password (can be retrieved from SEEKDB_PASSWORD environment variable)
@@ -86,7 +91,6 @@ export SEEKDB_PASSWORD="your_password"
 client = pyseekdb.Client(
     host="127.0.0.1",
     port=2881,
-    tenant="sys",  # or "test" for OceanBase
     database="demo",
     user="root"
     # password parameter omitted - will use SEEKDB_PASSWORD from environment
@@ -123,7 +127,6 @@ admin = pyseekdb.AdminClient(path="./seekdb")
 admin = pyseekdb.AdminClient(
     host="127.0.0.1",
     port=2881,
-    tenant="sys",  # Default tenant for SeekDB Server
     user="root",
     password=""  # Can be retrieved from SEEKDB_PASSWORD environment variable
 )
@@ -132,27 +135,10 @@ admin = pyseekdb.AdminClient(
 admin = pyseekdb.AdminClient(
     host="127.0.0.1",
     port=2881,
-    tenant="test",  # Default tenant for OceanBase
+    tenant="sys",  # Default tenant for OceanBase
     user="root",
     password=""  # Can be retrieved from SEEKDB_PASSWORD environment variable
 )
-
-# Use context manager
-with pyseekdb.AdminClient(host="127.0.0.1", port=2881, tenant="sys", user="root") as admin:
-    # Create database
-    admin.create_database("my_database")
-    
-    # List all databases
-    databases = admin.list_databases()
-    for db in databases:
-        print(f"Database: {db.name}")
-    
-    # Get database information
-    db = admin.get_database("my_database")
-    print(f"Database: {db.name}, Charset: {db.charset}")
-    
-    # Delete database
-    admin.delete_database("my_database")
 ```
 
 
@@ -160,14 +146,14 @@ with pyseekdb.AdminClient(host="127.0.0.1", port=2881, tenant="sys", user="root"
 
 | Method                    | Description                                        |
 |---------------------------|----------------------------------------------------|
-| `create_database(name, tenant=DEFAULT_TENANT)` | Create a new database (uses client's tenant for remote server mode) |
-| `get_database(name, tenant=DEFAULT_TENANT)`    | Get database object with metadata (uses client's tenant for remote server mode) |
-| `delete_database(name, tenant=DEFAULT_TENANT)`  | Delete a database (uses client's tenant for remote server mode) |
-| `list_databases(limit=None, offset=None, tenant=DEFAULT_TENANT)` | List all databases with optional pagination (uses client's tenant for remote server mode) |
+| `create_database(name, tenant=DEFAULT_TENANT)` | Create a new database (uses client's tenant for remote oceanbase server mode) |
+| `get_database(name, tenant=DEFAULT_TENANT)`    | Get database object with metadata (uses client's tenant for remote oceanbase server mode) |
+| `delete_database(name, tenant=DEFAULT_TENANT)`  | Delete a database (uses client's tenant for remote oceanbase server mode) |
+| `list_databases(limit=None, offset=None, tenant=DEFAULT_TENANT)` | List all databases with optional pagination (uses client's tenant for remote oceanbase server mode) |
 
 **Parameters:**
 - `name` (str): Database name
-- `tenant` (str, optional): Tenant name (uses client's tenant if different, ignored for embedded mode)
+- `tenant` (str, optional): Tenant name (uses client's tenant if different, ignored for seekDB)
 - `limit` (int, optional): Maximum number of results to return
 - `offset` (int, optional): Number of results to skip for pagination
 
@@ -183,7 +169,7 @@ The `get_database()` and `list_databases()` methods return `Database` objects wi
 
 ## 3. Collection (Table) Management
 
-Collections are the primary data structures in SeekDBClient, similar to tables in traditional databases. Each collection stores documents with vector embeddings, metadata, and full-text search capabilities.
+Collections are the primary data structures in pyseekdb, similar to tables in traditional databases. Each collection stores documents with vector embeddings, metadata, and full-text search capabilities.
 
 ### 3.1 Creating a Collection
 
@@ -194,20 +180,14 @@ from pyseekdb import DefaultEmbeddingFunction, HNSWConfiguration
 # Create a client
 client = pyseekdb.Client(host="127.0.0.1", port=2881, database="test")
 
-# Create a collection with vector dimension (traditional way)
+# Create a collection
 collection = client.create_collection(
     name="my_collection",
-    configuration=HNSWConfiguration(dimension=128, distance='cosine')
-)
-
-# Create a collection with default embedding function (auto-calculates dimension)
-collection = client.create_collection(
-    name="my_collection",
-    embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
+    # embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
 )
 
 # Create a collection with custom embedding function
-ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
+ef = UserDefinedEmbeddingFunction(model_name='all-MiniLM-L6-v2') #UserDefinedEmbeddingFunction should be defined before
 config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
 collection = client.create_collection(
     name="my_collection",
@@ -225,8 +205,6 @@ collection = client.create_collection(
 # Get or create collection (creates if doesn't exist)
 collection = client.get_or_create_collection(
     name="my_collection",
-    configuration=HNSWConfiguration(dimension=128, distance='cosine'),
-    embedding_function=DefaultEmbeddingFunction()
 )
 ```
 
@@ -295,8 +273,8 @@ Each `Collection` object has the following properties:
 - `id` (str, optional): Collection unique identifier
 - `dimension` (int, optional): Vector dimension
 - `embedding_function` (EmbeddingFunction, optional): Embedding function associated with this collection
+- `distance` (str): Distance metric used by the index (e.g., 'l2', 'cosine', 'inner_product')
 - `metadata` (dict): Collection metadata
-- `client`: Reference to the client that created it
 
 **Accessing Embedding Function:**
 ```python
@@ -1258,50 +1236,6 @@ python3 -m pytest pyseekdb/tests/test_client_creation.py::TestClientCreation::te
 
 # Run specific test file
 python3 -m pytest pyseekdb/tests/test_client_creation.py -v
-```
-
-### Environment Variables (Optional)
-
-#### Password Environment Variables
-
-For security purposes, you can set passwords via environment variables instead of passing them directly in code:
-
-- **`SEEKDB_PASSWORD`**: Password for remote server connections (used by `Client()` and `AdminClient()` when `password` parameter is not provided or is empty). Works for both SeekDB Server and OceanBase Server.
-
-```bash
-# Set password for remote server connections (SeekDB Server or OceanBase Server)
-export SEEKDB_PASSWORD="your_password"
-```
-
-#### Test Configuration Environment Variables
-
-`test_client_creation.py` honors the following overrides:
-
-```bash
-export SEEKDB_PATH=/data/seekdb
-export SEEKDB_DATABASE=demo
-export SERVER_HOST=127.0.0.1
-export SERVER_PORT=2881           # SeekDB Server port
-export SERVER_USER=root
-export SERVER_PASSWORD=secret
-export OB_HOST=127.0.0.1
-export OB_PORT=2881                # OceanBase port (same as SeekDB Server)
-export OB_TENANT=test              # OceanBase tenant
-export OB_USER=root
-export OB_PASSWORD=                # Uses SEEKDB_PASSWORD if not set
-```
-
-## Architecture
-
-- **ClientAPI**: Collection operations interface
-- **AdminAPI**: Database operations interface
-- **ServerAPI (BaseClient)**: Implements both interfaces
-- **_ClientProxy**: Exposes only collection operations
-- **_AdminClientProxy**: Exposes only database operations
-
-```
-Client() → _ClientProxy → BaseClient (ServerAPI)
-AdminClient() → _AdminClientProxy → BaseClient (ServerAPI)
 ```
 
 ## License
