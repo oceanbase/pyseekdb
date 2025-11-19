@@ -1,5 +1,5 @@
 """
-Comprehensive Example: Complete guide to all SeekDBClient features
+Comprehensive Example: Complete guide to all pyseekdb features
 
 This example demonstrates all available operations:
 1. Client connection (all modes)
@@ -19,13 +19,13 @@ import pyseekdb
 # PART 1: CLIENT CONNECTION
 # ============================================================================
 
-# Option 1: Embedded mode (local SeekDB)
+# Option 1: Embedded mode (local seekdb)
 client = pyseekdb.Client(
     #path="./seekdb",
     #database="test"
 )
 
-# Option 2: Server mode (remote SeekDB server)
+# Option 2: Server mode (remote seekdb server)
 # client = pyseekdb.Client(
 #     host="127.0.0.1",
 #     port=2881,

@@ -51,7 +51,7 @@ class TestDefaultEmbeddingFunction:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Check if sentence-transformers is available
         # try:

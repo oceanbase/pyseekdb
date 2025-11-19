@@ -116,7 +116,7 @@ class TestOfficialExample:
         try:
             import pylibseekdb  # noqa: F401
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
 
         client = pyseekdb.Client(path=SEEKDB_PATH, database=SEEKDB_DATABASE)
         collection_name, collection = self._create_collection(client)
@@ -127,7 +127,7 @@ class TestOfficialExample:
             self._cleanup_collection(client, collection_name)
 
     def test_server_official_example(self):
-        """Official example using SeekDB server (RemoteServerClient default tenant)."""
+        """Official example using seekdb server (RemoteServerClient default tenant)."""
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
@@ -141,7 +141,7 @@ class TestOfficialExample:
             result = client._server.execute("SELECT 1 as test")
             assert result and result[0].get("test", 1) == 1
         except Exception as exc:
-            pytest.fail(f"SeekDB server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}")
+            pytest.fail(f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}")
 
         collection_name, collection = self._create_collection(client)
 

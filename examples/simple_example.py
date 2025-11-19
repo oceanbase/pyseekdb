@@ -1,5 +1,5 @@
 """
-Simple Example: Basic usage of SeekDBClient with Embedding Functions
+Simple Example: Basic usage of pyseekdb with Embedding Functions
 
 This example demonstrates the most common operations with embedding functions:
 1. Create a client connection
@@ -17,12 +17,12 @@ from pyseekdb import DefaultEmbeddingFunction
 # You can use embedded mode, server mode, or OceanBase mode
 # For this example, we'll use server mode (you can change to embedded or OceanBase)
 
-# Embedded mode (local SeekDB)
+# Embedded mode (local seekdb)
 client = pyseekdb.Client(
     path="./seekdb.db",
     database="test"
 )
-# Alternative: Server mode (connecting to remote SeekDB server)
+# Alternative: Server mode (connecting to remote seekdb server)
 # client = pyseekdb.Client(
 #     host="127.0.0.1",
 #     port=2881,

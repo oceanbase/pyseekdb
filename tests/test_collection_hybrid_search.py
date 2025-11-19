@@ -536,7 +536,7 @@ class TestCollectionHybridSearch:
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
-            tenant="sys",  # Default tenant for SeekDB Server
+            tenant="sys",  # Default tenant for seekdb Server
             database=SERVER_DATABASE,
             user=SERVER_USER,
             password=SERVER_PASSWORD
@@ -599,7 +599,7 @@ class TestCollectionHybridSearch:
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
-            tenant="sys",  # Default tenant for SeekDB Server
+            tenant="sys",  # Default tenant for seekdb Server
             database=SERVER_DATABASE,
             user=SERVER_USER,
             password=SERVER_PASSWORD
@@ -867,7 +867,7 @@ class TestCollectionHybridSearch:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(
@@ -925,7 +925,7 @@ class TestCollectionHybridSearch:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(
@@ -979,7 +979,7 @@ class TestCollectionHybridSearch:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(
@@ -1037,7 +1037,7 @@ class TestCollectionHybridSearch:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(
@@ -1106,7 +1106,7 @@ class TestCollectionHybridSearch:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(

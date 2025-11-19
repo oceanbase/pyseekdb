@@ -396,7 +396,7 @@ class TestCollectionEmbeddingFunction:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         
         client = pyseekdb.Client(
@@ -490,7 +490,7 @@ class TestCollectionEmbeddingFunction:
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("SeekDBClient - Collection Embedding Function Tests")
+    print("pyseekdb - Collection Embedding Function Tests")
     print("="*60)
     print(f"\nEnvironment Variable Configuration:")
     print(f"  Embedded mode: path={SEEKDB_PATH}, database={SEEKDB_DATABASE}")

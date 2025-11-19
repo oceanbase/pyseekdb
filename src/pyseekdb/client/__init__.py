@@ -1,5 +1,5 @@
 """
-SeekDBClient client module
+pyseekdb client module
 
 Provides client and admin factory functions with strict separation:
 
@@ -13,7 +13,7 @@ Database Management (AdminAPI):
 
 All factories use the underlying ServerAPI implementations:
 - SeekdbEmbeddedClient - Local seekdb
-- RemoteServerClient - Remote server via pymysql (supports both SeekDB Server and OceanBase Server)
+- RemoteServerClient - Remote server via pymysql (supports both seekdb Server and OceanBase Server)
 """
 import logging
 import os
@@ -73,7 +73,7 @@ def Client(
     
     Automatically selects embedded or remote server mode based on parameters:
     - If path is provided, uses embedded mode
-    - If host/port is provided, uses remote server mode (supports both SeekDB Server and OceanBase Server)
+    - If host/port is provided, uses remote server mode (supports both seekdb Server and OceanBase Server)
     - If neither path nor host is provided, defaults to embedded mode with current working directory as path
     
     Returns a ClientProxy that only exposes collection operations.
@@ -84,7 +84,7 @@ def Client(
               defaults to current working directory
         host: server address (remote server mode)
         port: server port (remote server mode, default 2881)
-        tenant: tenant name (remote server mode, default "sys" for SeekDB Server, "test" for OceanBase)
+        tenant: tenant name (remote server mode, default "sys" for seekdb Server, "test" for OceanBase)
         database: database name
         user: username (remote server mode, without tenant suffix)
         password: password (remote server mode). If not provided, will be retrieved from SEEKDB_PASSWORD environment variable
@@ -102,7 +102,7 @@ def Client(
         >>> client = Client(database="db1")
         >>> client.create_collection("my_collection")  # ✅ Available
         
-        >>> # Remote server mode (SeekDB Server)
+        >>> # Remote server mode (seekdb Server)
         >>> client = Client(
         ...     host='localhost',
         ...     port=2881,
@@ -137,7 +137,7 @@ def Client(
         )
     
     elif host is not None:
-        # Remote server mode (supports both SeekDB Server and OceanBase Server)
+        # Remote server mode (supports both seekdb Server and OceanBase Server)
         if port is None:
             port = 2881  # Default port
         if user is None:
@@ -184,7 +184,7 @@ def AdminClient(
     
     Automatically selects embedded or remote server mode based on parameters:
     - If path is provided, uses embedded mode
-    - If host/port is provided, uses remote server mode (supports both SeekDB Server and OceanBase Server)
+    - If host/port is provided, uses remote server mode (supports both seekdb Server and OceanBase Server)
     
     Returns a lightweight AdminClient proxy that only exposes database operations.
     For collection management, use Client().
@@ -193,7 +193,7 @@ def AdminClient(
         path: seekdb data directory path (embedded mode)
         host: server address (remote server mode)
         port: server port (remote server mode, default 2881)
-        tenant: tenant name (remote server mode, default "sys" for SeekDB Server, "test" for OceanBase)
+        tenant: tenant name (remote server mode, default "sys" for seekdb Server, "test" for OceanBase)
         user: username (remote server mode, without tenant suffix)
         password: password (remote server mode). If not provided, will be retrieved from SEEKDB_PASSWORD environment variable
         **kwargs: other parameters
@@ -207,7 +207,7 @@ def AdminClient(
         >>> admin.create_database("new_db")  # ✅ Available
         >>> # admin.create_collection("coll")  # ❌ Not available
         
-        >>> # Remote server mode (SeekDB Server)
+        >>> # Remote server mode (seekdb Server)
         >>> admin = AdminClient(
         ...     host='localhost',
         ...     port=2881,
@@ -240,7 +240,7 @@ def AdminClient(
         )
     
     elif host is not None:
-        # Remote server mode (supports both SeekDB Server and OceanBase Server)
+        # Remote server mode (supports both seekdb Server and OceanBase Server)
         if port is None:
             port = 2881  # Default port
         if user is None:

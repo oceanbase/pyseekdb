@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class SeekdbEmbeddedClient(BaseClient):
-    """Embedded SeekDB client (lazy connection)"""
+    """Embedded seekdb client (lazy connection)"""
     
     def __init__(
         self,
@@ -54,11 +54,11 @@ class SeekdbEmbeddedClient(BaseClient):
             # 1. open seekdb
             try:
                 seekdb.open(db_dir=self.path)  # type: ignore
-                logger.info(f"✅ SeekDB opened: {self.path}")
+                logger.info(f"✅ seekdb opened: {self.path}")
             except Exception as e:
                 if "initialized twice" not in str(e):
                     raise
-                logger.debug(f"SeekDB already opened: {e}")
+                logger.debug(f"seekdb already opened: {e}")
             
             self._initialized = True
         
@@ -112,7 +112,7 @@ class SeekdbEmbeddedClient(BaseClient):
     def _use_context_manager_for_cursor(self) -> bool:
         """
         Override to use try/finally instead of context manager for cursor
-        (SeekDB embedded client doesn't support context manager)
+        (seekdb embedded client doesn't support context manager)
         """
         return False
     

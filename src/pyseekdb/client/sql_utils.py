@@ -1,5 +1,5 @@
 """
-Utility functions and classes for SQL string generation and escaping in SeekDB client.
+Utility functions and classes for SQL string generation and escaping in seekdb client.
 
 Provides helpers to safely stringify values and SQL identifiers for insertion into SQL expressions.
 """

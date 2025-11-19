@@ -138,7 +138,7 @@ class TestCollectionGet:
         try:
             import pylibseekdb
         except ImportError:
-            pytest.fail("SeekDB embedded package is not installed")
+            pytest.fail("seekdb embedded package is not installed")
         
         # Create embedded client
         client = pyseekdb.Client(
@@ -262,7 +262,7 @@ class TestCollectionGet:
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
-            tenant="sys",  # Default tenant for SeekDB Server
+            tenant="sys",  # Default tenant for seekdb Server
             database=SERVER_DATABASE,
             user=SERVER_USER,
             password=SERVER_PASSWORD
@@ -581,7 +581,7 @@ class TestCollectionGet:
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("SeekDBClient - Collection Get Tests")
+    print("pyseekdb - Collection Get Tests")
     print("="*60)
     print(f"\nEnvironment Variable Configuration:")
     print(f"  Embedded mode: path={SEEKDB_PATH}, database={SEEKDB_DATABASE}")

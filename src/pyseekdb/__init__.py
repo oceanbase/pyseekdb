@@ -1,11 +1,11 @@
 """
-SeekDBClient - Unified vector database client wrapper
+pyseekdb - Unified vector database client wrapper
 
 Based on seekdb and pymysql, providing a simple and unified API.
 
 Supports two modes:
 1. Embedded mode - using local seekdb
-2. Remote server mode - connecting to remote server via pymysql (supports both SeekDB Server and OceanBase Server)
+2. Remote server mode - connecting to remote server via pymysql (supports both seekdb Server and OceanBase Server)
 
 Examples:
     >>> import pyseekdb
@@ -13,7 +13,7 @@ Examples:
     >>> # Embedded mode - Collection management
     >>> client = pyseekdb.Client(path="./seekdb", database="test")
 
-    >>> # Remote server mode (SeekDB Server) - Collection management
+    >>> # Remote server mode (seekdb Server) - Collection management
     >>> client = pyseekdb.Client(
     ...     host='localhost',
     ...     port=2881,
@@ -64,7 +64,7 @@ try:
 except importlib.metadata.PackageNotFoundError:
   __version__ = "0.0.1.dev1"
 
-__author__ = "SeekDBClient Team"
+__author__ = "OceanBase <open_oceanbase@oceanbase.com>"
 
 __all__ = [
     'BaseConnection',

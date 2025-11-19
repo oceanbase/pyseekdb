@@ -272,7 +272,7 @@ class TestClientCreation:
             import pylibseekdb as seekdb
             if not hasattr(seekdb, 'open') and not hasattr(seekdb, '_initialize_module'):
                 pytest.fail(
-                    "❌ SeekDB embedded package is not properly installed!\n"
+                    "❌ seekdb embedded package is not properly installed!\n"
                     "The 'seekdb' module exists but lacks required methods.\n"
                     "Required: 'open' method or '_initialize_module' method\n\n"
                     "Solution: Please install the seekdb embedded package from correct source:\n"
@@ -281,7 +281,7 @@ class TestClientCreation:
                 )
         except ImportError:
             pytest.fail(
-                "❌ SeekDB embedded package is not installed!\n"
+                "❌ seekdb embedded package is not installed!\n"
                 "The 'seekdb' module cannot be imported.\n\n"
                 "Solution: Please install the seekdb embedded package:\n"
                 "  pip install seekdb\n"
@@ -330,7 +330,7 @@ class TestClientCreation:
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
-            tenant="sys",  # Default tenant for SeekDB Server
+            tenant="sys",  # Default tenant for seekdb Server
             database=SERVER_DATABASE,
             user=SERVER_USER,
             password=SERVER_PASSWORD
@@ -367,7 +367,7 @@ class TestClientCreation:
             
         except Exception as e:
             pytest.fail(f"Server connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}\n"
-                       f"Hint: Please ensure SeekDB Server is running on port {SERVER_PORT}")
+                       f"Hint: Please ensure seekdb Server is running on port {SERVER_PORT}")
         
         # Automatic cleanup (via __del__)
     
@@ -423,7 +423,7 @@ class TestClientCreation:
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("SeekDBClient - Client Creation and Connection Tests")
+    print("pyseekdb - Client Creation and Connection Tests")
     print("="*60)
     print(f"\nEnvironment Variable Configuration:")
     print(f"  Embedded mode: path={SEEKDB_PATH}, database={SEEKDB_DATABASE}")

@@ -1,6 +1,6 @@
 """
 Remote server mode client - based on pymysql
-Supports both SeekDB Server and OceanBase Server
+Supports both seekdb Server and OceanBase Server
 """
 import logging
 from typing import Any, List, Optional, Sequence, Dict, Union
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class RemoteServerClient(BaseClient):
     """Remote server mode client (connecting via pymysql, lazy loading)
     
-    Supports both SeekDB Server and OceanBase Server.
+    Supports both seekdb Server and OceanBase Server.
     Uses user@tenant format for authentication.
     """
     
@@ -40,7 +40,7 @@ class RemoteServerClient(BaseClient):
         Args:
             host: server address
             port: server port (default 2881)
-            tenant: tenant name (default "sys" for SeekDB Server, "test" for OceanBase)
+            tenant: tenant name (default "sys" for seekdb Server, "test" for OceanBase)
             database: database name
             user: username (without tenant suffix)
             password: password
