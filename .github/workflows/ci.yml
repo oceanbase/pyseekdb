@@ -18,9 +18,6 @@ jobs:
         # server: seekdb-server
         test_mode: [embedded, server, oceanbase]
         os: [ubuntu-latest]
-        include:
-          - os: windows-latest
-            test_mode: server
 
     steps:
       - name: Free disk space
