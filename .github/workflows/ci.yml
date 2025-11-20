@@ -7,14 +7,22 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'README.md'
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         # server: seekdb-server
         test_mode: [embedded, server, oceanbase]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        exclude:
+          - os: windows-latest
+            test_mode: embedded
+          - os: macos-latest
+            test_mode: embedded
 
     steps:
       - name: Free disk space
@@ -61,7 +69,7 @@ jobs:
         shell: bash
         run: |
           docker run --name seekdb-server -p 2881:2881 -d oceanbase/seekdb:latest
-          sleep 15 
+          sleep 15
           docker logs seekdb-server
 
       - name: Run tests
