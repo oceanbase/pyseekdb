@@ -2,7 +2,6 @@ import os
 import logging
 from typing import Optional, Union
 
-from .utils import _NOT_PROVIDED
 from .admin_client import AdminAPI, _AdminClientProxy, _ClientProxy
 from .client_seekdb_embedded import _PYLIBSEEKDB_AVAILABLE
 

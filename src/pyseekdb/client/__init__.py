@@ -15,8 +15,6 @@ All factories use the underlying ServerAPI implementations:
 - SeekdbEmbeddedClient - Local seekdb (requires pylibseekdb, Linux only)
 - RemoteServerClient - Remote server via pymysql (supports both seekdb Server and OceanBase Server)
 """
-import logging
-import os
 
 from .base_connection import BaseConnection
 from .client_base import (
@@ -35,8 +33,6 @@ from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
 from .client import Client, AdminClient
 from .database import Database
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     'BaseConnection',
