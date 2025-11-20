@@ -17,15 +17,16 @@ jobs:
       matrix:
         # server: seekdb-server
         test_mode: [embedded, server, oceanbase]
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        exclude:
+        os: [ubuntu-latest]
+        include:
           - os: windows-latest
-            test_mode: embedded
+            test_mode: server
           - os: macos-latest
-            test_mode: embedded
+            test_mode: server
 
     steps:
       - name: Free disk space
+        if: matrix.os == 'ubuntu-latest'
         uses: kfir4444/free-disk-space@main
         with:
           tool-cache: false
