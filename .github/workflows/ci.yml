@@ -21,8 +21,6 @@ jobs:
         include:
           - os: windows-latest
             test_mode: server
-          - os: macos-latest
-            test_mode: server
 
     steps:
       - name: Free disk space
@@ -35,10 +33,6 @@ jobs:
           haskell: true
           large-packages: true
           swap-storage: true
-      - name: Setup Docker on macOS
-        if: matrix.os == 'macos-latest'
-        id: setup-docker
-        uses: douglascamata/setup-docker-macos-action@v1.0.1
 
       - name: Check out code
         uses: actions/checkout@v4
