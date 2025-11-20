@@ -21,8 +21,8 @@ classifiers = [
 python = ">=3.11,<4.0"
 pymysql = "^1.1.1"
 pylibseekdb = { version = "*", markers = "sys_platform == 'linux'" }
-onnxruntime = "1.19.0"  # Requires 1.19.0+ to support opset 5 (used by Hugging Face models)
-tokenizers = "0.15.0"  # Fixed version to ensure compatibility
+onnxruntime = ">=1.19.0"  # Requires 1.19.0+ to support opset 5 (used by Hugging Face models)
+tokenizers = ">=0.15.0"  # Fixed version to ensure compatibility
 httpx = "*"
 tqdm = "*"
 tenacity = "*"
