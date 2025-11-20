@@ -1,4 +1,10 @@
+# project
 poetry.lock
 tests/.env
 __pycache__/
 build/
+
+# demo
+.env
+.venv/
+demo/rag/data/
