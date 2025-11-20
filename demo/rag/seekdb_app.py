@@ -11,7 +11,7 @@ from llm import get_llm_answer, get_llm_client
 load_dotenv()
 # Page config
 st.set_page_config(
-    page_title="SeekDB RAG Demo",
+    page_title="seekdb RAG Demo",
     page_icon="https://avatars.githubusercontent.com/u/82347605?s=48&v=4",
     layout="wide"
 )
@@ -64,9 +64,9 @@ st.markdown(
         margin-bottom: 36px;
     }
     </style>
-    <div class="title"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAD90lEQVR4nOyX3U8cVRiHf+fMzLIzLMvC8FFaCJSPig3UtFisKZW29MM0MSWtvdFYb/0HvDHemXhhYowx6oXpjVdqIMZoqmmzadDElJJgSkEsH6XIhyywX7DL7rI75zVL0VAy6LbsMiGZ52aTM3PeeZ9z3jn7DscuxxawGlvAamwBq7EFrMYWsJqcCWgOyLmKvZGsPqTYxdTLR+ULrx3DVacsnC++Z5zPZnwztiXgVpmjpQbNxxtYW8dB3nG8gZ1WJOQ/uspT1bpRMunHYpZyNcVU4O2Lnqt71KX64ApCsVXE0mMSh1JaALdeIJVWFVNlbQkaasvYAQB5W8V+tVW6+OGPxrUdFzhzSDtzri76xtbTWEbBO4/wy6YCTrcDZU2NKD34LDzV9ay4vhruir1Q9VKougdcdkHTHeltZIAhIr44h4iIa6deQWB0/H8FtksihfAPd6n7i1vryRftL2O1HadQc+IE9rUeg36gGYAjk1iUXi5X+dovFFXdfD1rArMh+sM7BO/1AXH9pyHujZS3NaWeuXSJn7vwKRXuP5SrE89UYC6YnA5Gaboon7nTG75eM8loAsvBFQrMBDA7HcLk7zN0f3CG7vU9oL6JFT2GmvY2Vn/+ZXa68xNy6rVsfQVziWkxM9WTT0LEkVgyNo5zxQmRV+RGQUU5CqtqWGljA8qbmlnFkRYqaXwu07J4Wuizw83wDQxuHDPdAe3Nrz5fqTj7OoAogFUAIl2BBLiYyZxcr/J/YSrAHu1LumYLdjqhJ8XuhazGFrAaW8BqTI9REjuXADMSQfKPDsM/9gDLM1MU8S2wVDzMVhZiwhDEnAUKyZrKVE8Rogvzm+eb/w/kcl8ivlH+0HuTJnp+FtN3esk/PMn2OvaxSq0OZXlVcr2zTGi8hyncyd2yhGAySYJiCCcDhry4mpFAtmGBsX555Luu5L2ubgr3T9FR/SV+sqhdavK8xeraDzOFF268f6v1E78u3KJQMrRxLDcC8fAs/vylh8Zu3uAT3huUGAsbHXs6lXcrPkDTybNM5lq2HrVdgQSWph8iMD5CvsEhaX7gN2PqTh/mByf+eZHo+eJWx0ftw1C4OysZb8JUIP79O+9T8ZdfA2srpax3rSkwxFg8uEyxoB8Rnw9LM/NIxf/t5QyTWHw8Ogj2RKddhMLJEFIiCgYBgsLyJA0uucTs5sy+DbeJ8nHLN/wF/cpjg4LiNBa5Le4Ge8XIcj9NRu/jr9gE+RNLMDsFFZbuiRkMeqz53ZGX2PDOdacFKGb4cdvfZXjnvjV6F3uwnIpnHCS5lrdFnbtbcUmdlVeYJuX0g2dXsutbCVvAamwBq7EFrMYWsJpdL/B3AAAA//9GlWcPF8A4TQAAAABJRU5ErkJggg==" width="40" height="40" style="vertical-align: middle; margin-right: 10px;"> SeekDB RAG Demo</div>
+    <div class="title"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAD90lEQVR4nOyX3U8cVRiHf+fMzLIzLMvC8FFaCJSPig3UtFisKZW29MM0MSWtvdFYb/0HvDHemXhhYowx6oXpjVdqIMZoqmmzadDElJJgSkEsH6XIhyywX7DL7rI75zVL0VAy6LbsMiGZ52aTM3PeeZ9z3jn7DscuxxawGlvAamwBq7EFrMYWsJqcCWgOyLmKvZGsPqTYxdTLR+ULrx3DVacsnC++Z5zPZnwztiXgVpmjpQbNxxtYW8dB3nG8gZ1WJOQ/uspT1bpRMunHYpZyNcVU4O2Lnqt71KX64ApCsVXE0mMSh1JaALdeIJVWFVNlbQkaasvYAQB5W8V+tVW6+OGPxrUdFzhzSDtzri76xtbTWEbBO4/wy6YCTrcDZU2NKD34LDzV9ay4vhruir1Q9VKougdcdkHTHeltZIAhIr44h4iIa6deQWB0/H8FtksihfAPd6n7i1vryRftL2O1HadQc+IE9rUeg36gGYAjk1iUXi5X+dovFFXdfD1rArMh+sM7BO/1AXH9pyHujZS3NaWeuXSJn7vwKRXuP5SrE89UYC6YnA5Gaboon7nTG75eM8loAsvBFQrMBDA7HcLk7zN0f3CG7vU9oL6JFT2GmvY2Vn/+ZXa68xNy6rVsfQVziWkxM9WTT0LEkVgyNo5zxQmRV+RGQUU5CqtqWGljA8qbmlnFkRYqaXwu07J4Wuizw83wDQxuHDPdAe3Nrz5fqTj7OoAogFUAIl2BBLiYyZxcr/J/YSrAHu1LumYLdjqhJ8XuhazGFrAaW8BqTI9REjuXADMSQfKPDsM/9gDLM1MU8S2wVDzMVhZiwhDEnAUKyZrKVE8Rogvzm+eb/w/kcl8ivlH+0HuTJnp+FtN3esk/PMn2OvaxSq0OZXlVcr2zTGi8hyncyd2yhGAySYJiCCcDhry4mpFAtmGBsX555Luu5L2ubgr3T9FR/SV+sqhdavK8xeraDzOFF268f6v1E78u3KJQMrRxLDcC8fAs/vylh8Zu3uAT3huUGAsbHXs6lXcrPkDTybNM5lq2HrVdgQSWph8iMD5CvsEhaX7gN2PqTh/mByf+eZHo+eJWx0ftw1C4OysZb8JUIP79O+9T8ZdfA2srpax3rSkwxFg8uEyxoB8Rnw9LM/NIxf/t5QyTWHw8Ogj2RKddhMLJEFIiCgYBgsLyJA0uucTs5sy+DbeJ8nHLN/wF/cpjg4LiNBa5Le4Ge8XIcj9NRu/jr9gE+RNLMDsFFZbuiRkMeqz53ZGX2PDOdacFKGb4cdvfZXjnvjV6F3uwnIpnHCS5lrdFnbtbcUmdlVeYJuX0g2dXsutbCVvAamwBq7EFrMYWsJpdL/B3AAAA//9GlWcPF8A4TQAAAABJRU5ErkJggg==" width="40" height="40" style="vertical-align: middle; margin-right: 10px;"> seekdb RAG Demo</div>
     <div class="description">
-        This chatbot is built with SeekDB database, supported by OpenAI-compatible models.<br>
+        This chatbot is built with seekdb database, supported by OpenAI-compatible models.<br>
         Ask questions based on your document collection.
     </div>
     """,
@@ -77,7 +77,7 @@ st.divider()
 # Main content
 question = st.text_area(
     "Enter your question:",
-    placeholder="e.g., What is SeekDB?",
+    placeholder="e.g., What is seekdb?",
     height=100,
     key="question_input"
 )
@@ -157,4 +157,4 @@ with st.sidebar:
 
 # Footer
 st.divider()
-st.caption("Built with SeekDB • OpenAI-compatible models")
+st.caption("Built with seekdb • OpenAI-compatible models")

@@ -73,7 +73,7 @@ def process_and_insert_data(
     db_name: str = None, 
     collection_name: str = None
 ):
-    """Process text data and insert into SeekDB using local embedding model."""
+    """Process text data and insert into seekdb using local embedding model."""
     # Read from environment variables if not provided
     if db_dir is None:
         db_dir = os.getenv("SEEKDB_DIR")

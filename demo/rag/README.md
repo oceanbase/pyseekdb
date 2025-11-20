@@ -1,10 +1,10 @@
-# Building RAG with SeekDB
+# Building RAG with seekdb
 
-This tutorial will guide you through importing Markdown documents into SeekDB, building a vector search knowledge base, and launching a RAG interface via Streamlit.
+This tutorial will guide you through importing Markdown documents into seekdb, building a vector search knowledge base, and launching a RAG interface via Streamlit.
 
 ## Prerequisites
 
-- Python 3.8 or higher installed
+- Python 3.11 or higher installed
 - uv package manager installed
 - LLM API Key ready
 
@@ -65,7 +65,7 @@ EMBEDDING_MODEL_NAME=text-embedding-v4
 SENTENCE_TRANSFORMERS_MODEL_NAME=all-mpnet-base-v2
 SENTENCE_TRANSFORMERS_DEVICE=cpu
 
-# SeekDB configuration
+# seekdb configuration
 SEEKDB_DIR=./data/seekdb_rag
 SEEKDB_NAME=test
 COLLECTION_NAME=embeddings
@@ -84,7 +84,7 @@ COLLECTION_NAME=embeddings
 | EMBEDDING_MODEL_NAME               | Embedding model name                                | text-embedding-v4                                | Required when `EMBEDDING_FUNCTION_TYPE=api` |
 | SENTENCE_TRANSFORMERS_MODEL_NAME   | Local model name                                     | all-mpnet-base-v2                               | Optional when `EMBEDDING_FUNCTION_TYPE=local` |
 | SENTENCE_TRANSFORMERS_DEVICE       | Device to run on                                     | cpu                                              | Optional when `EMBEDDING_FUNCTION_TYPE=local` |
-| SEEKDB_DIR                         | SeekDB database directory                           | ./data/seekdb_rag                                | Optional                               |
+| SEEKDB_DIR                         | seekdb database directory                           | ./data/seekdb_rag                                | Optional                               |
 | SEEKDB_NAME                        | Database name                                        | test                                             | Optional                               |
 | COLLECTION_NAME                    | Collection name                                     | embeddings                                       | Optional                               |
 
@@ -116,7 +116,7 @@ During this step, the system will perform the following operations:
   - `local`: Uses custom sentence-transformers model
   - `api`: Uses configured Embedding API service
 - Automatically generate text embedding vectors
-- Store embedding vectors in SeekDB database
+- Store embedding vectors in seekdb database
 - Automatically skip failed document chunks to ensure batch processing stability
 
 ## Build RAG

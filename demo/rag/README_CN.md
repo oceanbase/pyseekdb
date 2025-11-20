@@ -1,6 +1,6 @@
-# 使用 SeekDB 快速构建 RAG
+# 使用 seekdb 快速构建 RAG
 
-本教程将引导您把 Markdown 文档导入 SeekDB，构建向量检索知识库并通过 Streamlit 启动 RAG 界面。
+本教程将引导您把 Markdown 文档导入 seekdb，构建向量检索知识库并通过 Streamlit 启动 RAG 界面。
 
 ## 前提条件
 
@@ -65,7 +65,7 @@ EMBEDDING_MODEL_NAME=text-embedding-v4
 SENTENCE_TRANSFORMERS_MODEL_NAME=all-mpnet-base-v2
 SENTENCE_TRANSFORMERS_DEVICE=cpu
 
-# SeekDB 配置
+# seekdb 配置
 SEEKDB_DIR=./data/seekdb_rag
 SEEKDB_NAME=test
 COLLECTION_NAME=embeddings
@@ -84,7 +84,7 @@ COLLECTION_NAME=embeddings
 | EMBEDDING_MODEL_NAME            | Embedding 模型名称                             | text-embedding-v4                                | `EMBEDDING_FUNCTION_TYPE=api` 时必需 |
 | SENTENCE_TRANSFORMERS_MODEL_NAME| 本地模型名称                                   | all-mpnet-base-v2                               | `EMBEDDING_FUNCTION_TYPE=local` 时可选 |
 | SENTENCE_TRANSFORMERS_DEVICE    | 运行设备                                       | cpu                                              | `EMBEDDING_FUNCTION_TYPE=local` 时可选 |
-| SEEKDB_DIR                      | SeekDB 数据库目录                              | ./data/seekdb_rag                                | 可选                        |
+| SEEKDB_DIR                      | seekdb 数据库目录                              | ./data/seekdb_rag                                | 可选                        |
 | SEEKDB_NAME                     | 数据库名称                                     | test                                             | 可选                        |
 | COLLECTION_NAME                 | 嵌入表名称                                     | embeddings                                       | 可选                        |
 
@@ -116,7 +116,7 @@ uv run python seekdb_insert.py ../../README.md
   - `local`: 使用自定义的 sentence-transformers 模型
   - `api`: 使用配置的 Embedding API 服务
 - 自动生成文本嵌入向量
-- 将嵌入向量存储到 SeekDB 数据库
+- 将嵌入向量存储到 seekdb 数据库
 - 自动跳过失败的文档块，确保批量处理的稳定性
 
 ## 构建 RAG

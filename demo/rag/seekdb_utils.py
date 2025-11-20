@@ -6,12 +6,12 @@ _client_cache = {}
 
 
 def get_seekdb_client(db_dir: str = "./seekdb_rag", db_name: str = "test"):
-    """Initialize SeekDB client (embedded mode)."""
+    """Initialize seekdb client (embedded mode)."""
     cache_key = (db_dir, db_name)
     if cache_key not in _client_cache:
-        print(f"Connecting to SeekDB: path={db_dir}, database={db_name}")
+        print(f"Connecting to seekdb: path={db_dir}, database={db_name}")
         _client_cache[cache_key] = pyseekdb.Client(path=db_dir, database=db_name)
-        print("SeekDB client connected successfully")
+        print("seekdb client connected successfully")
     return _client_cache[cache_key]
 
 
@@ -22,7 +22,7 @@ def get_seekdb_collection(client, collection_name: str = "embeddings",
     Get or create a collection using pyseekdb's get_or_create_collection.
     
     Args:
-        client: SeekDB client instance
+        client: seekdb client instance
         collection_name: Name of the collection
         embedding_function: Embedding function (required for automatic embedding generation)
         drop_if_exists: Whether to drop existing collection if it exists
