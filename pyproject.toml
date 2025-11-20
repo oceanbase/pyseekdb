@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyseekdb"
-version = "1.0.0.b3"
+version = "1.0.0.b4"
 description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase."
 authors = ["OceanBase <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
@@ -26,7 +26,7 @@ tokenizers = ">=0.15.0"  # Fixed version to ensure compatibility
 httpx = "*"
 tqdm = "*"
 tenacity = "*"
-numpy = ">=1.26,<1.27"
+numpy = ">=1.26"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
