@@ -1,5 +1,4 @@
-import pyseekdb
-from pyseekdb import DefaultEmbeddingFunction, EmbeddingFunction
+from pyseekdb import DefaultEmbeddingFunction, EmbeddingFunction, Client
 from typing import List, Dict, Any, Optional
 # Simple cache
 _client_cache = {}
@@ -10,7 +9,7 @@ def get_seekdb_client(db_dir: str = "./seekdb_rag", db_name: str = "test"):
     cache_key = (db_dir, db_name)
     if cache_key not in _client_cache:
         print(f"Connecting to seekdb: path={db_dir}, database={db_name}")
-        _client_cache[cache_key] = pyseekdb.Client(path=db_dir, database=db_name)
+        _client_cache[cache_key] = Client(path=db_dir, database=db_name)
         print("seekdb client connected successfully")
     return _client_cache[cache_key]
 
