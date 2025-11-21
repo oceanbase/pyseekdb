@@ -105,14 +105,18 @@ COLLECTION_NAME=embeddings
 
 ### 2. Prepare Data
 
-We use pyseekdb's SDK documentation as an example. You can also use your own Markdown documents.
+We use pyseekdb's SDK documentation as an example. You can also use your own Markdown documents or directory.
 
 **Import Data:**
 
 Run the data import script:
 
 ```bash
+# Import a single file
 uv run python seekdb_insert.py ../../README.md
+
+# Or import all markdown files from a directory
+uv run python seekdb_insert.py path/to/your_dir
 ```
 
 **Import Instructions:**

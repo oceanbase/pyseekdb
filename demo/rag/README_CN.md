@@ -105,14 +105,18 @@ COLLECTION_NAME=embeddings
 
 ### 2. 准备数据
 
-我们使用 pyseekdb 的 SDK 文档作为示例，您也可以使用自己的 Markdown 文档。
+我们使用 pyseekdb 的 SDK 文档作为示例，您也可以使用自己的 Markdown 文档或者目录
 
 **导入数据：**
 
 运行数据导入脚本：
 
 ```bash
+# 导入单个文件
 uv run python seekdb_insert.py ../../README.md
+
+# 或导入目录下的所有 Markdown 文件
+uv run python seekdb_insert.py path/to/your_dir
 ```
 
 **导入说明：**
