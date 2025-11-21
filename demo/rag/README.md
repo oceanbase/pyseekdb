@@ -14,9 +14,19 @@ This tutorial will guide you through importing Markdown documents into seekdb, b
 
 #### Install Dependencies
 
+**Basic installation (for `default` or `api` embedding types):**
+
 ```bash
 uv sync
 ```
+
+**With local embedding support (for `local` embedding type):**
+
+```bash
+uv sync --extra local
+```
+
+> **Note:** The `local` extra includes `sentence-transformers` and related dependencies (~2-3GB). 
 
 #### Configure Environment Variables
 

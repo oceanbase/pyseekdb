@@ -14,9 +14,19 @@
 
 #### 安装依赖
 
+**基础安装（适用于 `default` 或 `api` embedding 类型）：**
+
 ```bash
 uv sync
 ```
+
+**包含本地模型支持（适用于 `local` embedding 类型）：**
+
+```bash
+uv sync --extra local
+```
+
+> **提示：** `local` 额外依赖包含 `sentence-transformers` 及相关依赖（约 2-3GB）。
 
 #### 设置环境变量
 

@@ -9,7 +9,12 @@ dependencies = [
     "pyseekdb>=1.0.0b5",
     "streamlit>=1.28.0",
     "python-dotenv>=1.0.0",
-    "tqdm>=4.65.0"
+]
+
+[project.optional-dependencies]
+local = [
+    "sentence-transformers>=2.0.0",
+    "huggingface-hub>=0.34.0,<1.0",
 ]
 
 [tool.uv]
