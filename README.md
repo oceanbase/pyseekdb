@@ -17,7 +17,8 @@ To achieve the above design goals, this SDK follows the following design princip
 5. [DML Operations](#4-dml-operations)
 6. [DQL Operations](#5-dql-operations)
 7. [Embedding Functions](#6-embedding-functions)
-8. [Testing](#testing)
+8. [RAG Demo](#rag-demo)
+9. [Testing](#testing)
 
 ## Installation
 
@@ -1218,6 +1219,22 @@ results = collection.query(
     n_results=10
 )
 ```
+
+## RAG Demo
+
+We provide a complete RAG (Retrieval-Augmented Generation) demo application that demonstrates how to build a vector search knowledge base using pyseekdb. The demo includes:
+
+- **Document Import**: Import Markdown files or directory into seekdb
+- **Vector Search**: Semantic search over imported documents
+- **RAG Interface**: Interactive Streamlit web interface for querying
+
+The demo supports three embedding modes:
+
+- **`default`**: Uses pyseekdb's built-in `DefaultEmbeddingFunction` (ONNX-based, 384 dimensions). No API key required, automatically downloads models on first use.
+- **`local`**: Uses sentence-transformers models (e.g., all-mpnet-base-v2, 768 dimensions). Requires installing sentence-transformers library.
+- **`api`**: Uses OpenAI-compatible Embedding API services (e.g., DashScope, OpenAI). Requires API key configuration.
+
+For detailed instructions, see [demo/rag/README.md](demo/rag/README.md).
 
 ## Testing
 
