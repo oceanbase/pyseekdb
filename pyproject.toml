@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyseekdb"
-version = "1.0.0.b3"
+version = "1.0.0.b4"
 description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase."
 authors = ["OceanBase <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
@@ -20,13 +20,13 @@ classifiers = [
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 pymysql = "^1.1.1"
-pylibseekdb = "*"
-onnxruntime = "1.19.0"  # Requires 1.19.0+ to support opset 5 (used by Hugging Face models)
-tokenizers = "0.15.0"  # Fixed version to ensure compatibility
+pylibseekdb = { version = "*", markers = "sys_platform == 'linux'" }
+onnxruntime = ">=1.19.0"  # Requires 1.19.0+ to support opset 5 (used by Hugging Face models)
+tokenizers = ">=0.15.0"  # Fixed version to ensure compatibility
 httpx = "*"
 tqdm = "*"
 tenacity = "*"
-numpy = ">=1.26,<1.27"
+numpy = ">=1.26"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"

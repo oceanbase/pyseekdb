@@ -1,11 +1,18 @@
 """
 Embedded mode client - based on seekdb
+Note: Only available when pylibseekdb is installed (Linux only)
 """
 import os
 import logging
 from typing import Any, List, Optional, Sequence, Dict, Union
 
-import pylibseekdb as seekdb  # type: ignore
+# Try to import pylibseekdb - it may not be available on all platforms
+try:
+    import pylibseekdb as seekdb  # type: ignore
+    _PYLIBSEEKDB_AVAILABLE = True
+except ImportError:
+    seekdb = None  # type: ignore
+    _PYLIBSEEKDB_AVAILABLE = False
 
 from .client_base import BaseClient
 from .collection import Collection
@@ -16,21 +23,34 @@ logger = logging.getLogger(__name__)
 
 
 class SeekdbEmbeddedClient(BaseClient):
-    """Embedded seekdb client (lazy connection)"""
-    
+    """Embedded seekdb client (lazy connection)
+
+    Note: Only available on Linux platforms. pylibseekdb dependency is Linux-only.
+    """
+
     def __init__(
         self,
-        path: str = "./seekdb",
+        path: str = "./seekdb.db",
         database: str = "test",
         **kwargs
     ):
         """
         Initialize embedded client (no immediate connection)
-        
+
         Args:
             path: seekdb data directory path
             database: database name
+
+        Raises:
+            RuntimeError: If pylibseekdb is not available
         """
+        # Check if pylibseekdb is available
+        if not _PYLIBSEEKDB_AVAILABLE or seekdb is None:
+            raise RuntimeError(
+                "Embedded Client is not available because pylibseekdb is not available. "
+                "Please install pylibseekdb (Linux only) or use RemoteServerClient (host/port) instead."
+            )
+
         self.path = os.path.abspath(path)
         # Create directory if it doesn't exist
         if not os.path.exists(self.path):
@@ -38,19 +58,19 @@ class SeekdbEmbeddedClient(BaseClient):
             logger.info(f"Created directory: {self.path}")
         elif not os.path.isdir(self.path):
             raise ValueError(f"Path exists but is not a directory: {self.path}")
-        
+
         self.database = database
         self._connection = None
         self._initialized = False
-        
+
         logger.info(f"Initialize SeekdbEmbeddedClient: path={self.path}, database={self.database}")
-    
+
     # ==================== Connection Management ====================
-    
+
     def _ensure_connection(self) -> Any:  # seekdb.Connection
         """Ensure connection is established (internal method)"""
         if not self._initialized:
-            
+
             # 1. open seekdb
             try:
                 seekdb.open(db_dir=self.path)  # type: ignore
