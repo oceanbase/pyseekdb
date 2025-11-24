@@ -1,10 +1,12 @@
 import os
+import traceback
 import streamlit as st
 from dotenv import load_dotenv
 from embedding_function_factory import create_embedding_function
 from seekdb_utils import (
     get_seekdb_client, 
-    get_database_stats
+    get_database_stats,
+    seekdb_query
 )
 from llm import get_llm_answer, get_llm_client
 
@@ -82,6 +84,16 @@ question = st.text_area(
     key="question_input"
 )
 
+col1, col2 = st.columns([3, 2])
+with col1:
+    enable_hybrid_search = st.checkbox("Enable hybrid search", value=False, help="Combine vector search with keyword search for better results")
+with col2:
+    n_results = st.selectbox(
+        "Number of relevant results to retrieve:",
+        options=[3, 4, 5, 6, 7, 8, 9, 10],
+        index=2,
+    )
+
 if st.button("Submit", type="primary", use_container_width=True):
     if not question.strip():
         st.warning("⚠️ Please enter a question.")
@@ -89,12 +101,12 @@ if st.button("Submit", type="primary", use_container_width=True):
         try:
             # Search for relevant documents using collection.query()
             with st.spinner("🔍 Searching relevant documents..."):
-                results = collection.query(
-                    query_texts=[question],
-                    n_results=3,
-                    include=["documents", "metadatas", "distances"]
+                results = seekdb_query(
+                    collection=collection, 
+                    query_context=question, 
+                    n_results=n_results, 
+                    enable_hybrid_search=enable_hybrid_search
                 )
-
             if not results or not results.get("ids") or not results["ids"][0]:
                 st.warning("No relevant documents found. Try a different question.")
                 st.session_state.results = []
@@ -103,9 +115,9 @@ if st.button("Submit", type="primary", use_container_width=True):
                 st.session_state.results = [
                     {
                         'text': results["documents"][0][i],
-                        'similarity': 1.0 / (1.0 + results["distances"][0][i]),
+                        'similarity': 1.0 / (1.0 + float(results["distances"][0][i])),
                         'source': results["metadatas"][0][i].get('source_file', '') if results["metadatas"][0][i] else '',
-                        'distance': results["distances"][0][i]
+                        'distance': float(results["distances"][0][i])
                     }
                     for i in range(len(results["ids"][0]))
                 ]
@@ -125,6 +137,8 @@ if st.button("Submit", type="primary", use_container_width=True):
                 
         except Exception as e:
             st.error(f"❌ Error: {e}")
+            with st.expander("Detailed error information"):
+                st.code(traceback.format_exc(), language='python')
             st.session_state.results = []
 
 # Sidebar

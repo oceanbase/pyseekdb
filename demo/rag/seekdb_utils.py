@@ -90,3 +90,29 @@ def get_database_stats(collection) -> Dict[str, Any]:
         print(f"Error getting database stats: {e}")
         return {"total_embeddings": 0, "unique_source_files": 0}
 
+def seekdb_query(collection, query_context: str, n_results: int = 5,enable_hybrid_search: bool = False)->Dict[str, Any]:
+    """Query the collection."""
+
+    if enable_hybrid_search:
+        print("Performing hybrid search")
+        results = collection.hybrid_search(
+            query={
+                "where_document": {"$contains": query_context},
+                "n_results": n_results*2
+            },
+            knn={
+                "query_texts": [query_context],  # Will be embedded automatically
+                "n_results": n_results*2
+            },
+            rank={"rrf": {}},  # Reciprocal Rank Fusion
+            n_results=n_results,
+            include=["documents", "metadatas", "distances"]
+        )
+    else:
+        print("Performing vector search")
+        results = collection.query(
+            query_texts=query_context,
+            n_results=n_results,
+            include=["documents", "metadatas", "distances"]
+        )
+    return results
