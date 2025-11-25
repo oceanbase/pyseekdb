@@ -99,7 +99,7 @@ if st.button("Submit", type="primary", use_container_width=True):
         st.warning("⚠️ Please enter a question.")
     else:
         try:
-            # Search for relevant documents using collection.query()
+            # Search for relevant documents using seekdb_query()
             with st.spinner("🔍 Searching relevant documents..."):
                 results = seekdb_query(
                     collection=collection, 
