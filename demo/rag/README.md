@@ -32,7 +32,7 @@ uv sync --extra local
 >   - Basic installation (Tsinghua mirror): `uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
 >   - Basic installation (Aliyun mirror): `uv sync --index-url https://mirrors.aliyun.com/pypi/simple`
 >   - Local model (Tsinghua mirror): `uv sync --extra local --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
->   - Local model (Aliyun mirror): `uv sync --extra local --index-url https://mirrors.aliyun.com/pypi/simple` 
+>   - Local model (Aliyun mirror): `uv sync --extra local --index-url https://mirrors.aliyun.com/pypi/simple`
 
 #### Configure Environment Variables
 
