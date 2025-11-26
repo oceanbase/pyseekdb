@@ -26,7 +26,13 @@ uv sync
 uv sync --extra local
 ```
 
-> **Note:** The `local` extra includes `sentence-transformers` and related dependencies (~2-3GB). 
+> **Note:** 
+> - The `local` extra includes `sentence-transformers` and related dependencies (~2-3GB).
+> - If you experience slow download speeds, you can use mirror sources to accelerate:
+>   - Basic installation (Tsinghua mirror): `uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
+>   - Basic installation (Aliyun mirror): `uv sync --index-url https://mirrors.aliyun.com/pypi/simple`
+>   - Local model (Tsinghua mirror): `uv sync --extra local --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
+>   - Local model (Aliyun mirror): `uv sync --extra local --index-url https://mirrors.aliyun.com/pypi/simple` 
 
 #### Configure Environment Variables
 

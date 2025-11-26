@@ -26,7 +26,13 @@ uv sync
 uv sync --extra local
 ```
 
-> **提示：** `local` 额外依赖包含 `sentence-transformers` 及相关依赖（约 2-3GB）。
+> **提示：** 
+> - `local` 额外依赖包含 `sentence-transformers` 及相关依赖（约 2-3GB）。
+> - 如果您在中国大陆，可以使用国内镜像源加速下载：
+>   - 基础安装（清华源）：`uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
+>   - 基础安装（阿里源）：`uv sync --index-url https://mirrors.aliyun.com/pypi/simple`
+>   - 本地模型（清华源）：`uv sync --extra local --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
+>   - 本地模型（阿里源）：`uv sync --extra local --index-url https://mirrors.aliyun.com/pypi/simple`
 
 #### 设置环境变量
 
