@@ -9,6 +9,7 @@ on:
       - main
     paths-ignore:
       - 'README.md'
+      - 'demo/**'
 
 jobs:
   test:
