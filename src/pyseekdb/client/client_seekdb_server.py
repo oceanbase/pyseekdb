@@ -95,7 +95,7 @@ class RemoteServerClient(BaseClient):
         """Check connection status"""
         return self._connection is not None and self._connection.open
     
-    def execute(self, sql: str) -> Any:
+    def _execute(self, sql: str) -> Any:
         conn = self._ensure_connection()
         
         with conn.cursor() as cursor:
@@ -162,7 +162,7 @@ class RemoteServerClient(BaseClient):
         
         logger.info(f"Creating database: {name} in tenant: {self.tenant}")
         sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
-        self.execute(sql)
+        self._execute(sql)
         logger.info(f"✅ Database created: {name} in tenant: {self.tenant}")
     
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
@@ -184,7 +184,7 @@ class RemoteServerClient(BaseClient):
         
         logger.info(f"Getting database: {name} in tenant: {self.tenant}")
         sql = f"SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '{name}'"
-        result = self.execute(sql)
+        result = self._execute(sql)
         
         if not result:
             raise ValueError(f"Database not found: {name}")
@@ -213,7 +213,7 @@ class RemoteServerClient(BaseClient):
         
         logger.info(f"Deleting database: {name} in tenant: {self.tenant}")
         sql = f"DROP DATABASE IF EXISTS `{name}`"
-        self.execute(sql)
+        self._execute(sql)
         logger.info(f"✅ Database deleted: {name} in tenant: {self.tenant}")
     
     def list_databases(
@@ -248,7 +248,7 @@ class RemoteServerClient(BaseClient):
             else:
                 sql += f" LIMIT {limit}"
         
-        result = self.execute(sql)
+        result = self._execute(sql)
         
         databases = []
         for row in result:

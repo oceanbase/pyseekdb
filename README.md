@@ -48,10 +48,6 @@ client = pyseekdb.Client(
 client = pyseekdb.Client(
     database="demo"        # Database name (path defaults to current working directory/seekdb.db)
 )
-
-# Execute SQL queries
-rows = client.execute("SELECT 1")
-print(rows)
 ```
 
 ### 1.2 Remote Server Client

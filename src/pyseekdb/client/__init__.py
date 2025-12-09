@@ -8,7 +8,7 @@ Collection Management (ClientAPI):
 - Returns: _ClientProxy (collection operations only)
 
 Database Management (AdminAPI):
-- AdminClient() - Smart factory for Embedded/Remote Server mode  
+- AdminClient() - Smart factory for Embedded/Remote Server mode
 - Returns: _AdminClientProxy (database operations only)
 
 All factories use the underlying ServerAPI implementations:

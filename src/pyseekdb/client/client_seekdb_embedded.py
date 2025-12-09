@@ -102,25 +102,25 @@ class SeekdbEmbeddedClient(BaseClient):
     def is_connected(self) -> bool:
         """Check connection status"""
         return self._connection is not None and self._initialized
-    
-    def execute(self, sql: str) -> Any:   
+
+    def _execute(self, sql: str) -> Any:
         conn = self._ensure_connection()
         cursor = conn.cursor()
-        
+
         try:
             cursor.execute(sql)
-            
+
             sql_upper = sql.strip().upper()
-            if (sql_upper.startswith('SELECT') or 
-                sql_upper.startswith('SHOW') or 
+            if (sql_upper.startswith('SELECT') or
+                sql_upper.startswith('SHOW') or
                 sql_upper.startswith('DESCRIBE') or
                 sql_upper.startswith('DESC')):
                 return cursor.fetchall()
-            
+
             return cursor
         except Exception:
             raise
-    
+
     def get_raw_connection(self) -> Any:  # seekdb.Connection
         """Get raw connection object"""
         return self._ensure_connection()
@@ -275,7 +275,7 @@ class SeekdbEmbeddedClient(BaseClient):
         """
         logger.info(f"Creating database: {name}")
         sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
-        self.execute(sql)
+        self._execute(sql)
         logger.info(f"✅ Database created: {name}")
     
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
@@ -288,7 +288,7 @@ class SeekdbEmbeddedClient(BaseClient):
         """
         logger.info(f"Getting database: {name}")
         sql = f"SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '{name}'"
-        result = self.execute(sql)
+        result = self._execute(sql)
         
         if not result:
             raise ValueError(f"Database not found: {name}")
@@ -311,7 +311,7 @@ class SeekdbEmbeddedClient(BaseClient):
         """
         logger.info(f"Deleting database: {name}")
         sql = f"DROP DATABASE IF EXISTS `{name}`"
-        self.execute(sql)
+        self._execute(sql)
         logger.info(f"✅ Database deleted: {name}")
     
     def list_databases(
@@ -337,7 +337,7 @@ class SeekdbEmbeddedClient(BaseClient):
             else:
                 sql += f" LIMIT {limit}"
         
-        result = self.execute(sql)
+        result = self._execute(sql)
         
         databases = []
         for row in result:
