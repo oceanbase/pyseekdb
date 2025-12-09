@@ -12,6 +12,7 @@ from .base_connection import BaseConnection
 from .admin_client import AdminAPI, DEFAULT_TENANT
 from .meta_info import CollectionNames, CollectionFieldNames
 from .filters import FilterBuilder
+from .configuration import HNSWConfiguration
 from .embedding_function import (
     EmbeddingFunction,
     DefaultEmbeddingFunction,
@@ -39,30 +40,6 @@ class _NotProvided:
 
 _NOT_PROVIDED = _NotProvided()
 
-# Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
-EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
-
-
-@dataclass
-class HNSWConfiguration:
-    """
-    HNSW (Hierarchical Navigable Small World) index configuration
-    
-    Args:
-        dimension: Vector dimension (number of elements in each vector)
-        distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
-    """
-    dimension: int
-    distance: str = 'l2'
-    
-    def __post_init__(self):
-        if self.dimension <= 0:
-            raise ValueError(f"dimension must be positive, got {self.dimension}")
-        if self.distance not in ['l2', 'cosine', 'inner_product']:
-            raise ValueError(f"distance must be one of ['l2', 'cosine', 'inner_product'], got {self.distance}")
-
-# Type alias for configuration parameter that can be HNSWConfiguration, None, or sentinel
-ConfigurationParam = Union[HNSWConfiguration, None, Any]
 
 class ClientAPI(ABC):
     """
@@ -168,20 +145,20 @@ class BaseClient(BaseConnection, AdminAPI):
                                embedding_function.__call__("seekdb"), and this dimension will be used
                                to create the table. If configuration.dimension is set and doesn't match
                                the calculated dimension, a ValueError will be raised.
-            **kwargs: Additional parameters 
-            
+            **kwargs: Additional parameters
+
         Returns:
             Collection object
-            
+
         Raises:
             ValueError: If configuration is explicitly set to None and embedding_function is also None
                        (cannot determine dimension), or if embedding_function is provided and
                        configuration.dimension doesn't match the calculated dimension from embedding_function
-            
+
         Examples:
             # Using default configuration and default embedding function
             >>> collection = client.create_collection('my_collection')
-            
+
             # Using custom embedding function (dimension will be calculated automatically)
             >>> from pyseekdb import DefaultEmbeddingFunction
             >>> ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
@@ -191,10 +168,10 @@ class BaseClient(BaseConnection, AdminAPI):
             ...     configuration=config,
             ...     embedding_function=ef
             ... )
-            
+
             # Explicitly set configuration=None, use embedding function to determine dimension
             >>> collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
-            
+
             # Explicitly disable embedding function (use configuration dimension)
             >>> config = HNSWConfiguration(dimension=128, distance='cosine')
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
@@ -203,7 +180,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # If not provided (sentinel), use default embedding function
         if embedding_function is _NOT_PROVIDED:
             embedding_function = get_default_embedding_function()
-        
+
         # Calculate actual dimension from embedding function if provided
         actual_dimension = None
         if embedding_function is not None:
@@ -227,7 +204,7 @@ class BaseClient(BaseConnection, AdminAPI):
                     f"Failed to get dimension from embedding function: {e}. "
                     f"Please ensure the embedding function has a 'dimension' attribute or can be called with a string input."
                 ) from e
-        
+
         # Handle configuration
         # If not provided (sentinel), use default configuration
         if configuration is _NOT_PROVIDED:
@@ -248,7 +225,7 @@ class BaseClient(BaseConnection, AdminAPI):
                     "  2. Provide an embedding_function to calculate dimension automatically, or\n"
                     "  3. Do not set configuration=None (use default configuration)."
                 )
-            
+
             # Use calculated dimension from embedding function and default distance metric
             if actual_dimension is not None:
                 configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
@@ -257,11 +234,11 @@ class BaseClient(BaseConnection, AdminAPI):
                     "Failed to calculate dimension from embedding function. "
                     "Please ensure the embedding function can be called with a string input."
                 )
-        
+
         # Validate configuration type
         if not isinstance(configuration, HNSWConfiguration):
             raise TypeError(f"configuration must be HNSWConfiguration, got {type(configuration)}")
-        
+
         # If embedding_function is provided, validate configuration dimension matches
         if embedding_function is not None and actual_dimension is not None:
             if configuration.dimension != actual_dimension:
@@ -275,16 +252,16 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             # No embedding function, use configuration dimension
             dimension = configuration.dimension
-        
+
         # Extract distance from configuration
         distance = configuration.distance
-        
+
         # HNSW is the only supported index type
         index_type = 'hnsw'
-        
+
         # Construct table name: c$v1${name}
         table_name = CollectionNames.table_name(name)
-        
+
         # Construct CREATE TABLE SQL statement with HEAP organization
         sql = f"""CREATE TABLE `{table_name}` (
             _id varbinary(512) PRIMARY KEY NOT NULL,
@@ -294,10 +271,10 @@ class BaseClient(BaseConnection, AdminAPI):
             FULLTEXT INDEX idx_fts(document) WITH PARSER ik,
             VECTOR INDEX idx_vec (embedding) with(distance={distance}, type={index_type}, lib=vsag)
         ) ORGANIZATION = HEAP;"""
-        
+
         # Execute SQL to create table
         self.execute(sql)
-        
+
         # Create and return Collection object
         return Collection(
             client=self,
@@ -307,7 +284,7 @@ class BaseClient(BaseConnection, AdminAPI):
             distance=distance,
             **kwargs
         )
-    
+
     def get_collection(
         self,
         name: str,
