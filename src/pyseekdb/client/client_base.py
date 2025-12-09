@@ -273,7 +273,7 @@ class BaseClient(BaseConnection, AdminAPI):
         ) ORGANIZATION = HEAP;"""
 
         # Execute SQL to create table
-        self.execute(sql)
+        self._execute(sql)
 
         # Create and return Collection object
         return Collection(
@@ -310,7 +310,7 @@ class BaseClient(BaseConnection, AdminAPI):
         
         # Check if table exists by describing it
         try:
-            table_info = self.execute(f"DESCRIBE `{table_name}`")
+            table_info = self._execute(f"DESCRIBE `{table_name}`")
             if not table_info or len(table_info) == 0:
                 raise ValueError(f"Collection '{name}' does not exist (table '{table_name}' not found)")
         except Exception as e:
@@ -343,7 +343,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # Extract distance from CREATE TABLE statement
         distance = None
         try:
-            create_table_result = self.execute(f"SHOW CREATE TABLE `{table_name}`")
+            create_table_result = self._execute(f"SHOW CREATE TABLE `{table_name}`")
             if create_table_result and len(create_table_result) > 0:
                 # Handle both dict and tuple formats
                 if isinstance(create_table_result[0], dict):
@@ -401,7 +401,7 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError(f"Collection '{name}' does not exist (table '{table_name}' not found)")
         
         # Execute DROP TABLE SQL
-        self.execute(f"DROP TABLE IF EXISTS `{table_name}`")
+        self._execute(f"DROP TABLE IF EXISTS `{table_name}`")
     
     def list_collections(self) -> List["Collection"]:
         """
@@ -413,15 +413,15 @@ class BaseClient(BaseConnection, AdminAPI):
         # List all tables that start with 'c$v1'
         # Use SHOW TABLES LIKE 'c$v1%' to filter collection tables
         try:
-            tables = self.execute("SHOW TABLES LIKE 'c$v1$%'")
+            tables = self._execute("SHOW TABLES LIKE 'c$v1$%'")
         except Exception:
             # Fallback: try to query information_schema
             try:
                 # Get current database name
-                db_result = self.execute("SELECT DATABASE()")
+                db_result = self._execute("SELECT DATABASE()")
                 if db_result and len(db_result) > 0:
                     db_name = db_result[0][0] if isinstance(db_result[0], (tuple, list)) else db_result[0].get('DATABASE()', '')
-                    tables = self.execute(
+                    tables = self._execute(
                         f"SELECT TABLE_NAME FROM information_schema.TABLES "
                         f"WHERE TABLE_SCHEMA = '{db_name}' AND TABLE_NAME LIKE 'c$v1$%'"
                     )
@@ -486,7 +486,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # Check if table exists
         try:
             # Try to describe the table
-            table_info = self.execute(f"DESCRIBE `{table_name}`")
+            table_info = self._execute(f"DESCRIBE `{table_name}`")
             return table_info is not None and len(table_info) > 0
         except Exception:
             # If DESCRIBE fails, table doesn't exist
@@ -694,7 +694,7 @@ class BaseClient(BaseConnection, AdminAPI):
                  VALUES {','.join(values_list)}"""
         
         logger.debug(f"Executing SQL: {sql}")
-        self.execute(sql)
+        self._execute(sql)
         logger.info(f"✅ Successfully added {num_items} item(s) to collection '{collection_name}'")
     
     def _collection_update(
@@ -828,7 +828,7 @@ class BaseClient(BaseConnection, AdminAPI):
             sql = f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
             
             logger.debug(f"Executing SQL: {sql}")
-            self.execute(sql)
+            self._execute(sql)
         
         logger.info(f"✅ Successfully updated {len(ids)} item(s) in collection '{collection_name}'")
     
@@ -977,7 +977,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 if set_clauses:
                     sql = f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
                     logger.debug(f"Executing SQL: {sql}")
-                    self.execute(sql)
+                    self._execute(sql)
             else:
                 # Insert new record
                 if doc_val:
@@ -1002,7 +1002,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}) 
                          VALUES ({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})"""
                 logger.debug(f"Executing SQL: {sql}")
-                self.execute(sql)
+                self._execute(sql)
         
         logger.info(f"✅ Successfully upserted {len(ids)} item(s) in collection '{collection_name}'")
     
