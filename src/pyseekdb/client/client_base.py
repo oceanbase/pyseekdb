@@ -109,7 +109,7 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     """
     Generate VECTOR INDEX SQL clause from HNSWConfiguration.
     """
-    return f"WITH (DISTANCE={hnsw_config.distance} TYPE=hnsw LIB=vsag)"
+    return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag)"
 
 class ClientAPI(ABC):
     """
