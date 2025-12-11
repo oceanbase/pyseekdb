@@ -172,20 +172,68 @@ Collections are the primary data structures in pyseekdb, similar to tables in tr
 
 ```python
 import pyseekdb
-from pyseekdb import DefaultEmbeddingFunction, HNSWConfiguration
+from pyseekdb import (
+    DefaultEmbeddingFunction,
+    HNSWConfiguration,
+    Configuration,
+    FulltextParserConfig
+)
 
 # Create a client
 client = pyseekdb.Client(host="127.0.0.1", port=2881, database="test")
 
-# Create a collection
+# Create a collection with default configuration
 collection = client.create_collection(
-    name="my_collection",
-    # embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
+    name="my_collection"
+    # embedding_function defaults to DefaultEmbeddingFunction() (384 dimensions)
 )
 
 # Create a collection with custom embedding function
-ef = UserDefinedEmbeddingFunction(model_name='all-MiniLM-L6-v2') #UserDefinedEmbeddingFunction should be defined before
-config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
+# Dimension will be automatically calculated from embedding function
+ef = UserDefinedEmbeddingFunction(model_name='all-MiniLM-L6-v2')
+collection = client.create_collection(
+    name="my_collection",
+    embedding_function=ef
+)
+
+# Recommended: Create a collection with Configuration wrapper
+# Using IK parser (default for Chinese text)
+config = Configuration(
+    hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+    fulltext_config=FulltextParserConfig(parser='ik')
+)
+collection = client.create_collection(
+    name="my_collection",
+    configuration=config,
+    embedding_function=ef
+)
+
+# Recommended: Create a collection with Configuration (only HNSW config, uses default parser)
+config = Configuration(
+    hnsw=HNSWConfiguration(dimension=384, distance='cosine')
+)
+collection = client.create_collection(
+    name="my_collection",
+    configuration=config,
+    embedding_function=ef
+)
+
+# Create a collection with Space parser (for space-separated languages)
+config = Configuration(
+    hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+    fulltext_config=FulltextParserConfig(parser='space')
+)
+collection = client.create_collection(
+    name="my_collection",
+    configuration=config,
+    embedding_function=ef
+)
+
+# Create a collection with Ngram parser and custom parameters
+config = Configuration(
+    hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+    fulltext_config=FulltextParserConfig(parser='ngram', params={'ngram_token_size': 3})
+)
 collection = client.create_collection(
     name="my_collection",
     configuration=config,
@@ -193,9 +241,13 @@ collection = client.create_collection(
 )
 
 # Create a collection without embedding function (embeddings must be provided manually)
+# Recommended: Use Configuration wrapper
+config = Configuration(
+    hnsw=HNSWConfiguration(dimension=128, distance='cosine')
+)
 collection = client.create_collection(
     name="my_collection",
-    configuration=HNSWConfiguration(dimension=128, distance='cosine'),
+    configuration=config,
     embedding_function=None  # Explicitly disable embedding function
 )
 
@@ -207,13 +259,26 @@ collection = client.get_or_create_collection(
 
 **Parameters:**
 - `name` (str): Collection name (required)
-- `configuration` (HNSWConfiguration, optional): Index configuration with dimension and distance metric
-  - If not provided, uses default (dimension=384, distance='cosine')
+- `configuration` (Configuration, HNSWConfiguration, or None, optional): Index configuration
+  - **Recommended:** `Configuration` - Wrapper class that can include both `HNSWConfiguration` and `FulltextParserConfig`
+    - Use `Configuration(hnsw=HNSWConfiguration(...))` even when only vector index config is needed
+    - Allows easy addition of fulltext parser config later
+  - `HNSWConfiguration`: Vector index configuration with `dimension` and `distance` metric (backward compatibility)
+  - If not provided, uses default (dimension=384, distance='cosine', parser='ik')
   - If set to `None`, dimension will be calculated from `embedding_function`
 - `embedding_function` (EmbeddingFunction, optional): Function to convert documents to embeddings
   - If not provided, uses `DefaultEmbeddingFunction()` (384 dimensions)
   - If set to `None`, collection will not have an embedding function
   - If provided, the dimension will be automatically calculated and validated against `configuration.dimension`
+
+**Fulltext Parser Options:**
+- `'ik'` (default): IK parser for Chinese text segmentation
+- `'space'`: Space-separated tokenizer for languages like English
+- `'ngram'`: N-gram tokenizer
+- `'ngram2'`: 2-gram tokenizer
+- `'beng'`: Bengali text parser
+
+For more information about parser, please refer to [create_index section tokenizer_option](https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000004479548#tokenizer_option).
 
 **Note:** When `embedding_function` is provided, the system will automatically calculate the vector dimension by calling the function. If `configuration.dimension` is also provided, it must match the embedding function's dimension, otherwise a `ValueError` will be raised.
 
@@ -734,15 +799,15 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
 `collection.hybrid_search()` runs full-text/scalar queries and vector KNN search in parallel, then fuses the results (RRF is supported). You can pass raw dicts/lists or a `HybridSearch` builder (the builder can be given as the first argument or via `search=`; when present it overrides other parameters).
 
 **Parameters（dict mode）**
-- `query` (dict or List[dict], optional): full-text/scalar routes  
-  - `where_document`: `$contains` / `$not_contains` plus `$and` / `$or` combinations of those clauses  
-  - `where`: metadata filters (see 5.4) including logical operators and `#id`  
+- `query` (dict or List[dict], optional): full-text/scalar routes
+  - `where_document`: `$contains` / `$not_contains` plus `$and` / `$or` combinations of those clauses
+  - `where`: metadata filters (see 5.4) including logical operators and `#id`
   - `boost`: weight for this text route when results are fused
-- `knn` (dict or List[dict], optional): vector routes  
-  - `query_embeddings`: `List[float]` or `List[List[float]]`; validated against `collection.dimension` when present  
-  - `query_texts`: str or List[str]; auto-embedded with the collection's `embedding_function` (missing function raises `ValueError`)  
-  - `where`: metadata filters for this vector route  
-  - `n_results`: candidates per vector route (k, default 10)  
+- `knn` (dict or List[dict], optional): vector routes
+  - `query_embeddings`: `List[float]` or `List[List[float]]`; validated against `collection.dimension` when present
+  - `query_texts`: str or List[str]; auto-embedded with the collection's `embedding_function` (missing function raises `ValueError`)
+  - `where`: metadata filters for this vector route
+  - `n_results`: candidates per vector route (k, default 10)
   - `boost`: weight for this vector route
 - `rank` (dict, optional): ranking config; RRF tested via `{"rrf": {...}}` or `{}`. Omit to use single-route ordering.
 - `n_results` (int): final fused result count (default 10).
@@ -939,11 +1004,11 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
     """
     A custom embedding function using sentence-transformers with a specific model.
     """
-    
+
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", device: str = "cpu"):
         """
         Initialize the sentence-transformer embedding function.
-        
+
         Args:
             model_name: Name of the sentence-transformers model to use
             device: Device to run the model on ('cpu' or 'cuda')
@@ -952,7 +1017,7 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
         self.device = device
         self._model = None
         self._dimension = None
-    
+
     def _ensure_model_loaded(self):
         """Lazy load the embedding model"""
         if self._model is None:
@@ -967,51 +1032,54 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
                     "sentence-transformers is not installed. "
                     "Please install it with: pip install sentence-transformers"
                 )
-    
+
     @property
     def dimension(self) -> int:
         """Get the dimension of embeddings produced by this function"""
         self._ensure_model_loaded()
         return self._dimension
-    
+
     def __call__(self, input: Documents) -> Embeddings:
         """
         Generate embeddings for the given documents.
-        
+
         Args:
             input: Single document (str) or list of documents (List[str])
-            
+
         Returns:
             List of embedding embeddings
         """
         self._ensure_model_loaded()
-        
+
         # Handle single string input
         if isinstance(input, str):
             input = [input]
-        
+
         # Handle empty input
         if not input:
             return []
-        
+
         # Generate embeddings
         embeddings = self._model.encode(
             input,
             convert_to_numpy=True,
             show_progress_bar=False
         )
-        
+
         # Convert numpy arrays to lists
         return [embedding.tolist() for embedding in embeddings]
 
 # Use the custom embedding function
+from pyseekdb import Configuration, HNSWConfiguration
 ef = SentenceTransformerCustomEmbeddingFunction(
     model_name='all-MiniLM-L6-v2',
     device='cpu'
 )
 collection = client.create_collection(
     name="my_collection",
-    configuration=HNSWConfiguration(dimension=384, distance='cosine'),
+    configuration=Configuration(
+        hnsw=HNSWConfiguration(dimension=384, distance='cosine')
+    ),
     embedding_function=ef
 )
 ```
@@ -1032,11 +1100,11 @@ class OpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
     """
     A custom embedding function using OpenAI's embedding API.
     """
-    
+
     def __init__(self, model_name: str = "text-embedding-ada-002", api_key: str = None):
         """
         Initialize the OpenAI embedding function.
-        
+
         Args:
             model_name: Name of the OpenAI embedding model
             api_key: OpenAI API key (if not provided, uses OPENAI_API_KEY env var)
@@ -1045,10 +1113,10 @@ class OpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY')
         if not self.api_key:
             raise ValueError("OpenAI API key is required")
-        
+
         # Dimension for text-embedding-ada-002 is 1536
         self._dimension = 1536 if "ada-002" in model_name else None
-    
+
     @property
     def dimension(self) -> int:
         """Get the dimension of embeddings produced by this function"""
@@ -1056,44 +1124,47 @@ class OpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
             # Call API to get dimension (or use known values)
             raise ValueError("Dimension not set for this model")
         return self._dimension
-    
+
     def __call__(self, input: Documents) -> Embeddings:
         """
         Generate embeddings using OpenAI API.
-        
+
         Args:
             input: Single document (str) or list of documents (List[str])
-            
+
         Returns:
             List of embedding embeddings
         """
         # Handle single string input
         if isinstance(input, str):
             input = [input]
-        
+
         # Handle empty input
         if not input:
             return []
-        
+
         # Call OpenAI API
         response = openai.Embedding.create(
             model=self.model_name,
             input=input,
             api_key=self.api_key
         )
-        
+
         # Extract embeddings
         embeddings = [item['embedding'] for item in response['data']]
         return embeddings
 
 # Use the custom embedding function
+from pyseekdb import Configuration, HNSWConfiguration
 ef = OpenAIEmbeddingFunction(
     model_name='text-embedding-ada-002',
     api_key='your-api-key'
 )
 collection = client.create_collection(
     name="my_collection",
-    configuration=HNSWConfiguration(dimension=1536, distance='cosine'),
+    configuration=Configuration(
+        hnsw=HNSWConfiguration(dimension=1536, distance='cosine')
+    ),
     embedding_function=ef
 )
 ```
@@ -1121,11 +1192,15 @@ When creating a custom embedding function, ensure:
 Once you've created a custom embedding function, use it when creating or getting collections:
 
 ```python
+from pyseekdb import Configuration, HNSWConfiguration
+
 # Create collection with custom embedding function
 ef = MyCustomEmbeddingFunction()
 collection = client.create_collection(
     name="my_collection",
-    configuration=HNSWConfiguration(dimension=ef.dimension, distance='cosine'),
+    configuration=Configuration(
+        hnsw=HNSWConfiguration(dimension=ef.dimension, distance='cosine')
+    ),
     embedding_function=ef
 )
 
