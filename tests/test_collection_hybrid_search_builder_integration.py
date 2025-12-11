@@ -487,7 +487,7 @@ class TestCollectionHybridSearchWithBuilder:
             self._cleanup_collection(client, collection_name)
 
     # -------------------- Seekdb Server --------------------
-    def test_seekdb_server_hybrid_search_full_text_only(self):
+    def test_server_hybrid_search_full_text_only(self):
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
@@ -548,7 +548,7 @@ class TestCollectionHybridSearchWithBuilder:
         finally:
             self._cleanup_collection(client, collection_name)
 
-    def test_seekdb_server_hybrid_search_combined(self):
+    def test_server_hybrid_search_combined(self):
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
@@ -589,7 +589,7 @@ class TestCollectionHybridSearchWithBuilder:
         finally:
             self._cleanup_collection(client, collection_name)
 
-    def test_seekdb_server_hybrid_search_vector_only(self):
+    def test_server_hybrid_search_vector_only(self):
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
@@ -632,7 +632,7 @@ class TestCollectionHybridSearchWithBuilder:
         finally:
             self._cleanup_collection(client, collection_name)
 
-    def test_seekdb_server_hybrid_search_with_metadata_filter(self):
+    def test_server_hybrid_search_with_metadata_filter(self):
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
@@ -685,7 +685,7 @@ class TestCollectionHybridSearchWithBuilder:
         finally:
             self._cleanup_collection(client, collection_name)
 
-    def test_seekdb_server_hybrid_search_with_logical_operators(self):
+    def test_server_hybrid_search_with_logical_operators(self):
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,
@@ -735,7 +735,7 @@ class TestCollectionHybridSearchWithBuilder:
         finally:
             self._cleanup_collection(client, collection_name)
 
-    def test_seekdb_server_hybrid_search_scalar_in_nin_and_id(self):
+    def test_server_hybrid_search_scalar_in_nin_and_id(self):
         client = pyseekdb.Client(
             host=SERVER_HOST,
             port=SERVER_PORT,

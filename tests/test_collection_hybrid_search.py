@@ -626,7 +626,7 @@ class TestCollectionHybridSearch:
         finally:
             self._cleanup_collection(client, collection_name)
     
-    def test_seekdb_server_hybrid_search_full_text_only(self):
+    def test_server_hybrid_search_full_text_only(self):
         """Test hybrid_search with only full-text search (query) using SeekdbServer"""
         # Create SeekdbServer client
         client = pyseekdb.Client(
@@ -709,7 +709,7 @@ class TestCollectionHybridSearch:
             # Cleanup
             self._cleanup_collection(client, collection_name)
     
-    def test_seekdb_server_hybrid_search_combined(self):
+    def test_server_hybrid_search_combined(self):
         """Test hybrid_search with both full-text and vector search using SeekdbServer"""
         # Create SeekdbServer client
         client = pyseekdb.Client(
@@ -774,7 +774,7 @@ class TestCollectionHybridSearch:
             # Cleanup
             self._cleanup_collection(client, collection_name)
     
-    def test_seekdb_server_hybrid_search_vector_only(self):
+    def test_server_hybrid_search_vector_only(self):
         """Test hybrid_search with only vector search (knn) using SeekdbServer"""
         # Create SeekdbServer client
         client = pyseekdb.Client(
@@ -832,7 +832,7 @@ class TestCollectionHybridSearch:
             # Cleanup
             self._cleanup_collection(client, collection_name)
     
-    def test_seekdb_server_hybrid_search_with_metadata_filter(self):
+    def test_server_hybrid_search_with_metadata_filter(self):
         """Test hybrid_search with metadata filters using SeekdbServer"""
         # Create SeekdbServer client
         client = pyseekdb.Client(
@@ -905,7 +905,7 @@ class TestCollectionHybridSearch:
             # Cleanup
             self._cleanup_collection(client, collection_name)
     
-    def test_seekdb_server_hybrid_search_with_logical_operators(self):
+    def test_server_hybrid_search_with_logical_operators(self):
         """Test hybrid_search with logical operators in metadata filters using SeekdbServer"""
         # Create SeekdbServer client
         client = pyseekdb.Client(
@@ -1044,7 +1044,7 @@ class TestCollectionHybridSearch:
         finally:
             self._cleanup_collection(client, collection_name)
 
-    def test_seekdb_server_hybrid_search_scalar_in_nin_and_id(self):
+    def test_server_hybrid_search_scalar_in_nin_and_id(self):
         """Test hybrid_search scalar $in/$nin and #id support using SeekdbServer"""
         client = pyseekdb.Client(
             host=SERVER_HOST,
