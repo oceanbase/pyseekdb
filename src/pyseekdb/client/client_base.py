@@ -12,7 +12,14 @@ from .base_connection import BaseConnection
 from .admin_client import AdminAPI, DEFAULT_TENANT
 from .meta_info import CollectionNames, CollectionFieldNames
 from .filters import FilterBuilder
-from .configuration import HNSWConfiguration
+from .configuration import (
+    HNSWConfiguration,
+    Configuration,
+    ConfigurationParam,
+    FulltextParserConfig,
+    DEFAULT_VECTOR_DIMENSION,
+    DEFAULT_DISTANCE_METRIC
+)
 from .embedding_function import (
     EmbeddingFunction,
     DefaultEmbeddingFunction,
@@ -25,13 +32,10 @@ from .collection import Collection
 
 from .database import Database
 
-logger = logging.getLogger(__name__)
+# Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
+EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
 
-# Default configuration constants
-# Note: Default embedding function (DefaultEmbeddingFunction) produces 384-dim embeddings
-# So we use 384 as the default dimension to match
-DEFAULT_VECTOR_DIMENSION = 384  # Matches DefaultEmbeddingFunction dimension
-DEFAULT_DISTANCE_METRIC = 'cosine'
+logger = logging.getLogger(__name__)
 
 # Sentinel object to distinguish between "parameter not provided" and "explicitly set to None"
 class _NotProvided:
@@ -40,6 +44,72 @@ class _NotProvided:
 
 _NOT_PROVIDED = _NotProvided()
 
+
+def _extract_hnsw_config(config: ConfigurationParam) -> Optional[HNSWConfiguration]:
+    if config is None:
+        return None
+    elif isinstance(config, HNSWConfiguration):
+        return config
+    elif isinstance(config, Configuration):
+        return config.hnsw
+    else:
+        raise TypeError(
+            f"configuration must be Configuration, HNSWConfiguration, or None, "
+            f"got {type(config)}"
+        )
+
+
+def _extract_fulltext_config(config: ConfigurationParam) -> Optional[FulltextParserConfig]:
+    if config is None:
+        return None
+    elif isinstance(config, HNSWConfiguration):
+        # HNSWConfiguration doesn't have fulltext config, return None (will use default)
+        return None
+    elif isinstance(config, Configuration):
+        # If Configuration has fulltext_config, return it; otherwise return None (will use default)
+        return config.fulltext_config
+    else:
+        # Should not reach here due to type checking, but handle gracefully
+        return None
+
+
+def _get_fulltext_index_sql(fulltext_config: Optional[FulltextParserConfig] = None) -> str:
+    """
+    Generate FULLTEXT INDEX SQL clause from fulltext configuration.
+
+    Args:
+        fulltext_config: FulltextParserConfig or None. If None, defaults to IK parser.
+
+    Returns:
+        SQL clause string for FULLTEXT INDEX (e.g., "WITH PARSER ik" or "WITH PARSER ngram PARSER_PROPERTIES=(size=2)")
+    """
+    if fulltext_config is None:
+        # Default to IK parser for backward compatibility
+        return "WITH PARSER ik"
+
+    parser_name = fulltext_config.parser
+    params = fulltext_config.params or {}
+
+    # Build SQL clause with parser name
+    if params:
+        # Format parameters as key=value pairs
+        # Quote string values, leave numbers and booleans as-is
+        param_parts = []
+        for k, v in params.items():
+            if isinstance(v, str):
+                param_parts.append(f"{k}='{v}'")
+            else:
+                param_parts.append(f"{k}={v}")
+        param_str = ', '.join(param_parts)
+        return f"WITH PARSER {parser_name} PARSER_PROPERTIES=({param_str})"
+    else:
+        return f"WITH PARSER {parser_name}"
+
+def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
+    """
+    Generate VECTOR INDEX SQL clause from HNSWConfiguration.
+    """
+    return f"WITH (DISTANCE={hnsw_config.distance} TYPE=hnsw LIB=vsag)"
 
 class ClientAPI(ABC):
     """
@@ -60,7 +130,9 @@ class ClientAPI(ABC):
         
         Args:
             name: Collection name
-            configuration: HNSW index configuration (HNSWConfiguration)
+            configuration: Index configuration (Configuration or HNSWConfiguration).
+                          For backward compatibility, HNSWConfiguration is still accepted.
+                          Configuration can include fulltext parser configuration (FulltextParserConfig).
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -121,7 +193,7 @@ class BaseClient(BaseConnection, AdminAPI):
     """
     
     # ==================== Collection Management (User-facing) ====================
-    
+
     def create_collection(
         self,
         name: str,
@@ -131,13 +203,15 @@ class BaseClient(BaseConnection, AdminAPI):
     ) -> "Collection":
         """
         Create a collection (user-facing API)
-        
+
         Args:
             name: Collection name
-            configuration: HNSW index configuration (HNSWConfiguration)
-                          If not provided, uses default configuration (dimension=384, distance='cosine').
+            configuration: Index configuration (Configuration or HNSWConfiguration).
+                          If not provided, uses default configuration (dimension=384, distance='cosine', parser='ik').
                           If explicitly set to None, will try to calculate dimension from embedding_function.
                           If embedding_function is also None, will raise an error.
+                          For backward compatibility, HNSWConfiguration is still accepted.
+                          Configuration can include fulltext parser configuration (FulltextParserConfig with parser='ik', 'space', 'ngram', 'ngram2', or 'beng').
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -154,9 +228,10 @@ class BaseClient(BaseConnection, AdminAPI):
             ValueError: If configuration is explicitly set to None and embedding_function is also None
                        (cannot determine dimension), or if embedding_function is provided and
                        configuration.dimension doesn't match the calculated dimension from embedding_function
+            TypeError: If configuration is not None, Configuration, or HNSWConfiguration
 
         Examples:
-            # Using default configuration and default embedding function
+            # Using default configuration and default embedding function (defaults to IK parser)
             >>> collection = client.create_collection('my_collection')
 
             # Using custom embedding function (dimension will be calculated automatically)
@@ -168,6 +243,28 @@ class BaseClient(BaseConnection, AdminAPI):
             ...     configuration=config,
             ...     embedding_function=ef
             ... )
+
+            # Using Configuration wrapper with IK parser (default)
+            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextParserConfig
+            >>> config = Configuration(
+            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+            ...     fulltext_config=FulltextParserConfig(parser='ik')
+            ... )
+            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+
+            # Using Space parser
+            >>> config = Configuration(
+            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+            ...     fulltext_config=FulltextParserConfig(parser='space')
+            ... )
+            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+
+            # Using Ngram parser with parameters
+            >>> config = Configuration(
+            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+            ...     fulltext_config=FulltextParserConfig(parser='ngram', params={'size': 2})
+            ... )
+            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Explicitly set configuration=None, use embedding function to determine dimension
             >>> collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
@@ -206,13 +303,15 @@ class BaseClient(BaseConnection, AdminAPI):
                 ) from e
 
         # Handle configuration
-        # If not provided (sentinel), use default configuration
+        # Extract HNSWConfiguration from ConfigurationParam (handles both Configuration and HNSWConfiguration)
+        hnsw_config = None
+
         if configuration is _NOT_PROVIDED:
             # Use default configuration, but if embedding_function is provided, use its dimension
             if actual_dimension is not None:
-                configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+                hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
             else:
-                configuration = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
+                hnsw_config = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
         elif configuration is None:
             # Configuration is explicitly set to None
             # Try to calculate dimension from embedding_function
@@ -228,22 +327,28 @@ class BaseClient(BaseConnection, AdminAPI):
 
             # Use calculated dimension from embedding function and default distance metric
             if actual_dimension is not None:
-                configuration = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+                hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
             else:
                 raise ValueError(
                     "Failed to calculate dimension from embedding function. "
                     "Please ensure the embedding function can be called with a string input."
                 )
+        else:
+            # Extract HNSWConfiguration from Configuration or use HNSWConfiguration directly
+            hnsw_config = _extract_hnsw_config(configuration)
 
-        # Validate configuration type
-        if not isinstance(configuration, HNSWConfiguration):
-            raise TypeError(f"configuration must be HNSWConfiguration, got {type(configuration)}")
+            # If Configuration was provided but hnsw is None, create default HNSWConfiguration
+            if hnsw_config is None:
+                if actual_dimension is not None:
+                    hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+                else:
+                    hnsw_config = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
 
         # If embedding_function is provided, validate configuration dimension matches
         if embedding_function is not None and actual_dimension is not None:
-            if configuration.dimension != actual_dimension:
+            if hnsw_config.dimension != actual_dimension:
                 raise ValueError(
-                    f"Configuration dimension ({configuration.dimension}) doesn't match "
+                    f"Configuration dimension ({hnsw_config.dimension}) doesn't match "
                     f"embedding function dimension ({actual_dimension}). "
                     f"Please update configuration to use dimension={actual_dimension} or remove dimension from configuration."
                 )
@@ -251,13 +356,14 @@ class BaseClient(BaseConnection, AdminAPI):
             dimension = actual_dimension
         else:
             # No embedding function, use configuration dimension
-            dimension = configuration.dimension
+            dimension = hnsw_config.dimension
 
         # Extract distance from configuration
-        distance = configuration.distance
+        distance = hnsw_config.distance
 
-        # HNSW is the only supported index type
-        index_type = 'hnsw'
+        # Extract fulltext parser configuration
+        fulltext_config = _extract_fulltext_config(configuration)
+        fulltext_index_clause = _get_fulltext_index_sql(fulltext_config)
 
         # Construct table name: c$v1${name}
         table_name = CollectionNames.table_name(name)
@@ -268,8 +374,8 @@ class BaseClient(BaseConnection, AdminAPI):
             document string,
             embedding vector({dimension}),
             metadata json,
-            FULLTEXT INDEX idx_fts(document) WITH PARSER ik,
-            VECTOR INDEX idx_vec (embedding) with(distance={distance}, type={index_type}, lib=vsag)
+            FULLTEXT INDEX idx_fts(document) {fulltext_index_clause},
+            VECTOR INDEX idx_vec (embedding) {_get_vector_index_sql(hnsw_config)}
         ) ORGANIZATION = HEAP;"""
 
         # Execute SQL to create table

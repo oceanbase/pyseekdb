@@ -64,6 +64,22 @@ class EmbeddingFunction(Protocol[D]):
         """
         ...
 
+def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
+    """
+    Get the dimension of the embeddings produced by the embedding function.
+    """
+    if hasattr(embedding_function, "dimension") and callable(getattr(embedding_function, "dimension", None)):
+        return embedding_function.dimension()
+    elif hasattr(embedding_function, "dimension"):
+        return embedding_function.dimension
+    else:
+        # Fallback: if no dimension attribute, call the function to calculate dimension
+        # This may trigger model initialization, but is necessary for custom embedding functions
+        test_embeddings = embedding_function.__call__("seekdb")
+        if test_embeddings and len(test_embeddings) > 0:
+            return len(test_embeddings[0])
+        else:
+            raise ValueError("Embedding function returned empty result when called with 'seekdb'")
 
 class DefaultEmbeddingFunction:
     """

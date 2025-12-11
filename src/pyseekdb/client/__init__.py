@@ -22,10 +22,12 @@ from typing import Optional
 from .base_connection import BaseConnection
 from .client_base import (
     BaseClient,
-    ClientAPI,
+    ClientAPI
+)
+from .configuration import (
+    Configuration,
     HNSWConfiguration,
-    DEFAULT_VECTOR_DIMENSION,
-    DEFAULT_DISTANCE_METRIC
+    FulltextParserConfig
 )
 from .embedding_function import (
     EmbeddingFunction,
@@ -56,8 +58,8 @@ __all__ = [
     'BaseClient',
     'ClientAPI',
     'HNSWConfiguration',
-    'DEFAULT_VECTOR_DIMENSION',
-    'DEFAULT_DISTANCE_METRIC',
+    'Configuration',
+    'FulltextParserConfig',
     'EmbeddingFunction',
     'DefaultEmbeddingFunction',
     'get_default_embedding_function',
