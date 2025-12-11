@@ -176,7 +176,7 @@ class TestCollectionHybridSearch:
             # Use CAST to convert string to binary for varbinary(512) field
             sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
                      VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
-            client._server.execute(sql)
+            client._server._execute(sql)
         
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
         return inserted_ids
@@ -185,7 +185,7 @@ class TestCollectionHybridSearch:
         """Helper method to cleanup test collection"""
         table_name = f"c$v1${collection_name}"
         try:
-            client._server.execute(f"DROP TABLE IF EXISTS `{table_name}`")
+            client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
             print(f"   Cleaned up test table: {table_name}")
         except Exception as cleanup_error:
             print(f"   Warning: Failed to cleanup test table: {cleanup_error}")
@@ -208,7 +208,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -287,7 +287,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -351,7 +351,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -416,7 +416,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -495,7 +495,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -567,7 +567,7 @@ class TestCollectionHybridSearch:
         )
         
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -644,7 +644,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"SeekdbServer connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -723,7 +723,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"SeekdbServer connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -787,7 +787,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"SeekdbServer connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -845,7 +845,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"SeekdbServer connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -918,7 +918,7 @@ class TestCollectionHybridSearch:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"SeekdbServer connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -1055,7 +1055,7 @@ class TestCollectionHybridSearch:
         )
         
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"SeekdbServer connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")

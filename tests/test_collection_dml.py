@@ -73,7 +73,7 @@ class TestCollectionDML:
             FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
             VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=cosine, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
-        client._server.execute(create_table_sql)
+        client._server._execute(create_table_sql)
         
         # Get collection object
         collection = client.get_collection(name=collection_name, embedding_function=None)
@@ -222,7 +222,7 @@ class TestCollectionDML:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"Server connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -241,7 +241,7 @@ class TestCollectionDML:
             FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
             VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=cosine, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
-        client._server.execute(create_table_sql)
+        client._server._execute(create_table_sql)
         
         # Get collection object
         collection = client.get_collection(name=collection_name, embedding_function=None)
@@ -425,7 +425,7 @@ class TestCollectionDML:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")
@@ -444,7 +444,7 @@ class TestCollectionDML:
             FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
             VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=cosine, type=hnsw, lib=vsag)
         ) ORGANIZATION = HEAP;"""
-        client._server.execute(create_table_sql)
+        client._server._execute(create_table_sql)
         
         # Get collection object
         collection = client.get_collection(name=collection_name, embedding_function=None)

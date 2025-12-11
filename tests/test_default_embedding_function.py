@@ -230,7 +230,7 @@ class TestDefaultEmbeddingFunction:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"Server connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -307,7 +307,7 @@ class TestDefaultEmbeddingFunction:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")

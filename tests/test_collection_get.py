@@ -128,7 +128,7 @@ class TestCollectionGet:
             # Use CAST to convert string to binary for varbinary(512) field
             sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
                      VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
-            client._server.execute(sql)
+            client._server._execute(sql)
         
         return inserted_ids
     
@@ -274,7 +274,7 @@ class TestCollectionGet:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"Server connection failed ({SERVER_HOST}:{SERVER_PORT}): {e}")
@@ -428,7 +428,7 @@ class TestCollectionGet:
         
         # Test connection
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
         except Exception as e:
             pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {e}")

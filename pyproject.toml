@@ -32,6 +32,13 @@ numpy = ">=1.26"
 pytest = "^8.2.2"
 pylint = "^3.2.7"
 
+
+
+[[tool.poetry.source]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+priority = "primary"
+
 [tool.pytest.ini_options]
 log_level = "INFO"
 

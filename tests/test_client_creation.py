@@ -54,7 +54,7 @@ class TestClientCreation:
         # Note: If embedding_function is not provided, default embedding function will be used
         # and dimension will be automatically updated to 384. We need to use the actual dimension.
         # To use a specific dimension, we need to set embedding_function=None
-        from pyseekdb import HNSWConfiguration
+        from pyseekdb import HNSWConfiguration, Configuration, FulltextParserConfig
         config = HNSWConfiguration(dimension=test_dimension, distance='cosine')
         collection = client.create_collection(
             name=test_collection_name,
@@ -62,6 +62,25 @@ class TestClientCreation:
             embedding_function=None
         )
         
+        # Test: Verify Configuration class with fulltext parser works
+        test_collection_name_config = "test_collection_config_" + str(int(time.time()))
+        config_with_fulltext = Configuration(
+            hnsw=HNSWConfiguration(dimension=test_dimension, distance='cosine'),
+            fulltext_config=FulltextParserConfig(parser='ik')
+        )
+        collection_config = client.create_collection(
+            name=test_collection_name_config,
+            configuration=config_with_fulltext,
+            embedding_function=None
+        )
+        assert collection_config is not None
+        assert collection_config.name == test_collection_name_config
+        # Clean up
+        try:
+            client.delete_collection(test_collection_name_config)
+        except Exception:
+            pass
+
         # Verify collection object
         assert collection is not None
         assert collection.name == test_collection_name
@@ -73,7 +92,7 @@ class TestClientCreation:
         table_name = f"c$v1${test_collection_name}"
         try:
             # Try to describe table structure to verify it exists
-            table_info = client._server.execute(f"DESCRIBE `{table_name}`")
+            table_info = client._server._execute(f"DESCRIBE `{table_name}`")
             assert table_info is not None
             assert len(table_info) > 0
             
@@ -119,7 +138,7 @@ class TestClientCreation:
         except Exception as e:
             # Clean up and fail
             try:
-                client._server.execute(f"DROP TABLE IF EXISTS `{table_name}`")
+                client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
             except Exception:
                 pass
             pytest.fail(f"Failed to verify collection table creation: {e}")
@@ -256,7 +275,7 @@ class TestClientCreation:
         
         # Clean up: delete the test collection table
         try:
-            client._server.execute(f"DROP TABLE IF EXISTS `{table_name}`")
+            client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
             print(f"   Cleaned up test table: {table_name}")
         except Exception as cleanup_error:
             print(f"   Warning: Failed to cleanup test table: {cleanup_error}")
@@ -309,7 +328,7 @@ class TestClientCreation:
         assert not client._server.is_connected()
         
         # Execute query through proxy (first use, triggers connection)
-        result = client._server.execute("SELECT 1")
+        result = client._server._execute("SELECT 1")
         assert result is not None
         assert len(result) > 0
         
@@ -351,7 +370,7 @@ class TestClientCreation:
         
         # Execute query through proxy (first use, triggers connection)
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
             assert len(result) > 0
             assert result[0]['test'] == 1
@@ -400,7 +419,7 @@ class TestClientCreation:
         
         # Execute query through proxy (first use, triggers connection)
         try:
-            result = client._server.execute("SELECT 1 as test")
+            result = client._server._execute("SELECT 1 as test")
             assert result is not None
             assert len(result) > 0
             assert result[0]['test'] == 1
