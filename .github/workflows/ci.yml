@@ -48,7 +48,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry source remove tuna
           poetry install
 
       - name: Start OceanBase container
