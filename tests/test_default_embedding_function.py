@@ -19,6 +19,7 @@ if str(project_root) not in sys.path:
 
 import pyseekdb
 from pyseekdb import DefaultEmbeddingFunction
+from pyseekdb.client.embedding_function import dimension_of
 
 
 # ==================== Environment Variable Configuration ====================
@@ -362,6 +363,76 @@ class TestDefaultEmbeddingFunction:
                 client.delete_collection(collection_name)
             except Exception as e:
                 print(f"⚠️  Failed to cleanup: {e}")
+
+    def test_dimension_of(self):
+        """Test dimension_of function with different embedding function types"""
+
+        # Test 1: DefaultEmbeddingFunction with dimension property
+        print(f"\n✅ Testing dimension_of with DefaultEmbeddingFunction")
+        default_ef = DefaultEmbeddingFunction()
+        dim = dimension_of(default_ef)
+        assert dim == 384, f"Expected dimension 384, got {dim}"
+        assert dim == default_ef.dimension, "dimension_of should return the same as .dimension property"
+        print(f"   DefaultEmbeddingFunction dimension: {dim}")
+
+        # Test 2: Embedding function with callable dimension() method
+        print(f"\n✅ Testing dimension_of with callable dimension() method")
+        class CallableDimensionEF:
+            def dimension(self):
+                return 128
+
+            def __call__(self, input):
+                if isinstance(input, str):
+                    input = [input]
+                # Return embeddings with dimension 128
+                return [[0.1] * 128 for _ in input]
+
+        callable_dim_ef = CallableDimensionEF()
+        dim = dimension_of(callable_dim_ef)
+        assert dim == 128, f"Expected dimension 128, got {dim}"
+        print(f"   CallableDimensionEF dimension: {dim}")
+
+        # Test 3: Embedding function with non-callable dimension attribute
+        print(f"\n✅ Testing dimension_of with non-callable dimension attribute")
+        class PropertyDimensionEF:
+            def __init__(self):
+                self.dimension = 256
+
+            def __call__(self, input):
+                if isinstance(input, str):
+                    input = [input]
+                # Return embeddings with dimension 256
+                return [[0.1] * 256 for _ in input]
+
+        property_dim_ef = PropertyDimensionEF()
+        dim = dimension_of(property_dim_ef)
+        assert dim == 256, f"Expected dimension 256, got {dim}"
+        print(f"   PropertyDimensionEF dimension: {dim}")
+
+        # Test 4: Embedding function without dimension attribute (fallback)
+        print(f"\n✅ Testing dimension_of with fallback (no dimension attribute)")
+        class NoDimensionEF:
+            def __call__(self, input):
+                if isinstance(input, str):
+                    input = [input]
+                # Return embeddings with dimension 512
+                return [[0.1] * 512 for _ in input]
+
+        no_dim_ef = NoDimensionEF()
+        dim = dimension_of(no_dim_ef)
+        assert dim == 512, f"Expected dimension 512, got {dim}"
+        print(f"   NoDimensionEF dimension (fallback): {dim}")
+
+        # Test 5: Edge case - empty result should raise ValueError
+        print(f"\n✅ Testing dimension_of with empty result (should raise ValueError)")
+        class EmptyResultEF:
+            def __call__(self, input):
+                return []
+
+        empty_ef = EmptyResultEF()
+        with pytest.raises(ValueError, match="Embedding function returned empty result"):
+            dimension_of(empty_ef)
+        print(f"   EmptyResultEF correctly raised ValueError")
 
 
 if __name__ == "__main__":
