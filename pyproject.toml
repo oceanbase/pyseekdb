@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pyseekdb"
 version = "1.0.0.b4"
-description = "A unified Python client for SeekDB that supports embedded, server, and OceanBase."
+description = "A unified Python client for seekdb that supports embedded, server, and OceanBase."
 authors = ["OceanBase <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
 license = "Apache-2.0"
@@ -31,13 +31,6 @@ numpy = ">=1.26"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
 pylint = "^3.2.7"
-
-
-
-[[tool.poetry.source]]
-name = "tuna"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-priority = "primary"
 
 [tool.pytest.ini_options]
 log_level = "INFO"
