@@ -56,7 +56,7 @@ jobs:
         uses: oceanbase/setup-oceanbase-ce@v1
         with:
           image_name: 'oceanbase/oceanbase-ce'
-          image_tag: '4.4.1.0-100000032025101610'
+          image_tag: '4.5.0.0-100000012025112711'
           mode: 'mini'
           sql_port: 10000
           datafile_size: '20G'
