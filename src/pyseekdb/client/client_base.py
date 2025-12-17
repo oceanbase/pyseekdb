@@ -4,6 +4,7 @@ Base client interface definition
 import json
 import logging
 import re
+import struct
 from abc import ABC, abstractmethod
 from typing import List, Optional, Sequence, Dict, Any, Union, TYPE_CHECKING, Tuple, Callable
 from dataclasses import dataclass
@@ -110,6 +111,23 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     Generate VECTOR INDEX SQL clause from HNSWConfiguration.
     """
     return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag)"
+
+def _embedding_to_hexstring(embedding: List[float]) -> str:
+    """
+    Convert embedding (list of floats) to a hex string.
+
+    Args:
+        embedding: List of floats
+
+    Returns:
+        Hex string representing the binary serialization of all floats in the list.
+    """
+    if not embedding:
+        return ""
+    # Pack as binary (float32 for compactness, common in vector DBs)
+    binary = struct.pack(f"<{len(embedding)}f", *embedding)
+    hexstr = binary.hex()
+    return f'X"{hexstr}"'
 
 class ClientAPI(ABC):
     """
@@ -786,12 +804,8 @@ class BaseClient(BaseConnection, AdminAPI):
             
             # Process vector
             vec_val = embeddings[i] if embeddings else None
-            if vec_val is not None:
-                # Convert vector to string format: [1.0,2.0,3.0]
-                vec_str = "[" + ",".join(map(str, vec_val)) + "]"
-                vec_sql = f"'{vec_str}'"
-            else:
-                vec_sql = "NULL"
+            vec_sql = "NULL" if vec_val is None else _embedding_to_hexstring(vec_val)
+
             
             values_list.append(f"({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})")
         
