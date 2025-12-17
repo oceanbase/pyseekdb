@@ -1091,8 +1091,8 @@ class BaseClient(BaseConnection, AdminAPI):
                     set_clauses.append(f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'")
                 
                 if vec_val is not None:
-                    vec_str = "[" + ",".join(map(str, final_vector)) + "]" if final_vector else "NULL"
-                    set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = '{vec_str}'")
+                    vec_str = _embedding_to_hexstring(final_vector) if final_vector else "NULL"
+                    set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = {vec_str}")
                 
                 if set_clauses:
                     sql = f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
@@ -1112,13 +1112,9 @@ class BaseClient(BaseConnection, AdminAPI):
                     meta_sql = f"'{meta_json_escaped}'"
                 else:
                     meta_sql = "NULL"
-                
-                if vec_val is not None:
-                    vec_str = "[" + ",".join(map(str, vec_val)) + "]"
-                    vec_sql = f"'{vec_str}'"
-                else:
-                    vec_sql = "NULL"
-                
+
+                vec_sql = "NULL" if vec_val is None else _embedding_to_hexstring(vec_val)
+
                 sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}) 
                          VALUES ({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})"""
                 logger.debug(f"Executing SQL: {sql}")
@@ -1678,18 +1674,18 @@ class BaseClient(BaseConnection, AdminAPI):
         
         for query_vector in query_embeddings:
             # Convert vector to string format for SQL
-            vector_str = "[" + ",".join(map(str, query_vector)) + "]"
+            vector_str = _embedding_to_hexstring(query_vector)
             
             # Build SQL query with vector distance calculation
             # Reference: SELECT id, vec FROM t2 ORDER BY l2_distance(vec, '[0.1, 0.2, 0.3]') APPROXIMATE LIMIT 5;
             # Need to include distance in SELECT for result processing
             # Use the appropriate distance function based on the index configuration
             sql = f"""
-                SELECT {select_clause}, 
-                       {distance_func}(embedding, '{vector_str}') AS distance
+                SELECT {select_clause},
+                       {distance_func}(embedding, {vector_str}) AS distance
                 FROM `{table_name}`
                 {where_clause}
-                ORDER BY {distance_func}(embedding, '{vector_str}')
+                ORDER BY {distance_func}(embedding, {vector_str})
                 APPROXIMATE
                 LIMIT %s
             """
