@@ -127,7 +127,7 @@ def _embedding_to_hexstring(embedding: List[float]) -> str:
     # Pack as binary (float32 for compactness, common in vector DBs)
     binary = struct.pack(f"<{len(embedding)}f", *embedding)
     hexstr = binary.hex()
-    return f'X"{hexstr}"'
+    return f"X'{hexstr}'"
 
 class ClientAPI(ABC):
     """
