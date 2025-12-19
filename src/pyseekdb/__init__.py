@@ -9,12 +9,18 @@ Supports two modes:
 
 Examples:
 
-    # Embedded mode - Collection management
+Embedded mode - Collection management:
+
+.. code-block:: python
+
     import pyseekdb
     client = pyseekdb.Client(path="./seekdb.db", database="test")
     collection = client.get_or_create_collection("my_collection")
 
-    # Remote server mode (seekdb Server) - Collection management
+Remote server mode (seekdb Server) - Collection management:
+
+.. code-block:: python
+
     import pyseekdb
     client = pyseekdb.Client(
         host='localhost',
@@ -26,7 +32,10 @@ Examples:
     )
     collection = client.get_or_create_collection("my_collection")
 
-    # Remote server mode (OceanBase Server) - Collection management
+Remote server mode (OceanBase Server) - Collection management:
+
+.. code-block:: python
+
     import pyseekdb
     client = pyseekdb.Client(
         host='localhost',
@@ -38,7 +47,10 @@ Examples:
     )
     collection = client.get_or_create_collection("my_collection")
 
-    # Admin client - Database management
+Admin client - Database management:
+
+.. code-block:: python
+
     import pyseekdb
     admin = pyseekdb.AdminClient(path="./seekdb.db")
     admin.create_database("new_db")
