@@ -1,6 +1,6 @@
 # 使用 seekdb 快速构建 RAG
 
-本教程将引导您把 Markdown 文档导入 seekdb，构建向量检索知识库并通过 Streamlit 启动 RAG 界面。
+本教程将引导您把 Markdown 文档导入 seekdb，构建混合检索知识库并通过 Streamlit 启动 RAG 界面。
 
 ## 前提条件
 

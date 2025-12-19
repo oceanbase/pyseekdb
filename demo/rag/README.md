@@ -1,6 +1,6 @@
 # Building RAG with seekdb
 
-This tutorial will guide you through importing Markdown documents into seekdb, building a vector search knowledge base, and launching a RAG interface via Streamlit.
+This tutorial will guide you through importing Markdown documents into seekdb, building a hybrid search knowledge base, and launching a RAG interface via Streamlit.
 
 ## Prerequisites
 

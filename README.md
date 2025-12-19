@@ -1223,7 +1223,7 @@ results = collection.query(
 
 ## RAG Demo
 
-We provide a complete RAG (Retrieval-Augmented Generation) demo application that demonstrates how to build a vector search knowledge base using pyseekdb. The demo includes:
+We provide a complete RAG (Retrieval-Augmented Generation) demo application that demonstrates how to build a hybrid search knowledge base using pyseekdb. The demo includes:
 
 - **Document Import**: Import Markdown files or directory into seekdb
 - **Vector Search**: Semantic search over imported documents

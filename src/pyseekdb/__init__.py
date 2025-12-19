@@ -56,6 +56,7 @@ from .client import (
     AdminAPI,
     AdminClient,
     Database,
+    Version,
 )
 from .client.collection import Collection
 from .client.hybrid_search import (
@@ -105,5 +106,6 @@ __all__ = [
     'METADATAS',
     'EMBEDDINGS_FIELD',
     'SCORES',
+    'Version',
 ]
 

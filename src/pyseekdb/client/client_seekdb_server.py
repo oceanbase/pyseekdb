@@ -3,7 +3,7 @@ Remote server mode client - based on pymysql
 Supports both seekdb Server and OceanBase Server
 """
 import logging
-from typing import Any, List, Optional, Sequence, Dict, Union
+from typing import Any, Optional, Sequence, Tuple
 
 import pymysql
 from pymysql.cursors import DictCursor

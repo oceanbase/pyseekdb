@@ -37,6 +37,7 @@ from .embedding_function import (
 from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
 from .database import Database
+from .version import Version
 from .admin_client import AdminAPI, _AdminClientProxy, _ClientProxy
 from .hybrid_search import (
     HybridSearch,
@@ -79,6 +80,7 @@ __all__ = [
     'METADATAS',
     'EMBEDDINGS_FIELD',
     'SCORES',
+    'Version',
 ]
 
 def Client(
