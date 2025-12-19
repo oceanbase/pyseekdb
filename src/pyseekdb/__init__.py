@@ -4,8 +4,9 @@ pyseekdb - Unified vector database client wrapper
 Based on seekdb and pymysql, providing a simple and unified API.
 
 Supports two modes:
-1. Embedded mode - using local seekdb
-2. Remote server mode - connecting to remote server via pymysql (supports both seekdb Server and OceanBase Server)
+
+* **Embedded mode** - using local seekdb
+* **Remote server mode** - connecting to remote server via pymysql (supports both seekdb Server and OceanBase Server)
 
 Examples:
 
