@@ -27,6 +27,10 @@ extensions = [
     "myst_parser",
 ]
 
+# Enable Markdown in docstrings
+myst_enable_extensions = ["colon_fence"]
+myst_all_links_external = False
+
 # Autodoc settings
 autodoc_default_options = {
     "members": True,
