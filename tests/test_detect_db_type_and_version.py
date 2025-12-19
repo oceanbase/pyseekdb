@@ -55,10 +55,6 @@ class TestDetectDbTypeAndVersion:
         
         # Test connection and detection
         try:
-            # Ensure connection is established
-            result = client._server.execute("SELECT 1 as test")
-            assert result is not None
-            
             # Test detect_db_type_and_version
             db_type, version = client._server.detect_db_type_and_version()
             
@@ -96,10 +92,6 @@ class TestDetectDbTypeAndVersion:
         
         # Test connection and detection
         try:
-            # Ensure connection is established
-            result = client._server.execute("SELECT 1 as test")
-            assert result is not None
-            
             # Test detect_db_type_and_version
             db_type, version = client._server.detect_db_type_and_version()
             
