@@ -31,9 +31,9 @@ numpy = ">=1.26"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
 pylint = "^3.2.7"
-sphinx
-sphinx-rtd-theme
-myst-parser
+sphinx = ">=8.2.3"
+sphinx-rtd-theme = ">=3.0.2"
+myst-parser = ">=4.0.1"
 
 [tool.pytest.ini_options]
 log_level = "INFO"
