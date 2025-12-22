@@ -937,10 +937,6 @@ results = collection.hybrid_search(hs)
 count = collection.count()
 print(f"Collection has {count} items")
 
-# Get detailed collection information
-info = collection.describe()
-print(f"Name: {info['name']}, Dimension: {info['dimension']}")
-
 # Preview first few items in collection (returns all columns by default)
 preview = collection.peek(limit=5)
 for i in range(len(preview["ids"])):
@@ -954,7 +950,6 @@ print(f"Database has {collection_count} collections")
 
 **Methods:**
 - `collection.count()` - Get the number of items in the collection
-- `collection.describe()` - Get detailed collection information
 - `collection.peek(limit=10)` - Quickly preview the first few items in the collection
 - `client.count_collection()` - Count the number of collections in the current database
 
