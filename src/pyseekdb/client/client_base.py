@@ -483,7 +483,7 @@ class BaseClient(BaseConnection, AdminAPI):
         fulltext_config = _extract_fulltext_config(configuration)
         fulltext_index_clause = _get_fulltext_index_sql(fulltext_config)
 
-        # Construct table name: c$v1${name}
+        # Construct table name
         table_name = CollectionNames.table_name(name)
 
         # Construct CREATE TABLE SQL statement with HEAP organization
@@ -529,7 +529,7 @@ class BaseClient(BaseConnection, AdminAPI):
         Raises:
             ValueError: If collection does not exist
         """
-        # Construct table name: c$v1${name}
+        # Construct table name
         table_name = CollectionNames.table_name(name)
         
         # Check if table exists by describing it
@@ -617,7 +617,7 @@ class BaseClient(BaseConnection, AdminAPI):
         Raises:
             ValueError: If collection does not exist
         """
-        # Construct table name: c$v1${name}
+        # Construct table name
         table_name = CollectionNames.table_name(name)
         
         # Check if table exists first
@@ -634,10 +634,11 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             List of Collection objects
         """
-        # List all tables that start with 'c$v1'
-        # Use SHOW TABLES LIKE 'c$v1%' to filter collection tables
+        # List all tables that start with collection prefix
+        # Use SHOW TABLES LIKE pattern to filter collection tables
+        pattern = CollectionNames.table_pattern()
         try:
-            tables = self._execute("SHOW TABLES LIKE 'c$v1$%'")
+            tables = self._execute(f"SHOW TABLES LIKE '{pattern}'")
         except Exception:
             # Fallback: try to query information_schema
             try:
@@ -647,7 +648,7 @@ class BaseClient(BaseConnection, AdminAPI):
                     db_name = db_result[0][0] if isinstance(db_result[0], (tuple, list)) else db_result[0].get('DATABASE()', '')
                     tables = self._execute(
                         f"SELECT TABLE_NAME FROM information_schema.TABLES "
-                        f"WHERE TABLE_SCHEMA = '{db_name}' AND TABLE_NAME LIKE 'c$v1$%'"
+                        f"WHERE TABLE_SCHEMA = '{db_name}' AND TABLE_NAME LIKE '{pattern}'"
                     )
                 else:
                     return []
@@ -666,9 +667,9 @@ class BaseClient(BaseConnection, AdminAPI):
             else:
                 table_name = str(row)
             
-            # Extract collection name from table name (remove 'c$v1$' prefix)
-            if table_name.startswith('c$v1$'):
-                collection_name = table_name[5:]  # Remove 'c$v1$' prefix
+            # Extract collection name from table name
+            if CollectionNames.is_collection_table(table_name):
+                collection_name = CollectionNames.collection_name(table_name)
                 
                 # Get collection with dimension
                 try:
@@ -704,7 +705,7 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             True if exists, False otherwise
         """
-        # Construct table name: c$v1${name}
+        # Construct table name
         table_name = CollectionNames.table_name(name)
         
         # Check if table exists
@@ -1700,7 +1701,7 @@ class BaseClient(BaseConnection, AdminAPI):
         conn = self._ensure_connection()
         
         # Convert collection name to table name
-        table_name = f"c$v1${collection_name}"
+        table_name = CollectionNames.table_name(collection_name)
         
         # Handle vector generation logic:
         # 1. If query_embeddings are provided, use them directly without embedding
@@ -1886,7 +1887,7 @@ class BaseClient(BaseConnection, AdminAPI):
         conn = self._ensure_connection()
         
         # Convert collection name to table name
-        table_name = f"c$v1${collection_name}"
+        table_name = CollectionNames.table_name(collection_name)
         
         # Set defaults
         if limit is None:
@@ -2028,7 +2029,7 @@ class BaseClient(BaseConnection, AdminAPI):
         conn = self._ensure_connection()
         
         # Build table name
-        table_name = f"c$v1${collection_name}"
+        table_name = CollectionNames.table_name(collection_name)
         
         # Build search_parm JSON
         search_parm = self._build_search_parm(query, knn, rank, n_results, dimension=dimension, **kwargs)

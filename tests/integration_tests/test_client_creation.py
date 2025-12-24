@@ -68,7 +68,8 @@ class TestClientCreationRefactored:
         assert actual_dimension > 0, f"Collection dimension should be positive, got {actual_dimension}"
         
         # Verify table was created by checking if it exists
-        table_name = f"c$v1${test_collection_name}"
+        from pyseekdb.client.meta_info import CollectionNames
+        table_name = CollectionNames.table_name(test_collection_name)
         try:
             # Try to describe table structure to verify it exists
             table_info = db_client._server._execute(f"DESCRIBE `{table_name}`")

@@ -42,7 +42,8 @@ class TestCollectionGet:
     
     def _insert_test_data(self, client, collection_name: str):
         """Helper method to insert test data and return inserted IDs"""
-        table_name = f"c$v1${collection_name}"
+        from pyseekdb.client.meta_info import CollectionNames
+        table_name = CollectionNames.table_name(collection_name)
         
         # Insert test data with vectors, documents, and metadata
         test_data = [

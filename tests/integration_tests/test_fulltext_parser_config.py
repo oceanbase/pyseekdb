@@ -47,7 +47,8 @@ class TestFulltextParserConfigRefactored:
         assert collection.dimension == test_dimension
 
         # Verify the fulltext index was created with correct parser
-        table_name = f"c$v1${test_collection_name}"
+        from pyseekdb.client.meta_info import CollectionNames
+        table_name = CollectionNames.table_name(test_collection_name)
         try:
             # Get CREATE TABLE statement
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
@@ -113,8 +114,8 @@ class TestFulltextParserConfigRefactored:
 
         assert collection is not None
 
-        # Verify default parser (ik) is used
-        table_name = f"c$v1${test_collection_name}"
+        # Verify default parser (ik) is used  
+        table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             create_stmt = create_table_result[0][1] if isinstance(create_table_result[0], (tuple, list)) else \
@@ -153,7 +154,7 @@ class TestFulltextParserConfigRefactored:
         assert collection is not None
 
         # Verify default parser (ik) is used for backward compatibility
-        table_name = f"c$v1${test_collection_name}"
+        table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             create_stmt = create_table_result[0][1] if isinstance(create_table_result[0], (tuple, list)) else \

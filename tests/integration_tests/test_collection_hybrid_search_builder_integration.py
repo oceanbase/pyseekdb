@@ -55,7 +55,8 @@ class TestCollectionHybridSearchWithBuilderRefactored:
         return extended[:dimension]
 
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
-        table_name = f"c$v1${collection_name}"
+        from pyseekdb.client.meta_info import CollectionNames
+        table_name = CollectionNames.table_name(collection_name)
         base_vectors = [
             [1.0, 2.0, 3.0],
             [2.0, 3.0, 4.0],

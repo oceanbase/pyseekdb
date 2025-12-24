@@ -41,7 +41,8 @@ class TestCollectionHybridSearchRefactored:
     
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
         """Helper method to insert test data via SQL and return inserted IDs"""
-        table_name = f"c$v1${collection_name}"
+        from pyseekdb.client.meta_info import CollectionNames
+        table_name = CollectionNames.table_name(collection_name)
         
         base_vectors = [
             [1.0, 2.0, 3.0],

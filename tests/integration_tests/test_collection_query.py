@@ -21,7 +21,8 @@ class TestCollectionQueryRefactored:
             collection_name: Collection name
             dimension: Actual dimension of the collection (used to generate vectors)
         """
-        table_name = f"c$v1${collection_name}"
+        from pyseekdb.client.meta_info import CollectionNames
+        table_name = CollectionNames.table_name(collection_name)
         
         # Base vectors (3D) - will be extended or truncated to match actual dimension
         base_vectors = [
