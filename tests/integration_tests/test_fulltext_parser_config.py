@@ -114,7 +114,8 @@ class TestFulltextParserConfigRefactored:
 
         assert collection is not None
 
-        # Verify default parser (ik) is used  
+        # Verify default parser (ik) is used
+        from pyseekdb.client.meta_info import CollectionNames
         table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
@@ -154,6 +155,7 @@ class TestFulltextParserConfigRefactored:
         assert collection is not None
 
         # Verify default parser (ik) is used for backward compatibility
+        from pyseekdb.client.meta_info import CollectionNames
         table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
