@@ -235,7 +235,6 @@ class BaseClient(BaseConnection, AdminAPI):
             True
         """
         from .version import Version
-
         def _get_value(result, key: str) -> Optional[str]:
             """Extract value from query result"""
             if not result or len(result) == 0:
@@ -257,7 +256,6 @@ class BaseClient(BaseConnection, AdminAPI):
             except Exception as e:
                 logger.debug(f"Failed to execute {sql}: {e}")
                 return None
-
         def _extract_seekdb_version(version_str: str) -> Optional[str]:
             """Extract version from seekdb version string (case-insensitive)"""
             # Use case-insensitive pattern matching
@@ -278,7 +276,6 @@ class BaseClient(BaseConnection, AdminAPI):
                 return ("seekdb", Version(seekdb_version_str))
             else:
                 raise ValueError(f"Detected seekdb in version string, but failed to extract version: {version_result}")
-
         # Query ob_version() for OceanBase
         ob_version_str = _query("SELECT ob_version() as ob_version", "ob_version")
         if ob_version_str:
@@ -287,7 +284,6 @@ class BaseClient(BaseConnection, AdminAPI):
                 return ("oceanbase", Version(ob_version_str))
             except ValueError:
                 # If OceanBase version doesn't match standard format, try to extract numeric parts
-
                 parts = re.findall(r'\d+', ob_version_str)
                 if len(parts) >= 3:
                     # Take first 3 or 4 parts
@@ -297,19 +293,16 @@ class BaseClient(BaseConnection, AdminAPI):
                     # Fallback: return as-is but wrap in Version with minimal format
                     # This handles edge cases where version format is unusual
                     raise ValueError(f"Unable to parse OceanBase version: {ob_version_str}")
-
         # Truncate potentially verbose or sensitive database responses in error message
         def _truncate(val, length=20):
             if val is None:
                 return "None"
             val_str = str(val)
             return val_str[:length] + ("..." if len(val_str) > length else "")
-
         raise ValueError(
             f"Unable to detect database type. version()={_truncate(version_result)}, "
             f"ob_version()={_truncate(ob_version_str)}"
         )
-
     # ==================== Collection Management (User-facing) ====================
 
     def create_collection(
