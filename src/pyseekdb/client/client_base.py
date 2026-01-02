@@ -42,11 +42,6 @@ EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
 
 _COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
-# Logical maximum collection name length exposed by the Python API.
-# The effective maximum may be lower depending on the underlying database
-# table name length limit and the configured collection table prefix.
-_MAX_COLLECTION_NAME_LENGTH = 512
-
 # Current seekdb/OceanBase table name length limit is 64 characters.
 # We subtract the collection table prefix length from this value when
 # validating collection names so that the generated table name stays
@@ -98,10 +93,7 @@ def _validate_collection_name(name: str) -> None:
     Rules:
     - Type must be str
     - Length between 1 and the effective maximum, where:
-      effective_max = min(
-          _MAX_COLLECTION_NAME_LENGTH,
-          _MAX_TABLE_NAME_LENGTH - len(CollectionNames.table_name(""))
-      )
+      effective_max = _MAX_TABLE_NAME_LENGTH - len(CollectionNames.table_name(""))
     - Only [a-zA-Z0-9_]
 
     Raises:
@@ -116,7 +108,7 @@ def _validate_collection_name(name: str) -> None:
     table_prefix = CollectionNames.table_name("")
     # Guard against misconfiguration where prefix itself is too long
     available_length = max(0, _MAX_TABLE_NAME_LENGTH - len(table_prefix))
-    effective_max = min(_MAX_COLLECTION_NAME_LENGTH, available_length)
+    effective_max = available_length
     if effective_max <= 0:
         raise ValueError(
             "Invalid collection table prefix configuration: no space left for collection name. "

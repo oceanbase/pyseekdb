@@ -24,14 +24,11 @@ class TestCollectionNameValidation:
         Calculate effective maximum name length based on current prefix and
         database table name limit used in client_base.
         """
-        from pyseekdb.client.client_base import (  # type: ignore
-            _MAX_COLLECTION_NAME_LENGTH,
-            _MAX_TABLE_NAME_LENGTH,
-        )
+        from pyseekdb.client.client_base import _MAX_TABLE_NAME_LENGTH  # type: ignore
 
         prefix = CollectionNames.table_name("")
         available = max(0, _MAX_TABLE_NAME_LENGTH - len(prefix))
-        return min(_MAX_COLLECTION_NAME_LENGTH, available)
+        return available
 
     def test_valid_names(self):
         """Names with allowed characters and length should pass."""
