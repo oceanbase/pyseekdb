@@ -40,6 +40,9 @@ from .database import Database
 # Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
 EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
 
+_COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
+_MAX_COLLECTION_NAME_LENGTH = 512
+
 logger = logging.getLogger(__name__)
 
 # Sentinel object to distinguish between "parameter not provided" and "explicitly set to None"
@@ -76,6 +79,35 @@ def _extract_fulltext_config(config: ConfigurationParam) -> Optional[FulltextPar
     else:
         # Should not reach here due to type checking, but handle gracefully
         return None
+
+
+def _validate_collection_name(name: str) -> None:
+    """
+    Validate collection name against allowed charset and length constraints.
+
+    Rules:
+    - Type must be str
+    - 1 to 512 characters
+    - Only [a-zA-Z0-9_]
+
+    Raises:
+        TypeError: If name is not a string.
+        ValueError: If name is empty, too long, or contains invalid characters.
+    """
+    if not isinstance(name, str):
+        raise TypeError(f"Collection name must be a string, got {type(name).__name__}")
+    if not name:
+        raise ValueError("Collection name must not be empty")
+    if len(name) > _MAX_COLLECTION_NAME_LENGTH:
+        raise ValueError(
+            f"Collection name too long: {len(name)} characters; "
+            f"maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}"
+        )
+    if _COLLECTION_NAME_PATTERN.match(name) is None:
+        raise ValueError(
+            "Collection name contains invalid characters. "
+            "Only letters, digits, and underscore are allowed: [a-zA-Z0-9_]"
+        )
 
 
 def _get_fulltext_index_sql(fulltext_config: Optional[FulltextParserConfig] = None) -> str:
@@ -384,6 +416,7 @@ class BaseClient(BaseConnection, AdminAPI):
             >>> config = HNSWConfiguration(dimension=128, distance='cosine')
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
         """
+        _validate_collection_name(name)
         # Handle embedding function first
         # If not provided (sentinel), use default embedding function
         if embedding_function is _NOT_PROVIDED:
@@ -742,12 +775,15 @@ class BaseClient(BaseConnection, AdminAPI):
                        embedding_function is also None (cannot determine dimension), or if embedding_function
                        is provided and configuration.dimension doesn't match the calculated dimension
         """
+        # Validate collection name before any database interaction
+        _validate_collection_name(name)
+
         # First, try to get the collection
         if self.has_collection(name):
             # Collection exists, return it
             # Pass embedding_function (could be _NOT_PROVIDED, None, or an EmbeddingFunction instance)
             return self.get_collection(name, embedding_function=embedding_function)
-        
+
         # Collection doesn't exist, create it with provided or default configuration
         return self.create_collection(
             name=name,

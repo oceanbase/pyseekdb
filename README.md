@@ -258,7 +258,7 @@ collection = client.get_or_create_collection(
 ```
 
 **Parameters:**
-- `name` (str): Collection name (required)
+- `name` (str): Collection name (required). Must be 1–512 characters and contain only letters, digits, or underscores (`[a-zA-Z0-9_]`).
 - `configuration` (Configuration, HNSWConfiguration, or None, optional): Index configuration
   - **Recommended:** `Configuration` - Wrapper class that can include both `HNSWConfiguration` and `FulltextParserConfig`
     - Use `Configuration(hnsw=HNSWConfiguration(...))` even when only vector index config is needed
