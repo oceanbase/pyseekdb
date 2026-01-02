@@ -5,9 +5,11 @@ import pytest
 import sys
 from pathlib import Path
 
-# Ensure project root is on sys.path so we can import pyseekdb from source
+# Ensure local src/ is on sys.path so we import the in-repo pyseekdb,
+# not an already-installed version in the virtualenv.
 project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+src_root = project_root / "src"
+sys.path.insert(0, str(src_root))
 
 from pyseekdb.client.client_base import _validate_collection_name  # type: ignore
 from pyseekdb.client.meta_info import CollectionNames
