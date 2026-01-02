@@ -41,7 +41,17 @@ from .database import Database
 EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
 
 _COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
+
+# Logical maximum collection name length exposed by the Python API.
+# The effective maximum may be lower depending on the underlying database
+# table name length limit and the configured collection table prefix.
 _MAX_COLLECTION_NAME_LENGTH = 512
+
+# Current seekdb/OceanBase table name length limit is 64 characters.
+# We subtract the collection table prefix length from this value when
+# validating collection names so that the generated table name stays
+# within the database constraint.
+_MAX_TABLE_NAME_LENGTH = 64
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +97,11 @@ def _validate_collection_name(name: str) -> None:
 
     Rules:
     - Type must be str
-    - 1 to 512 characters
+    - Length between 1 and the effective maximum, where:
+      effective_max = min(
+          _MAX_COLLECTION_NAME_LENGTH,
+          _MAX_TABLE_NAME_LENGTH - len(CollectionNames.table_name(""))
+      )
     - Only [a-zA-Z0-9_]
 
     Raises:
@@ -98,10 +112,20 @@ def _validate_collection_name(name: str) -> None:
         raise TypeError(f"Collection name must be a string, got {type(name).__name__}")
     if not name:
         raise ValueError("Collection name must not be empty")
-    if len(name) > _MAX_COLLECTION_NAME_LENGTH:
+    # Calculate effective maximum based on table prefix and database limit
+    table_prefix = CollectionNames.table_name("")
+    # Guard against misconfiguration where prefix itself is too long
+    available_length = max(0, _MAX_TABLE_NAME_LENGTH - len(table_prefix))
+    effective_max = min(_MAX_COLLECTION_NAME_LENGTH, available_length)
+    if effective_max <= 0:
+        raise ValueError(
+            "Invalid collection table prefix configuration: no space left for collection name. "
+            f"Prefix={table_prefix!r}, table name limit={_MAX_TABLE_NAME_LENGTH}."
+        )
+    if len(name) > effective_max:
         raise ValueError(
             f"Collection name too long: {len(name)} characters; "
-            f"maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}"
+            f"maximum allowed is {effective_max} for the current prefix."
         )
     if _COLLECTION_NAME_PATTERN.match(name) is None:
         raise ValueError(

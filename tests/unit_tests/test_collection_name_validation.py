@@ -10,20 +10,37 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from pyseekdb.client.client_base import _validate_collection_name  # type: ignore
+from pyseekdb.client.meta_info import CollectionNames
 
 
 class TestCollectionNameValidation:
     """Tests for collection name constraints."""
 
+    @property
+    def _effective_max_length(self) -> int:
+        """
+        Calculate effective maximum name length based on current prefix and
+        database table name limit used in client_base.
+        """
+        from pyseekdb.client.client_base import (  # type: ignore
+            _MAX_COLLECTION_NAME_LENGTH,
+            _MAX_TABLE_NAME_LENGTH,
+        )
+
+        prefix = CollectionNames.table_name("")
+        available = max(0, _MAX_TABLE_NAME_LENGTH - len(prefix))
+        return min(_MAX_COLLECTION_NAME_LENGTH, available)
+
     def test_valid_names(self):
         """Names with allowed characters and length should pass."""
+        max_len = self._effective_max_length
         valid_names = [
             "a",
             "A",
             "0",
             "collection_1",
             "MyCollection_123",
-            "A" * 512,
+            "A" * max_len,
         ]
         for name in valid_names:
             _validate_collection_name(name)
@@ -41,9 +58,10 @@ class TestCollectionNameValidation:
             _validate_collection_name("")
 
     def test_name_too_long(self):
-        """Names longer than 512 characters should be rejected."""
-        long_name = "a" * 513
-        with pytest.raises(ValueError, match="maximum allowed is 512"):
+        """Names longer than effective maximum should be rejected."""
+        max_len = self._effective_max_length
+        long_name = "a" * (max_len + 1)
+        with pytest.raises(ValueError, match="maximum allowed is"):
             _validate_collection_name(long_name)
 
     def test_invalid_characters(self):
@@ -62,4 +80,3 @@ class TestCollectionNameValidation:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
