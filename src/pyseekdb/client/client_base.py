@@ -6,15 +6,14 @@ import logging
 import re
 import struct
 from abc import ABC, abstractmethod
-from typing import List, Optional, Sequence, Dict, Any, Union, TYPE_CHECKING, Tuple, Callable
+from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from .version import Version
-from dataclasses import dataclass
 from pymysql.converters import escape_string
 
 from .base_connection import BaseConnection
-from .admin_client import AdminAPI, DEFAULT_TENANT
+from .admin_client import AdminAPI
 from .meta_info import CollectionNames, CollectionFieldNames
 from .filters import FilterBuilder
 from .configuration import (
@@ -27,26 +26,20 @@ from .configuration import (
 )
 from .embedding_function import (
     EmbeddingFunction,
-    DefaultEmbeddingFunction,
     get_default_embedding_function,
-    Documents as EmbeddingDocuments,
-    Embeddings as EmbeddingVectors
+    Documents as EmbeddingDocuments
 )
 
 from .collection import Collection
 
-from .database import Database
 
 # Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
 EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
 
 _COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
-# Current seekdb/OceanBase table name length limit is 64 characters.
-# We subtract the collection table prefix length from this value when
-# validating collection names so that the generated table name stays
-# within the database constraint.
-_MAX_TABLE_NAME_LENGTH = 64
+# Maximum allowed length for user-facing collection names.
+_MAX_COLLECTION_NAME_LENGTH = 512
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +85,7 @@ def _validate_collection_name(name: str) -> None:
 
     Rules:
     - Type must be str
-    - Length between 1 and the effective maximum, where:
-      effective_max = _MAX_TABLE_NAME_LENGTH - len(CollectionNames.table_name(""))
+    - Length between 1 and _MAX_COLLECTION_NAME_LENGTH
     - Only [a-zA-Z0-9_]
 
     Raises:
@@ -104,20 +96,10 @@ def _validate_collection_name(name: str) -> None:
         raise TypeError(f"Collection name must be a string, got {type(name).__name__}")
     if not name:
         raise ValueError("Collection name must not be empty")
-    # Calculate effective maximum based on table prefix and database limit
-    table_prefix = CollectionNames.table_name("")
-    # Guard against misconfiguration where prefix itself is too long
-    available_length = max(0, _MAX_TABLE_NAME_LENGTH - len(table_prefix))
-    effective_max = available_length
-    if effective_max <= 0:
-        raise ValueError(
-            "Invalid collection table prefix configuration: no space left for collection name. "
-            f"Prefix={table_prefix!r}, table name limit={_MAX_TABLE_NAME_LENGTH}."
-        )
-    if len(name) > effective_max:
+    if len(name) > _MAX_COLLECTION_NAME_LENGTH:
         raise ValueError(
             f"Collection name too long: {len(name)} characters; "
-            f"maximum allowed is {effective_max} for the current prefix."
+            f"maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}."
         )
     if _COLLECTION_NAME_PATTERN.match(name) is None:
         raise ValueError(
@@ -2100,7 +2082,7 @@ class BaseClient(BaseConnection, AdminAPI):
         rows = self._execute_query_with_cursor(conn, get_sql_query, [], use_context_manager)
         
         if not rows or not rows[0].get("query_sql"):
-            logger.warning(f"No SQL query returned from GET_SQL")
+            logger.warning("No SQL query returned from GET_SQL")
             return {
                 "ids": [[]],
                 "distances": [[]],
