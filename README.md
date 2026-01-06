@@ -258,7 +258,7 @@ collection = client.get_or_create_collection(
 ```
 
 **Parameters:**
-- `name` (str): Collection name (required). Must be non-empty, use only letters/digits/underscore (`[a-zA-Z0-9_]`), and its length must fit within the underlying table name limit after adding the collection prefix (for the default `c$v1$` prefix on seekdb/OceanBase, this is typically up to 59 characters).
+- `name` (str): Collection name (required). Must be non-empty, use only letters/digits/underscore (`[a-zA-Z0-9_]`), and be at most 512 characters.
 - `configuration` (Configuration, HNSWConfiguration, or None, optional): Index configuration
   - **Recommended:** `Configuration` - Wrapper class that can include both `HNSWConfiguration` and `FulltextParserConfig`
     - Use `Configuration(hnsw=HNSWConfiguration(...))` even when only vector index config is needed
