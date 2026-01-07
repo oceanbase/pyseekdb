@@ -1,43 +1,46 @@
-[tool.poetry]
+[project]
 name = "pyseekdb"
 version = "1.0.0.b4"
 description = "A unified Python client for seekdb that supports embedded, server, and OceanBase."
-authors = ["OceanBase <open_oceanbase@oceanbase.com>"]
 readme = "README.md"
-license = "Apache-2.0"
-
-packages = [{include = "pyseekdb", from = "src"}]
-homepage = "https://github.com/oceanbase/pyseekdb/"
-repository = "https://github.com/oceanbase/pyseekdb/"
-
+license = { text = "Apache-2.0" }
+authors = [{ name = "OceanBase", email = "open_oceanbase@oceanbase.com" }]
+requires-python = ">=3.11,<4.0"
 classifiers = [
     "Development Status :: 4 - Beta",
 ]
+dependencies = [
+    "pymysql>=1.1.1",
+    "pylibseekdb; sys_platform == \"linux\"",
+    "onnxruntime>=1.19.0",
+    "tokenizers>=0.15.0",
+    "httpx",
+    "tqdm",
+    "tenacity",
+    "numpy>=1.26",
+]
 
-[tool.poetry.urls]
+[project.urls]
+Homepage = "https://github.com/oceanbase/pyseekdb/"
+Repository = "https://github.com/oceanbase/pyseekdb/"
 "Bug Tracker" = "https://github.com/oceanbase/pyseekdb/issues"
 
-[tool.poetry.dependencies]
-python = ">=3.11,<4.0"
-pymysql = "^1.1.1"
-pylibseekdb = { version = "*", markers = "sys_platform == 'linux'" }
-onnxruntime = ">=1.19.0"  # Requires 1.19.0+ to support opset 5 (used by Hugging Face models)
-tokenizers = ">=0.15.0"  # Fixed version to ensure compatibility
-httpx = "*"
-tqdm = "*"
-tenacity = "*"
-numpy = ">=1.26"
+[dependency-groups]
+dev = [
+    "pytest>=8.2.2",
+    "pylint>=3.2.7",
+    "sphinx>=8.2.3",
+    "sphinx-rtd-theme>=3.0.2",
+    "myst-parser>=4.0.1",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
-pylint = "^3.2.7"
-sphinx = ">=8.2.3"
-sphinx-rtd-theme = ">=3.0.2"
-myst-parser = ">=4.0.1"
+[tool.pdm.build]
+source-includes = ["docs/", "examples/", "tests/"]
+excludes = ["docs/_build/", "tests/seekdb.db/"]
 
 [tool.pytest.ini_options]
 log_level = "INFO"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

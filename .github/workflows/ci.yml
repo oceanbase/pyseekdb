@@ -20,22 +20,14 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v3
+      - name: Set up environment
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: '3.11'
 
-      - name: Install Poetry
-        run: |
-          pip install poetry
-
-      - name: Install dependencies
-        run: |
-          poetry install
-
       - name: Run unit tests
         run: |
-          poetry run pytest tests/unit_tests/ -v --log-cli-level=INFO
+          uv run pytest tests/unit_tests/ -v --log-cli-level=INFO
 
   integration-test:
     runs-on: ubuntu-latest
@@ -58,18 +50,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v3
+      - name: Set up environment
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: '3.11'
-
-      - name: Install Poetry
-        run: |
-          pip install poetry
-
-      - name: Install dependencies
-        run: |
-          poetry install
 
       - name: Start OceanBase container
         if: matrix.test_mode == 'oceanbase'
@@ -99,4 +83,4 @@ jobs:
           SERVER_PORT: 2881
         run: |
           # Run integration tests filtered by test mode
-          poetry run pytest tests/integration_tests/ -v --log-cli-level=INFO -k "${{ matrix.test_mode }}" 
+          uv run pytest tests/integration_tests/ -v --log-cli-level=INFO -k "${{ matrix.test_mode }}" 

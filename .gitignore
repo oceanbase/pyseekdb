@@ -3,6 +3,9 @@ poetry.lock
 tests/.env
 __pycache__/
 build/
+dist/
+docs/_build/
+tests/seekdb.db/
 
 # demo
 .env
