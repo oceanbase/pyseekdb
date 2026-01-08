@@ -5,6 +5,11 @@ install: ## Install the virtual environment
 	@echo ">> Installing dependencies"
 	@$(UV) sync --all-groups
 
+.PHONY: demo
+demo: ## Run RAG demo (Streamlit)
+	@echo ">> Running RAG demo"
+	@$(UV) run --project demo/rag streamlit run demo/rag/seekdb_app.py
+
 .PHONY: test
 test: ## Run unit tests
 	@echo ">> Running unit tests"

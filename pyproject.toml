@@ -34,6 +34,9 @@ dev = [
     "myst-parser>=4.0.1",
 ]
 
+[tool.uv.workspace]
+members = ["demo/rag"]
+
 [tool.pdm.build]
 source-includes = ["docs/", "examples/", "tests/"]
 excludes = ["docs/_build/", "tests/seekdb.db/"]

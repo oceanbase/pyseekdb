@@ -8,11 +8,45 @@ This tutorial will guide you through importing Markdown documents into seekdb, b
 - uv package manager installed
 - LLM API Key ready
 
+## Workspace workflow (optional)
+
+By default, the commands below assume you are in `demo/rag`. The demo is configured to use the local `pyseekdb` source from this repository via uv workspace. If you prefer to stay at the repository root, use these workspace commands.
+
+**Sync dependencies (workspace):**
+
+```bash
+uv sync --project demo/rag
+```
+
+**Install local embedding extra for the demo:**
+
+```bash
+uv sync --project demo/rag --extra local
+```
+
+**Run the demo from the repo root:**
+
+```bash
+uv run --project demo/rag streamlit run demo/rag/seekdb_app.py
+```
+
+**Verify the demo uses the local pyseekdb source:**
+
+```bash
+uv run --project demo/rag python -c "import os, pyseekdb; print(os.path.abspath(pyseekdb.__file__))"
+```
+
+The printed path should point to `src/pyseekdb` in this repository.
+
+You can also run `make demo` from the repository root.
+
 ## Setup
 
 ### 1. Environment Setup
 
 #### Install Dependencies
+
+> **Note:** The commands in this section assume you are in `demo/rag`. If you are running from the repository root, use the workspace workflow above.
 
 **Basic installation (for `default` or `api` embedding types):**
 
@@ -150,4 +184,3 @@ uv run streamlit run seekdb_app.py
 After launching, you can access the RAG interface in your browser to query your data.
 
 > **Tip:** When using the `uv` package manager, use the `uv run` prefix to run commands to ensure the correct Python environment and dependencies are used.
-

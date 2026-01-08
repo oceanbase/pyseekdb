@@ -8,11 +8,45 @@
 - 已安装 uv
 - 已准备好 LLM API Key
 
+## Workspace 工作流（可选）
+
+默认情况下，本 README 中的命令假设你在 `demo/rag` 目录。demo 通过 uv workspace 直接使用本仓库的本地 `pyseekdb` 源码。如果你希望在仓库根目录执行，请使用以下 workspace 命令。
+
+**同步依赖（workspace）：**
+
+```bash
+uv sync --project demo/rag
+```
+
+**安装 demo 的本地模型额外依赖：**
+
+```bash
+uv sync --project demo/rag --extra local
+```
+
+**从仓库根目录运行 demo：**
+
+```bash
+uv run --project demo/rag streamlit run demo/rag/seekdb_app.py
+```
+
+**验证 demo 使用本地 pyseekdb 源码：**
+
+```bash
+uv run --project demo/rag python -c "import os, pyseekdb; print(os.path.abspath(pyseekdb.__file__))"
+```
+
+输出路径应指向本仓库的 `src/pyseekdb`。
+
+也可以在仓库根目录执行 `make demo`。
+
 ## 准备工作
 
 ### 1. 设置环境
 
 #### 安装依赖
+
+> **提示：** 本节命令默认在 `demo/rag` 目录运行。如果你从仓库根目录执行，请使用上面的 workspace 命令。
 
 **基础安装（适用于 `default` 或 `api` embedding 类型）：**
 
