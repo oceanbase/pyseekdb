@@ -5,7 +5,6 @@ __pycache__/
 build/
 dist/
 docs/_build/
-tests/seekdb.db/
 
 # demo
 .env
