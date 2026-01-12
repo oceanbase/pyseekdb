@@ -63,7 +63,7 @@ class QwenEmbeddingFunction(LiteLLMEmbeddingFunction):
                     Qwen API supports "float" or "base64".
                 - timeout: Request timeout in seconds
                 - max_retries: Maximum number of retries
-                - See https://docs.litellm.ai/docs/embedding for more options
+                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
         """
         # Set default api_key_env if not provided
         if api_key_env is None:

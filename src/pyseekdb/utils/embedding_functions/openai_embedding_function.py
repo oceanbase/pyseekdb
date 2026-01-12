@@ -9,6 +9,8 @@ class OpenAIEmbeddingFunction(LiteLLMEmbeddingFunction):
     This class provides a simplified interface to OpenAI embedding models using LiteLLM.
     It sets default values for OpenAI-specific configurations.
 
+    For more information about OpenAI models, see https://platform.openai.com/docs/guides/embeddings
+
     Example:
         pip install pyseekdb litellm
 
@@ -64,7 +66,7 @@ class OpenAIEmbeddingFunction(LiteLLMEmbeddingFunction):
                 - max_retries: Maximum number of retries
                 - api_version: API version
                 - user: User identifier for usage tracking
-                - See https://docs.litellm.ai/docs/embedding for more options
+                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
         """
         # Set default api_key_env if not provided
         if api_key_env is None:

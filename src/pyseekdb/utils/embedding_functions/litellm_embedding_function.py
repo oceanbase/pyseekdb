@@ -77,7 +77,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                 - max_retries: Maximum number of retries
                 - api_version: API version (provider-specific)
                 - user: User identifier for usage tracking
-                - See https://docs.litellm.ai/docs/embedding for more options
+                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
         """
         try:
             from litellm import embedding
@@ -135,7 +135,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
         # LiteLLM returns an EmbeddingResponse object with a 'data' attribute
         # Each item in data has an 'embedding' field with the actual vector
         embeddings = []
-        
+
         # Handle EmbeddingResponse object (most common case)
         if hasattr(response, 'data'):
             for item in response.data:
