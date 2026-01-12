@@ -3,7 +3,7 @@ Remote server mode client - based on pymysql
 Supports both seekdb Server and OceanBase Server
 """
 import logging
-from typing import Any, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import pymysql
 from pymysql.cursors import DictCursor
@@ -95,21 +95,6 @@ class RemoteServerClient(BaseClient):
         """Check connection status"""
         return self._connection is not None and self._connection.open
     
-    def _execute(self, sql: str) -> Any:
-        conn = self._ensure_connection()
-        
-        with conn.cursor() as cursor:
-            cursor.execute(sql)
-            
-            sql_upper = sql.strip().upper()
-            if (sql_upper.startswith('SELECT') or
-                sql_upper.startswith('SHOW') or
-                sql_upper.startswith('DESCRIBE') or
-                sql_upper.startswith('DESC')):
-                return cursor.fetchall()
-            
-            return cursor
-    
     def get_raw_connection(self) -> pymysql.Connection:
         """Get raw connection object"""
         return self._ensure_connection()
@@ -145,7 +130,7 @@ class RemoteServerClient(BaseClient):
     # _collection_count is inherited from BaseClient - no override needed
     
     # ==================== Database Management ====================
-    
+
     def create_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
         """
         Create database (remote server has tenant concept, uses client's tenant)
@@ -157,13 +142,7 @@ class RemoteServerClient(BaseClient):
         Note:
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
-        if tenant != self.tenant and tenant != DEFAULT_TENANT:
-            logger.warning(f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant")
-        
-        logger.info(f"Creating database: {name} in tenant: {self.tenant}")
-        sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
-        self._execute(sql)
-        logger.info(f"✅ Database created: {name} in tenant: {self.tenant}")
+        return super().create_database(name=name, tenant=tenant)
     
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
@@ -179,23 +158,7 @@ class RemoteServerClient(BaseClient):
         Note:
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
-        if tenant != self.tenant and tenant != DEFAULT_TENANT:
-            logger.warning(f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant")
-        
-        logger.info(f"Getting database: {name} in tenant: {self.tenant}")
-        sql = f"SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '{name}'"
-        result = self._execute(sql)
-        
-        if not result:
-            raise ValueError(f"Database not found: {name}")
-        
-        row = result[0]
-        return Database(
-            name=row['SCHEMA_NAME'],
-            tenant=self.tenant,  # Remote server has tenant concept
-            charset=row['DEFAULT_CHARACTER_SET_NAME'],
-            collation=row['DEFAULT_COLLATION_NAME']
-        )
+        return super().get_database(name=name, tenant=tenant)
     
     def delete_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
         """
@@ -208,13 +171,7 @@ class RemoteServerClient(BaseClient):
         Note:
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
-        if tenant != self.tenant and tenant != DEFAULT_TENANT:
-            logger.warning(f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant")
-        
-        logger.info(f"Deleting database: {name} in tenant: {self.tenant}")
-        sql = f"DROP DATABASE IF EXISTS `{name}`"
-        self._execute(sql)
-        logger.info(f"✅ Database deleted: {name} in tenant: {self.tenant}")
+        return super().delete_database(name=name, tenant=tenant)
     
     def list_databases(
         self,
@@ -236,31 +193,14 @@ class RemoteServerClient(BaseClient):
         Note:
             Remote server has multi-tenant architecture. Lists databases in client's tenant.
         """
+        return super().list_databases(limit=limit, offset=offset, tenant=tenant)
+
+    def _database_tenant(self, tenant: str) -> Optional[str]:
         if tenant != self.tenant and tenant != DEFAULT_TENANT:
-            logger.warning(f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant")
-        
-        logger.info(f"Listing databases in tenant: {self.tenant}")
-        sql = "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA"
-        
-        if limit is not None:
-            if offset is not None:
-                sql += f" LIMIT {offset}, {limit}"
-            else:
-                sql += f" LIMIT {limit}"
-        
-        result = self._execute(sql)
-        
-        databases = []
-        for row in result:
-            databases.append(Database(
-                name=row['SCHEMA_NAME'],
-                tenant=self.tenant,  # Remote server has tenant concept
-                charset=row['DEFAULT_CHARACTER_SET_NAME'],
-                collation=row['DEFAULT_COLLATION_NAME']
-            ))
-        
-        logger.info(f"✅ Found {len(databases)} databases in tenant {self.tenant}")
-        return databases
+            logger.warning(
+                f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant"
+            )
+        return self.tenant
     
     def __repr__(self):
         status = "connected" if self.is_connected() else "disconnected"

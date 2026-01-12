@@ -6,14 +6,14 @@ import logging
 import re
 import struct
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING, Tuple
+from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING, Tuple, Sequence
 
 if TYPE_CHECKING:
     from .version import Version
 from pymysql.converters import escape_string
 
 from .base_connection import BaseConnection
-from .admin_client import AdminAPI
+from .admin_client import AdminAPI, DEFAULT_TENANT
 from .meta_info import CollectionNames, CollectionFieldNames
 from .filters import FilterBuilder
 from .configuration import (
@@ -31,6 +31,8 @@ from .embedding_function import (
 )
 
 from .collection import Collection
+from .database import Database
+from .sql_utils import is_query_sql
 
 
 # Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
@@ -333,6 +335,132 @@ class BaseClient(BaseConnection, AdminAPI):
             f"Unable to detect database type. version()={_truncate(version_result)}, "
             f"ob_version()={_truncate(ob_version_str)}"
         )
+
+    # ==================== Database Management (User-facing) ====================
+
+    def _database_tenant(self, tenant: str) -> Optional[str]:
+        """Resolve effective tenant for database operations."""
+        return None
+
+    def _database_context(self, tenant: Optional[str]) -> str:
+        return f" in tenant: {tenant}" if tenant else ""
+
+    def _parse_schema_row(
+        self,
+        row: Any
+    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        if isinstance(row, dict):
+            return (
+                row.get("SCHEMA_NAME"),
+                row.get("DEFAULT_CHARACTER_SET_NAME"),
+                row.get("DEFAULT_COLLATION_NAME"),
+            )
+        if isinstance(row, (tuple, list)):
+            name = row[0] if len(row) > 0 else None
+            charset = row[1] if len(row) > 1 else None
+            collation = row[2] if len(row) > 2 else None
+            return name, charset, collation
+        return None, None, None
+
+    def create_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
+        """
+        Create database
+
+        Args:
+            name: database name
+            tenant: tenant name (for OceanBase)
+        """
+        effective_tenant = self._database_tenant(tenant)
+        logger.info(f"Creating database: {name}{self._database_context(effective_tenant)}")
+        sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
+        self._execute(sql)
+        logger.info(f"✅ Database created: {name}{self._database_context(effective_tenant)}")
+
+    def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
+        """
+        Get database object
+
+        Args:
+            name: database name
+            tenant: tenant name (for OceanBase)
+        """
+        effective_tenant = self._database_tenant(tenant)
+        logger.info(f"Getting database: {name}{self._database_context(effective_tenant)}")
+        sql = (
+            "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME "
+            "FROM information_schema.SCHEMATA "
+            f"WHERE SCHEMA_NAME = '{name}'"
+        )
+        result = self._execute(sql)
+
+        if not result:
+            raise ValueError(f"Database not found: {name}")
+
+        db_name, charset, collation = self._parse_schema_row(result[0])
+        if not db_name:
+            raise ValueError(f"Database not found: {name}")
+
+        return Database(
+            name=db_name,
+            tenant=effective_tenant,
+            charset=charset,
+            collation=collation,
+        )
+
+    def delete_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
+        """
+        Delete database
+
+        Args:
+            name: database name
+            tenant: tenant name (for OceanBase)
+        """
+        effective_tenant = self._database_tenant(tenant)
+        logger.info(f"Deleting database: {name}{self._database_context(effective_tenant)}")
+        sql = f"DROP DATABASE IF EXISTS `{name}`"
+        self._execute(sql)
+        logger.info(f"✅ Database deleted: {name}{self._database_context(effective_tenant)}")
+
+    def list_databases(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        tenant: str = DEFAULT_TENANT
+    ) -> Sequence[Database]:
+        """
+        List all databases
+
+        Args:
+            limit: maximum number of results to return
+            offset: number of results to skip
+            tenant: tenant name (for OceanBase)
+        """
+        effective_tenant = self._database_tenant(tenant)
+        logger.info(f"Listing databases{self._database_context(effective_tenant)}")
+        sql = "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA"
+
+        if limit is not None:
+            if offset is not None:
+                sql += f" LIMIT {offset}, {limit}"
+            else:
+                sql += f" LIMIT {limit}"
+
+        result = self._execute(sql)
+
+        databases = []
+        for row in result:
+            db_name, charset, collation = self._parse_schema_row(row)
+            if not db_name:
+                continue
+            databases.append(Database(
+                name=db_name,
+                tenant=effective_tenant,
+                charset=charset,
+                collation=collation,
+            ))
+
+        logger.info(f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}")
+        return databases
     # ==================== Collection Management (User-facing) ====================
 
     def create_collection(
@@ -1440,6 +1568,8 @@ class BaseClient(BaseConnection, AdminAPI):
         if use_context_manager:
             with conn.cursor() as cursor:
                 cursor.execute(sql, params)
+                if not self._should_fetch_results(cursor, sql):
+                    return []
                 rows = cursor.fetchall()
                 # Normalize rows
                 normalized_rows = []
@@ -1450,6 +1580,8 @@ class BaseClient(BaseConnection, AdminAPI):
             cursor = conn.cursor()
             try:
                 cursor.execute(sql, params)
+                if not self._should_fetch_results(cursor, sql):
+                    return []
                 rows = cursor.fetchall()
                 # Normalize rows
                 normalized_rows = []
@@ -1681,6 +1813,32 @@ class BaseClient(BaseConnection, AdminAPI):
         # Default implementation: use context manager
         # Subclasses can override this if they need different behavior
         return True
+
+    def _should_fetch_results(self, cursor: Any, sql: str) -> bool:
+        description = getattr(cursor, "description", None)
+        if description is not None:
+            return True
+        return is_query_sql(sql)
+
+    def _execute(self, sql: str) -> Any:
+        conn = self._ensure_connection()
+        use_context_manager = self._use_context_manager_for_cursor()
+
+        if use_context_manager:
+            with conn.cursor() as cursor:
+                cursor.execute(sql)
+                if self._should_fetch_results(cursor, sql):
+                    return cursor.fetchall()
+                return None
+
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            if self._should_fetch_results(cursor, sql):
+                return cursor.fetchall()
+            return None
+        finally:
+            cursor.close()
     
     # -------------------- DQL Operations (Common Implementation) --------------------
     

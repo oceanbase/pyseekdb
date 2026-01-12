@@ -4,12 +4,41 @@ Utility functions and classes for SQL string generation and escaping in seekdb c
 Provides helpers to safely stringify values and SQL identifiers for insertion into SQL expressions.
 """
 
-from typing import Optional, Union
+from typing import Any, Optional, Sequence, Union
 from pymysql.converters import escape_string
 
 
 def _quote_string(value, quote: str):
     return quote + str(value) + quote
+
+
+def is_query_sql(sql: str) -> bool:
+    if not sql:
+        return False
+    sql_upper = sql.strip().upper()
+    return (
+        sql_upper.startswith("SELECT")
+        or sql_upper.startswith("SHOW")
+        or sql_upper.startswith("DESCRIBE")
+        or sql_upper.startswith("DESC")
+    )
+
+
+def render_sql_with_params(sql: str, params: Sequence[Any]) -> str:
+    if not params:
+        return sql
+    rendered = sql
+    for param in params:
+        if param is None:
+            replacement = "NULL"
+        elif isinstance(param, (int, float)):
+            replacement = str(param)
+        elif isinstance(param, str):
+            replacement = f"'{escape_string(param)}'"
+        else:
+            replacement = f"'{escape_string(str(param))}'"
+        rendered = rendered.replace("%s", replacement, 1)
+    return rendered
 
 
 class SqlStringifier:

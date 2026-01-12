@@ -19,6 +19,7 @@ from .client_base import BaseClient
 from .collection import Collection
 from .database import Database
 from .admin_client import DEFAULT_TENANT
+from .sql_utils import is_query_sql, render_sql_with_params
 
 logger = logging.getLogger(__name__)
 
@@ -104,24 +105,6 @@ class SeekdbEmbeddedClient(BaseClient):
         """Check connection status"""
         return self._connection is not None and self._initialized
 
-    def _execute(self, sql: str) -> Any:
-        conn = self._ensure_connection()
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute(sql)
-
-            sql_upper = sql.strip().upper()
-            if (sql_upper.startswith('SELECT') or
-                sql_upper.startswith('SHOW') or
-                sql_upper.startswith('DESCRIBE') or
-                sql_upper.startswith('DESC')):
-                return cursor.fetchall()
-
-            return cursor
-        except Exception:
-            raise
-
     def get_raw_connection(self) -> Any:  # seekdb.Connection
         """Get raw connection object"""
         return self._ensure_connection()
@@ -159,19 +142,7 @@ class SeekdbEmbeddedClient(BaseClient):
         """
         # pyseekdb.Cursor.execute() only accepts SQL string, not parameters
         # Embed parameters directly into SQL
-        embedded_sql = sql
-        for param in params:
-            if param is None:
-                embedded_sql = embedded_sql.replace('%s', 'NULL', 1)
-            elif isinstance(param, (int, float)):
-                embedded_sql = embedded_sql.replace('%s', str(param), 1)
-            elif isinstance(param, str):
-                escaped = escape_string(param)
-                embedded_sql = embedded_sql.replace('%s', f"'{escaped}'", 1)
-            else:
-                # For other types (like lists in IN clauses), convert to string
-                escaped = escape_string(str(param))
-                embedded_sql = embedded_sql.replace('%s', f"'{escaped}'", 1)
+        embedded_sql = render_sql_with_params(sql, params)
 
         cursor = conn.cursor()
         try:
@@ -179,11 +150,7 @@ class SeekdbEmbeddedClient(BaseClient):
             
             # Check if this is a query statement (SELECT, SHOW, DESCRIBE, DESC)
             # Only query statements return result sets that need fetchall()
-            sql_upper = embedded_sql.strip().upper()
-            is_query = (sql_upper.startswith('SELECT') or 
-                       sql_upper.startswith('SHOW') or 
-                       sql_upper.startswith('DESCRIBE') or
-                       sql_upper.startswith('DESC'))
+            is_query = self._should_fetch_results(cursor, embedded_sql)
             
             if not is_query:
                 # For non-query statements (DELETE, UPDATE, INSERT, etc.), return empty list
@@ -274,10 +241,7 @@ class SeekdbEmbeddedClient(BaseClient):
             name: database name
             tenant: ignored for embedded mode (no tenant concept)
         """
-        logger.info(f"Creating database: {name}")
-        sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
-        self._execute(sql)
-        logger.info(f"✅ Database created: {name}")
+        return super().create_database(name=name, tenant=tenant)
     
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
@@ -287,20 +251,7 @@ class SeekdbEmbeddedClient(BaseClient):
             name: database name
             tenant: ignored for embedded mode (no tenant concept)
         """
-        logger.info(f"Getting database: {name}")
-        sql = f"SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '{name}'"
-        result = self._execute(sql)
-        
-        if not result:
-            raise ValueError(f"Database not found: {name}")
-        
-        row = result[0]
-        return Database(
-            name=row[0] if isinstance(row, tuple) else row.get('SCHEMA_NAME'),
-            tenant=None,  # No tenant concept in embedded mode
-            charset=row[1] if isinstance(row, tuple) else row.get('DEFAULT_CHARACTER_SET_NAME'),
-            collation=row[2] if isinstance(row, tuple) else row.get('DEFAULT_COLLATION_NAME')
-        )
+        return super().get_database(name=name, tenant=tenant)
     
     def delete_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
         """
@@ -310,10 +261,7 @@ class SeekdbEmbeddedClient(BaseClient):
             name: database name
             tenant: ignored for embedded mode (no tenant concept)
         """
-        logger.info(f"Deleting database: {name}")
-        sql = f"DROP DATABASE IF EXISTS `{name}`"
-        self._execute(sql)
-        logger.info(f"✅ Database deleted: {name}")
+        return super().delete_database(name=name, tenant=tenant)
     
     def list_databases(
         self,
@@ -329,28 +277,7 @@ class SeekdbEmbeddedClient(BaseClient):
             offset: number of results to skip
             tenant: ignored for embedded mode (no tenant concept)
         """
-        logger.info("Listing databases")
-        sql = "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA"
-        
-        if limit is not None:
-            if offset is not None:
-                sql += f" LIMIT {offset}, {limit}"
-            else:
-                sql += f" LIMIT {limit}"
-        
-        result = self._execute(sql)
-        
-        databases = []
-        for row in result:
-            databases.append(Database(
-                name=row[0] if isinstance(row, tuple) else row.get('SCHEMA_NAME'),
-                tenant=None,  # No tenant concept in embedded mode
-                charset=row[1] if isinstance(row, tuple) else row.get('DEFAULT_CHARACTER_SET_NAME'),
-                collation=row[2] if isinstance(row, tuple) else row.get('DEFAULT_COLLATION_NAME')
-            ))
-        
-        logger.info(f"✅ Found {len(databases)} databases")
-        return databases
+        return super().list_databases(limit=limit, offset=offset, tenant=tenant)
     
     def __repr__(self):
         status = "connected" if self.is_connected() else "disconnected"
