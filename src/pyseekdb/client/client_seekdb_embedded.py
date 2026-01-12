@@ -19,7 +19,7 @@ from .client_base import BaseClient
 from .collection import Collection
 from .database import Database
 from .admin_client import DEFAULT_TENANT
-from .sql_utils import is_query_sql, render_sql_with_params
+from .sql_utils import render_sql_with_params
 
 logger = logging.getLogger(__name__)
 
