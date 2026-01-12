@@ -18,7 +18,7 @@ All factories use the underlying ServerAPI implementations:
 
 import os
 import logging
-from typing import Optional
+from typing import Optional, Any
 from .base_connection import BaseConnection
 from .client_base import (
     BaseClient,
@@ -53,6 +53,77 @@ from .hybrid_search import (
 )
 
 logger = logging.getLogger(__name__)
+
+def _resolve_password(password: str) -> str:
+    """Get password from env if not provided (keeps existing behavior)."""
+    return password or os.environ.get("SEEKDB_PASSWORD", "")
+
+
+def _default_seekdb_path() -> str:
+    # Keep existing behavior: default to "seekdb.db" under current working directory.
+    return os.path.abspath("seekdb.db")
+
+
+def _create_server_client(
+    *,
+    path: Optional[str],
+    host: Optional[str],
+    port: Optional[int],
+    tenant: str,
+    database: str,
+    user: Optional[str],
+    password: str,
+    is_admin: bool,
+    **kwargs: Any,
+) -> BaseClient:
+    """
+    Create the underlying server client (single change point).
+
+    Keep simple but clean: only two backends today (embedded vs remote). We still avoid duplicated
+    if/else by sharing this helper between Client() and AdminClient().
+    """
+    if path is not None:
+        if is_admin:
+            logger.info(f"Creating embedded admin client: path={path}")
+        else:
+            logger.info(f"Creating embedded client: path={path}, database={database}")
+        return SeekdbEmbeddedClient(path=path, database=database, **kwargs)
+
+    if host is not None:
+        # Keep existing defaults
+        if port is None:
+            port = 2881
+        if user is None:
+            user = "root"
+        if is_admin:
+            logger.info(f"Creating remote server admin client: {user}@{tenant}@{host}:{port}")
+        else:
+            logger.info(f"Creating remote server client: {user}@{tenant}@{host}:{port}/{database}")
+        return RemoteServerClient(
+            host=host,
+            port=port,
+            tenant=tenant,
+            database=database,
+            user=user,
+            password=password,
+            **kwargs,
+        )
+
+    # Default behavior: embedded mode if available, otherwise require host
+    from .client_seekdb_embedded import _PYLIBSEEKDB_AVAILABLE
+
+    if _PYLIBSEEKDB_AVAILABLE:
+        default_path = _default_seekdb_path()
+        if is_admin:
+            logger.info(f"Creating embedded admin client (default): path={default_path}")
+        else:
+            logger.info(f"Creating embedded client (default): path={default_path}, database={database}")
+        return SeekdbEmbeddedClient(path=default_path, database=database, **kwargs)
+
+    raise ValueError(
+        "Default embedded mode is not available because pylibseekdb could not be imported. "
+        "Please provide host/port parameters to use RemoteServerClient."
+    )
 
 __all__ = [
     'BaseConnection',
@@ -147,57 +218,18 @@ def Client(
         ...     password="pass"
         ... )
     """
-    # Get password from environment variable if not provided
-    if not password:
-        password = os.environ.get("SEEKDB_PASSWORD", "")
-
-    # Determine mode and create appropriate server
-    if path is not None:
-        # Embedded mode (requires pylibseekdb)
-        logger.info(f"Creating embedded client: path={path}, database={database}")
-        server = SeekdbEmbeddedClient(
-            path=path,
-            database=database,
-            **kwargs
-        )
-
-    elif host is not None:
-        # Remote server mode (supports both seekdb Server and OceanBase Server)
-        if port is None:
-            port = 2881  # Default port
-        if user is None:
-            user = "root"
-
-        logger.info(
-            f"Creating remote server client: {user}@{tenant}@{host}:{port}/{database}"
-        )
-        server = RemoteServerClient(
-            host=host,
-            port=port,
-            tenant=tenant,
-            database=database,
-            user=user,
-            password=password,
-            **kwargs
-        )
-
-    else:
-        # Default behavior: embedded mode if available, otherwise require host
-        from .client_seekdb_embedded import _PYLIBSEEKDB_AVAILABLE
-        if _PYLIBSEEKDB_AVAILABLE:
-            # Default to embedded mode with current working directory as path
-            default_path = os.path.abspath("seekdb.db")
-            logger.info(f"Creating embedded client (default): path={default_path}, database={database}")
-            server = SeekdbEmbeddedClient(
-                path=default_path,
-                database=database,
-                **kwargs
-            )
-        else:
-            raise ValueError(
-                "Default embedded mode is not available because pylibseekdb could not be imported. "
-                "Please provide host/port parameters to use RemoteServerClient."
-            )
+    password = _resolve_password(password)
+    server = _create_server_client(
+        path=path,
+        host=host,
+        port=port,
+        tenant=tenant,
+        database=database,
+        user=user,
+        password=password,
+        is_admin=False,
+        **kwargs,
+    )
 
     # Return ClientProxy (only exposes collection operations)
     return _ClientProxy(server=server)
@@ -258,57 +290,19 @@ def AdminClient(
         ...     password="pass"
         ... )
     """
-    # Get password from environment variable if not provided
-    if not password:
-        password = os.environ.get("SEEKDB_PASSWORD", "")
-
-    # Determine mode and create appropriate server
-    if path is not None:
-        # Embedded mode (requires pylibseekdb)
-        logger.info(f"Creating embedded admin client: path={path}")
-        server = SeekdbEmbeddedClient(
-            path=path,
-            database="information_schema",  # Use system database for admin operations
-            **kwargs
-        )
-
-    elif host is not None:
-        # Remote server mode (supports both seekdb Server and OceanBase Server)
-        if port is None:
-            port = 2881  # Default port
-        if user is None:
-            user = "root"
-
-        logger.info(
-            f"Creating remote server admin client: {user}@{tenant}@{host}:{port}"
-        )
-        server = RemoteServerClient(
-            host=host,
-            port=port,
-            tenant=tenant,
-            database="information_schema",  # Use system database
-            user=user,
-            password=password,
-            **kwargs
-        )
-
-    else:
-        # No parameters provided
-        from .client_seekdb_embedded import _PYLIBSEEKDB_AVAILABLE
-        if _PYLIBSEEKDB_AVAILABLE:
-            # Default to embedded mode with seekdb.db in current working directory
-            default_path = os.path.abspath("seekdb.db")
-            logger.info(f"Creating embedded admin client (default): path={default_path}")
-            server = SeekdbEmbeddedClient(
-                path=default_path,
-                database="information_schema",  # Use system database for admin operations
-                **kwargs
-            )
-        else:
-            raise ValueError(
-                "Default embedded mode is not available because pylibseekdb could not be imported. "
-                "Please provide host/port parameters to use RemoteServerClient."
-            )
+    password = _resolve_password(password)
+    # Keep existing semantics: admin operations always use system database.
+    server = _create_server_client(
+        path=path,
+        host=host,
+        port=port,
+        tenant=tenant,
+        database="information_schema",
+        user=user,
+        password=password,
+        is_admin=True,
+        **kwargs,
+    )
 
     # Return AdminClient proxy (only exposes database operations)
     return _AdminClientProxy(server=server)
