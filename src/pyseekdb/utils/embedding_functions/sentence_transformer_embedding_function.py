@@ -9,18 +9,20 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
     Example:
         pip install pyseekdb sentence-transformers
 
-        >>> import pyseekdb
-        >>> from pyseekdb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-        >>> ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-        >>> db = pyseekdb.Client(
-        ...     path="./mydb"
-        ... )
-        >>> collection = db.create_collection(name="my_collection", embedding_function=ef)
-        >>> # Add documents
-        >>> collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
-        >>> # Query using semantic search
-        >>> results = collection.query("How are you?", top_k=1)
-        >>> print(results)
+    .. code-block:: python
+        import pyseekdb
+        from pyseekdb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+        ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+        db = pyseekdb.Client(
+            path="./mydb"
+        )
+        collection = db.create_collection(name="my_collection", embedding_function=ef)
+        # Add documents
+        collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
+        # Query using semantic search
+        results = collection.query("How are you?", top_k=1)
+        print(results)
+
     """
     # Since we do dynamic imports we have to type this as Any
     models: Dict[str, Any] = {}
