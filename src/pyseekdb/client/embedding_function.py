@@ -38,27 +38,27 @@ Embedding = List[float]
 class EmbeddingFunction(Protocol[D]):
     """
     Protocol for embedding functions that convert documents to vectors.
-    
+
     This is similar to Chroma's EmbeddingFunction interface.
     Implementations should convert text documents to vector embeddings.
-    
+
     Example:
-        >>> class MyEmbeddingFunction:
+        >>> class MyEmbeddingFunction(EmbeddingFunction[Documents]):
         ...     def __call__(self, input: Documents) -> Embeddings:
         ...         # Convert documents to embeddings
         ...         return [[0.1, 0.2, ...], [0.3, 0.4, ...]]
-        >>> 
+        >>>
         >>> ef = MyEmbeddingFunction()
         >>> embeddings = ef(["Hello", "World"])
     """
-    
+
     def __call__(self, input: D) -> Embeddings:
         """
         Convert input documents to embeddings.
-        
+
         Args:
             input: Documents to embed (can be a single string or list of strings)
-            
+
         Returns:
             List of embedding vectors (list of floats)
         """
@@ -81,30 +81,30 @@ def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
         else:
             raise ValueError("Embedding function returned empty result when called with 'seekdb'")
 
-class DefaultEmbeddingFunction:
+class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
     """
     Default embedding function using ONNX runtime.
-    
+
     Uses the 'all-MiniLM-L6-v2' model via ONNX, which produces 384-dimensional embeddings.
     This is a lightweight, fast model suitable for general-purpose text embeddings.
-    
+
     Example:
         >>> ef = DefaultEmbeddingFunction()
         >>> embeddings = ef(["Hello world", "How are you?"])
         >>> print(len(embeddings[0]))  # 384
     """
-    
+
     MODEL_NAME = "all-MiniLM-L6-v2"
     HF_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"  # Hugging Face model ID
     DOWNLOAD_PATH = Path.home() / ".cache" / "pyseekdb" / "onnx_models" / MODEL_NAME
     EXTRACTED_FOLDER_NAME = "onnx"
     ARCHIVE_FILENAME = "onnx.tar.gz"
     _DIMENSION = 384  # all-MiniLM-L6-v2 produces 384-dimensional embeddings
-    
+
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", preferred_providers: Optional[List[str]] = None):
         """
         Initialize the default embedding function.
-        
+
         Args:
             model_name: Name of the model (currently only 'all-MiniLM-L6-v2' is supported).
                        Default is 'all-MiniLM-L6-v2' (384 dimensions).
@@ -116,7 +116,7 @@ class DefaultEmbeddingFunction:
                 f"Currently only 'all-MiniLM-L6-v2' is supported, got '{model_name}'"
             )
         self.model_name = model_name
-        
+
         # Validate preferred_providers
         if preferred_providers and not all(
             [isinstance(i, str) for i in preferred_providers]
@@ -126,9 +126,9 @@ class DefaultEmbeddingFunction:
             set(preferred_providers)
         ):
             raise ValueError("Preferred providers must be unique")
-        
+
         self._preferred_providers = preferred_providers
-        
+
         # Import required modules
         import onnxruntime as ort_module
         import tokenizers
@@ -137,12 +137,12 @@ class DefaultEmbeddingFunction:
         self.ort = ort_module
         self.tokenizers = tokenizers  # Store the module
         self.tqdm = tqdm.tqdm
-    
+
     @property
     def dimension(self) -> int:
         """Get the dimension of embeddings produced by this function"""
         return self._DIMENSION
-    
+
     def _download(self, url: str, fname: str, chunk_size: int = 8192) -> None:
         """
         Download a file from the URL and save it to the file path.
@@ -172,7 +172,7 @@ class DefaultEmbeddingFunction:
     def _get_hf_endpoint(self) -> str:
         """Get Hugging Face endpoint URL, using HF_ENDPOINT environment variable if set."""
         return os.environ.get("HF_ENDPOINT", "https://huggingface.co")
-    
+
     def _download_from_huggingface(self) -> bool:
         """
         Download model files from Hugging Face (supports mirror acceleration).
@@ -184,7 +184,7 @@ class DefaultEmbeddingFunction:
             hf_endpoint = self._get_hf_endpoint()
             # Remove trailing slash
             hf_endpoint = hf_endpoint.rstrip('/')
-            
+
             # List of files to download
             # ONNX model files are in the onnx/ subdirectory, other files in the root directory
             files_to_download = {
@@ -195,25 +195,25 @@ class DefaultEmbeddingFunction:
                 "tokenizer_config.json": "tokenizer_config.json",
                 "vocab.txt": "vocab.txt",
             }
-            
+
             extracted_folder = os.path.join(self.DOWNLOAD_PATH, self.EXTRACTED_FOLDER_NAME)
             os.makedirs(extracted_folder, exist_ok=True)
-            
+
             logger.info(f"Downloading model from Hugging Face (endpoint: {hf_endpoint})")
-            
+
             # Download each file
             for hf_filename, local_filename in files_to_download.items():
                 local_path = os.path.join(extracted_folder, local_filename)
-                
+
                 # Skip if file already exists
                 if os.path.exists(local_path):
                     continue
-                
+
                 # Construct Hugging Face download URL
                 # Format: https://hf-mirror.com/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx
                 # Or: https://hf-mirror.com/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json
                 url = f"{hf_endpoint}/{self.HF_MODEL_ID}/resolve/main/{hf_filename}"
-                
+
                 try:
                     # First check if file exists (HEAD request)
                     try:
@@ -224,7 +224,7 @@ class DefaultEmbeddingFunction:
                     except Exception:
                         # If HEAD request fails, continue with GET request
                         pass
-                    
+
                     self._download(url, local_path, chunk_size=8192)
                     logger.info(f"Successfully downloaded {local_filename}")
                 except httpx.HTTPStatusError as e:
@@ -237,26 +237,26 @@ class DefaultEmbeddingFunction:
                     return False
                 except Exception as e:
                     logger.warning(f"Failed to download {hf_filename} from Hugging Face: {e}")
-                    # 如果下载失败，尝试删除部分下载的文件
+                    # If download fails, try to delete partially downloaded file
                     if os.path.exists(local_path):
                         os.remove(local_path)
                     return False
-            
-            # 验证关键文件是否存在
+
+            # Verify critical files exist
             if not os.path.exists(os.path.join(extracted_folder, "model.onnx")):
                 logger.error("model.onnx not found after download")
                 return False
             if not os.path.exists(os.path.join(extracted_folder, "tokenizer.json")):
                 logger.error("tokenizer.json not found after download")
                 return False
-            
+
             logger.info("Successfully downloaded all model files from Hugging Face")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error downloading from Hugging Face: {e}")
             return False
-    
+
     def _forward(
         self, documents: List[str], batch_size: int = 32
     ) -> npt.NDArray[np.float32]:
@@ -327,7 +327,7 @@ class DefaultEmbeddingFunction:
             all_embeddings.append(embeddings)
 
         return np.concatenate(all_embeddings)
-    
+
     @cached_property
     def tokenizer(self) -> Any:
         """
@@ -346,7 +346,7 @@ class DefaultEmbeddingFunction:
         tokenizer.enable_truncation(max_length=256)
         tokenizer.enable_padding(pad_id=0, pad_token="[PAD]", length=256)
         return tokenizer
-    
+
     @cached_property
     def model(self) -> Any:
         """
@@ -392,7 +392,7 @@ class DefaultEmbeddingFunction:
             providers=['CPUExecutionProvider'],
             sess_options=so,
         )
-    
+
     def _download_model_if_not_exists(self) -> None:
         """
         Download from Hugging Face with image mirror if the model doesn't exist.
@@ -411,11 +411,11 @@ class DefaultEmbeddingFunction:
             if not os.path.exists(os.path.join(extracted_folder, f)):
                 onnx_files_exist = False
                 break
-        
+
         # Model is not downloaded yet
         if not onnx_files_exist:
             os.makedirs(self.DOWNLOAD_PATH, exist_ok=True)
-            
+
             logger.info("Attempting to download model from Hugging Face...")
             hf_endpoint = self._get_hf_endpoint()
             if not self._download_from_huggingface():
@@ -426,21 +426,21 @@ class DefaultEmbeddingFunction:
                     f"Model ID: {self.HF_MODEL_ID}"
                 )
             logger.info("Model downloaded successfully from Hugging Face")
-    
+
     def max_tokens(self) -> int:
         """Get the maximum number of tokens supported by the model."""
         return 256
-    
+
     def __call__(self, input: Documents) -> Embeddings:
         """
         Generate embeddings for the given documents.
-        
+
         Args:
             input: Single document (str) or list of documents (List[str])
-            
+
         Returns:
             List of embedding vectors
-            
+
         Example:
             >>> ef = DefaultEmbeddingFunction()
             >>> # Single document
@@ -451,20 +451,20 @@ class DefaultEmbeddingFunction:
         # Handle single string input
         if isinstance(input, str):
             input = [input]
-        
+
         # Handle empty input
         if not input:
             return []
-        
+
         # Only download the model when it is actually used
         self._download_model_if_not_exists()
-        
+
         # Generate embeddings
         embeddings = self._forward(input)
-        
+
         # Convert numpy arrays to lists
         return [embedding.tolist() for embedding in embeddings]
-    
+
     def __repr__(self) -> str:
         return f"DefaultEmbeddingFunction(model_name='{self.model_name}')"
 
@@ -476,7 +476,7 @@ _default_embedding_function: Optional[DefaultEmbeddingFunction] = None
 def get_default_embedding_function() -> DefaultEmbeddingFunction:
     """
     Get or create the default embedding function instance.
-    
+
     Returns:
         DefaultEmbeddingFunction instance
     """
