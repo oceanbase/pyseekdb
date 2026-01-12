@@ -1,4 +1,4 @@
-from pyseekdb.client.embedding_function import EmbeddingFunction, Space, Embeddings, Documents
+from pyseekdb.client.embedding_function import EmbeddingFunction, Embeddings, Documents
 from typing import Dict, Any
 
 
@@ -14,7 +14,7 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         from pyseekdb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
         ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
         db = pyseekdb.Client(
-            path="./mydb"
+            path="./seekdb.db"
         )
         collection = db.create_collection(name="my_collection", embedding_function=ef)
         # Add documents
