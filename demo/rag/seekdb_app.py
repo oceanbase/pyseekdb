@@ -3,11 +3,7 @@ import traceback
 import streamlit as st
 from dotenv import load_dotenv
 from embedding_function_factory import create_embedding_function
-from seekdb_utils import (
-    get_seekdb_client, 
-    get_database_stats,
-    seekdb_query
-)
+from seekdb_utils import get_seekdb_client, get_database_stats, seekdb_query
 from llm import get_llm_answer, get_llm_client
 
 load_dotenv()
@@ -15,7 +11,7 @@ load_dotenv()
 st.set_page_config(
     page_title="seekdb RAG Demo",
     page_icon="https://avatars.githubusercontent.com/u/82347605?s=48&v=4",
-    layout="wide"
+    layout="wide",
 )
 
 # Configuration
@@ -23,18 +19,18 @@ DB_DIR = os.getenv("SEEKDB_DIR", "./seekdb_rag")
 DB_NAME = os.getenv("SEEKDB_NAME", "test")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME")
 
+
 @st.cache_resource
 def init_clients():
     """Initialize and cache all clients."""
     seekdb_client = get_seekdb_client(db_dir=DB_DIR, db_name=DB_NAME)
-    
+
     collection = seekdb_client.get_collection(
-        name=COLLECTION_NAME,
-        embedding_function=create_embedding_function()
+        name=COLLECTION_NAME, embedding_function=create_embedding_function()
     )
-    
+
     llm = get_llm_client()
-    
+
     return llm, collection
 
 
@@ -46,7 +42,7 @@ except Exception as e:
     st.stop()
 
 # Initialize session state
-if 'results' not in st.session_state:
+if "results" not in st.session_state:
     st.session_state.results = []
 
 # Header
@@ -81,12 +77,16 @@ question = st.text_area(
     "Enter your question:",
     placeholder="e.g., What is seekdb?",
     height=100,
-    key="question_input"
+    key="question_input",
 )
 
 col1, col2 = st.columns([3, 2])
 with col1:
-    enable_hybrid_search = st.checkbox("Enable hybrid search", value=False, help="Combine vector search with keyword search for better results")
+    enable_hybrid_search = st.checkbox(
+        "Enable hybrid search",
+        value=False,
+        help="Combine vector search with keyword search for better results",
+    )
 with col2:
     n_results = st.selectbox(
         "Number of relevant results to retrieve:",
@@ -102,10 +102,10 @@ if st.button("Submit", type="primary", use_container_width=True):
             # Search for relevant documents using seekdb_query()
             with st.spinner("🔍 Searching relevant documents..."):
                 results = seekdb_query(
-                    collection=collection, 
-                    query_context=question, 
-                    n_results=n_results, 
-                    enable_hybrid_search=enable_hybrid_search
+                    collection=collection,
+                    query_context=question,
+                    n_results=n_results,
+                    enable_hybrid_search=enable_hybrid_search,
                 )
             if not results or not results.get("ids") or not results["ids"][0]:
                 st.warning("No relevant documents found. Try a different question.")
@@ -114,17 +114,19 @@ if st.button("Submit", type="primary", use_container_width=True):
                 # Store results
                 st.session_state.results = [
                     {
-                        'text': results["documents"][0][i],
-                        'similarity': 1.0 / (1.0 + float(results["distances"][0][i])),
-                        'source': results["metadatas"][0][i].get('source_file', '') if results["metadatas"][0][i] else '',
-                        'distance': float(results["distances"][0][i])
+                        "text": results["documents"][0][i],
+                        "similarity": 1.0 / (1.0 + float(results["distances"][0][i])),
+                        "source": results["metadatas"][0][i].get("source_file", "")
+                        if results["metadatas"][0][i]
+                        else "",
+                        "distance": float(results["distances"][0][i]),
                     }
                     for i in range(len(results["ids"][0]))
                 ]
-                
+
                 # Generate answer
-                context = "\n\n".join([r['text'] for r in st.session_state.results])
-                
+                context = "\n\n".join([r["text"] for r in st.session_state.results])
+
                 with st.spinner("🤖 Generating answer..."):
                     answer = get_llm_answer(llm_client, context, question)
 
@@ -134,36 +136,38 @@ if st.button("Submit", type="primary", use_container_width=True):
                     st.write(question)
                 with st.chat_message("assistant"):
                     st.write(answer)
-                
+
         except Exception as e:
             st.error(f"❌ Error: {e}")
             with st.expander("Detailed error information"):
-                st.code(traceback.format_exc(), language='python')
+                st.code(traceback.format_exc(), language="python")
             st.session_state.results = []
 
 # Sidebar
 with st.sidebar:
     st.subheader("📊 Database Statistics")
-    
+
     try:
         stats = get_database_stats(collection)
         col1, col2 = st.columns(2)
-        col1.metric("Embeddings", stats['total_embeddings'])
-        col2.metric("Files", stats['unique_source_files'])
+        col1.metric("Embeddings", stats["total_embeddings"])
+        col2.metric("Files", stats["unique_source_files"])
     except Exception as e:
         st.error(f"Unable to load stats: {e}")
-    
+
     st.divider()
     st.subheader("📄 Retrieved Documents")
-    
+
     if st.session_state.results:
         for idx, result in enumerate(st.session_state.results, 1):
-            filename = os.path.basename(result['source']) if result['source'] else "Unknown"
-            
+            filename = (
+                os.path.basename(result["source"]) if result["source"] else "Unknown"
+            )
+
             with st.expander(f"{idx}. {filename}", expanded=False):
                 st.caption(f"L2 Distance: {result['distance']:.4f}")
-                preview = result['text'][:200]
-                if len(result['text']) > 200:
+                preview = result["text"][:200]
+                if len(result["text"]) > 200:
                     preview += "..."
                 st.text(preview)
     else:

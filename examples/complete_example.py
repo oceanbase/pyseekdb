@@ -11,6 +11,7 @@ This example demonstrates all available operations:
 
 This is a complete reference for all client capabilities.
 """
+
 import uuid
 import random
 import pyseekdb
@@ -21,8 +22,8 @@ import pyseekdb
 
 # Option 1: Embedded mode (local seekdb)
 client = pyseekdb.Client(
-    #path="./seekdb",
-    #database="test"
+    # path="./seekdb",
+    # database="test"
 )
 
 # Option 2: Server mode (remote seekdb server)
@@ -53,11 +54,12 @@ dimension = 128
 
 # 2.1 Create a collection
 from pyseekdb import HNSWConfiguration
-config = HNSWConfiguration(dimension=dimension, distance='cosine')
+
+config = HNSWConfiguration(dimension=dimension, distance="cosine")
 collection = client.get_or_create_collection(
     name=collection_name,
     configuration=config,
-    embedding_function=None  # Explicitly set to None since we're using custom 128-dim embeddings
+    embedding_function=None,  # Explicitly set to None since we're using custom 128-dim embeddings
 )
 
 # 2.2 Check if collection exists
@@ -70,11 +72,11 @@ retrieved_collection = client.get_collection(collection_name, embedding_function
 all_collections = client.list_collections()
 
 # 2.5 Get or create collection (creates if doesn't exist)
-config2 = HNSWConfiguration(dimension=64, distance='cosine')
+config2 = HNSWConfiguration(dimension=64, distance="cosine")
 collection2 = client.get_or_create_collection(
     name="another_collection",
     configuration=config2,
-    embedding_function=None  # Explicitly set to None since we're using custom 64-dim embeddings
+    embedding_function=None,  # Explicitly set to None since we're using custom 64-dim embeddings
 )
 
 # ============================================================================
@@ -91,7 +93,7 @@ documents = [
     "Natural language processing helps computers understand human language",
     "Deep learning requires large amounts of training data",
     "Reinforcement learning agents learn through trial and error",
-    "Computer vision enables machines to interpret visual information"
+    "Computer vision enables machines to interpret visual information",
 ]
 
 # Generate embeddings (in real usage, use an embedding model)
@@ -108,7 +110,7 @@ collection.add(
     ids=single_id,
     documents="This is a single document",
     embeddings=[random.random() for _ in range(dimension)],
-    metadatas={"type": "single", "category": "test"}
+    metadatas={"type": "single", "category": "test"},
 )
 
 # 3.2 Add multiple items
@@ -124,8 +126,8 @@ collection.add(
         {"category": "NLP", "score": 87, "tag": "language", "year": 2023},
         {"category": "AI", "score": 93, "tag": "deep", "year": 2023},
         {"category": "AI", "score": 85, "tag": "reinforcement", "year": 2022},
-        {"category": "CV", "score": 91, "tag": "vision", "year": 2023}
-    ]
+        {"category": "CV", "score": 91, "tag": "vision", "year": 2023},
+    ],
 )
 
 # 3.3 Add with only embeddings (no documents)
@@ -133,7 +135,7 @@ vector_only_ids = [str(uuid.uuid4()) for _ in range(2)]
 collection.add(
     ids=vector_only_ids,
     embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
-    metadatas=[{"type": "vector_only"}, {"type": "vector_only"}]
+    metadatas=[{"type": "vector_only"}, {"type": "vector_only"}],
 )
 
 # ============================================================================
@@ -143,7 +145,13 @@ collection.add(
 # 4.1 Update single item
 collection.update(
     ids=ids[0],
-    metadatas={"category": "AI", "score": 98, "tag": "ml", "year": 2024, "updated": True}
+    metadatas={
+        "category": "AI",
+        "score": 98,
+        "tag": "ml",
+        "year": 2024,
+        "updated": True,
+    },
 )
 
 # 4.2 Update multiple items
@@ -153,16 +161,13 @@ collection.update(
     embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
-        {"category": "Database", "score": 97, "updated": True}
-    ]
+        {"category": "Database", "score": 97, "updated": True},
+    ],
 )
 
 # 4.3 Update embeddings
 new_embeddings = [[random.random() for _ in range(dimension)] for _ in range(2)]
-collection.update(
-    ids=ids[2:4],
-    embeddings=new_embeddings
-)
+collection.update(ids=ids[2:4], embeddings=new_embeddings)
 
 # ============================================================================
 # PART 5: DML OPERATIONS - UPSERT DATA
@@ -173,7 +178,7 @@ collection.upsert(
     ids=ids[0],
     documents="Upserted document (was updated)",
     embeddings=[random.random() for _ in range(dimension)],
-    metadatas={"category": "AI", "upserted": True}
+    metadatas={"category": "AI", "upserted": True},
 )
 
 # 5.2 Upsert new item (will insert)
@@ -182,7 +187,7 @@ collection.upsert(
     ids=new_id,
     documents="This is a new document from upsert",
     embeddings=[random.random() for _ in range(dimension)],
-    metadatas={"category": "New", "upserted": True}
+    metadatas={"category": "New", "upserted": True},
 )
 
 # 5.3 Upsert multiple items
@@ -191,7 +196,7 @@ collection.upsert(
     ids=upsert_ids,
     documents=["Upserted doc 1", "Upserted doc 2"],
     embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
-    metadatas=[{"upserted": True}, {"upserted": True}]
+    metadatas=[{"upserted": True}, {"upserted": True}],
 )
 
 # ============================================================================
@@ -200,62 +205,45 @@ collection.upsert(
 
 # 6.1 Basic vector similarity query
 query_vector = embeddings[0]  # Query with first document's vector
-results = collection.query(
-    query_embeddings=query_vector,
-    n_results=3
-)
+results = collection.query(query_embeddings=query_vector, n_results=3)
 print(f"Query results: {len(results['ids'][0])} items")
 
 # 6.2 Query with metadata filter (simplified equality)
 results = collection.query(
-    query_embeddings=query_vector,
-    where={"category": "AI"},
-    n_results=5
+    query_embeddings=query_vector, where={"category": "AI"}, n_results=5
 )
 
 # 6.3 Query with comparison operators
 results = collection.query(
-    query_embeddings=query_vector,
-    where={"score": {"$gte": 90}},
-    n_results=5
+    query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5
 )
 
 # 6.4 Query with $in operator
 results = collection.query(
     query_embeddings=query_vector,
     where={"tag": {"$in": ["ml", "python", "neural"]}},
-    n_results=5
+    n_results=5,
 )
 
 # 6.5 Query with logical operators ($or) - simplified equality
 results = collection.query(
     query_embeddings=query_vector,
-    where={
-        "$or": [
-            {"category": "AI"},
-            {"tag": "python"}
-        ]
-    },
-    n_results=5
+    where={"$or": [{"category": "AI"}, {"tag": "python"}]},
+    n_results=5,
 )
 
 # 6.6 Query with logical operators ($and) - simplified equality
 results = collection.query(
     query_embeddings=query_vector,
-    where={
-        "$and": [
-            {"category": "AI"},
-            {"score": {"$gte": 90}}
-        ]
-    },
-    n_results=5
+    where={"$and": [{"category": "AI"}, {"score": {"$gte": 90}}]},
+    n_results=5,
 )
 
 # 6.7 Query with document filter
 results = collection.query(
     query_embeddings=query_vector,
     where_document={"$contains": "machine learning"},
-    n_results=5
+    n_results=5,
 )
 
 # 6.8 Query with combined filters (simplified equality)
@@ -263,15 +251,12 @@ results = collection.query(
     query_embeddings=query_vector,
     where={"category": "AI", "year": {"$gte": 2023}},
     where_document={"$contains": "learning"},
-    n_results=5
+    n_results=5,
 )
 
 # 6.9 Query with multiple embeddings (batch query)
 batch_embeddings = [embeddings[0], embeddings[1]]
-batch_results = collection.query(
-    query_embeddings=batch_embeddings,
-    n_results=2
-)
+batch_results = collection.query(query_embeddings=batch_embeddings, n_results=2)
 # batch_results["ids"][0] contains results for first query
 # batch_results["ids"][1] contains results for second query
 
@@ -279,7 +264,7 @@ batch_results = collection.query(
 results = collection.query(
     query_embeddings=query_vector,
     include=["documents", "metadatas", "embeddings"],
-    n_results=2
+    n_results=2,
 )
 
 # ============================================================================
@@ -297,49 +282,28 @@ results = collection.get(ids=ids[:3])
 # results["documents"] contains documents for all IDs
 
 # 7.3 Get by metadata filter (simplified equality)
-results = collection.get(
-    where={"category": "AI"},
-    limit=5
-)
+results = collection.get(where={"category": "AI"}, limit=5)
 
 # 7.4 Get with comparison operators
-results = collection.get(
-    where={"score": {"$gte": 90}},
-    limit=5
-)
+results = collection.get(where={"score": {"$gte": 90}}, limit=5)
 
 # 7.5 Get with $in operator
-results = collection.get(
-    where={"tag": {"$in": ["ml", "python"]}},
-    limit=5
-)
+results = collection.get(where={"tag": {"$in": ["ml", "python"]}}, limit=5)
 
 # 7.6 Get with logical operators (simplified equality)
 results = collection.get(
-    where={
-        "$or": [
-            {"category": "AI"},
-            {"category": "Programming"}
-        ]
-    },
-    limit=5
+    where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5
 )
 
 # 7.7 Get by document filter
-results = collection.get(
-    where_document={"$contains": "Python"},
-    limit=5
-)
+results = collection.get(where_document={"$contains": "Python"}, limit=5)
 
 # 7.8 Get with pagination
 results_page1 = collection.get(limit=2, offset=0)
 results_page2 = collection.get(limit=2, offset=2)
 
 # 7.9 Get with specific fields
-results = collection.get(
-    ids=ids[:2],
-    include=["documents", "metadatas", "embeddings"]
-)
+results = collection.get(ids=ids[:2], include=["documents", "metadatas", "embeddings"])
 
 # 7.10 Get all data
 all_results = collection.get(limit=100)
@@ -355,16 +319,16 @@ hybrid_results = collection.hybrid_search(
     query={
         "where_document": {"$contains": "machine learning"},
         "where": {"category": "AI"},  # Simplified equality
-        "n_results": 10
+        "n_results": 10,
     },
     knn={
         "query_embeddings": [embeddings[0]],
         "where": {"year": {"$gte": 2022}},
-        "n_results": 10
+        "n_results": 10,
     },
     rank={"rrf": {}},  # Reciprocal Rank Fusion
     n_results=5,
-    include=["documents", "metadatas"]
+    include=["documents", "metadatas"],
 )
 # hybrid_results["ids"][0] contains IDs for the hybrid search
 # hybrid_results["documents"][0] contains documents for the hybrid search
@@ -386,8 +350,7 @@ collection.delete(where_document={"$contains": "Updated document"})
 
 # 9.4 Delete with combined filters
 collection.delete(
-    where={"category": {"$eq": "CV"}},
-    where_document={"$contains": "vision"}
+    where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"}
 )
 
 # ============================================================================
@@ -402,9 +365,11 @@ print(f"Collection count: {count} items")
 # 10.3 Preview first few items in collection (returns all columns by default)
 preview = collection.peek(limit=5)
 print(f"Preview: {len(preview['ids'])} items")
-for i in range(len(preview['ids'])):
+for i in range(len(preview["ids"])):
     print(f"  ID: {preview['ids'][i]}, Document: {preview['documents'][i]}")
-    print(f"  Metadata: {preview['metadatas'][i]}, Embedding dim: {len(preview['embeddings'][i]) if preview['embeddings'][i] else 0}")
+    print(
+        f"  Metadata: {preview['metadatas'][i]}, Embedding dim: {len(preview['embeddings'][i]) if preview['embeddings'][i] else 0}"
+    )
 
 # 10.4 Count collections in database
 collection_count = client.count_collection()

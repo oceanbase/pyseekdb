@@ -1,4 +1,9 @@
-from pyseekdb.client.embedding_function import EmbeddingFunction, Space, Embeddings, Documents
+from pyseekdb.client.embedding_function import (
+    EmbeddingFunction,
+    Space,
+    Embeddings,
+    Documents,
+)
 from typing import Dict, Any
 
 
@@ -22,6 +27,7 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         >>> results = collection.query("How are you?", top_k=1)
         >>> print(results)
     """
+
     # Since we do dynamic imports we have to type this as Any
     models: Dict[str, Any] = {}
 

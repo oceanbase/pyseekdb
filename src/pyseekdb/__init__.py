@@ -57,6 +57,7 @@ Admin client - Database management:
     admin.create_database("new_db")
     databases = admin.list_databases()
 """
+
 import importlib.metadata
 
 # Note: pylibseekdb built with ABI=0 and onnxruntime built with ABI=1, so there's a conflict between the two libraries.
@@ -97,39 +98,38 @@ from .client.hybrid_search import (
 )
 
 try:
-  __version__ = importlib.metadata.version("pyseekdb")
+    __version__ = importlib.metadata.version("pyseekdb")
 except importlib.metadata.PackageNotFoundError:
-  __version__ = "0.0.1.dev1"
+    __version__ = "0.0.1.dev1"
 
 __author__ = "OceanBase <open_oceanbase@oceanbase.com>"
 
 __all__ = [
-    'BaseConnection',
-    'BaseClient',
-    'ClientAPI',
-    'Configuration',
-    'FulltextParserConfig',
-    'HNSWConfiguration',
-    'EmbeddingFunction',
-    'DefaultEmbeddingFunction',
-    'get_default_embedding_function',
-    'SeekdbEmbeddedClient',
-    'RemoteServerClient',
-    'Client',
-    'Collection',
-    'AdminAPI',
-    'AdminClient',
-    'Database',
-    'HybridSearch',
-    'DOCUMENT',
-    'TEXT',
-    'EMBEDDINGS',
-    'K',
-    'IDS',
-    'DOCUMENTS',
-    'METADATAS',
-    'EMBEDDINGS_FIELD',
-    'SCORES',
-    'Version',
+    "BaseConnection",
+    "BaseClient",
+    "ClientAPI",
+    "Configuration",
+    "FulltextParserConfig",
+    "HNSWConfiguration",
+    "EmbeddingFunction",
+    "DefaultEmbeddingFunction",
+    "get_default_embedding_function",
+    "SeekdbEmbeddedClient",
+    "RemoteServerClient",
+    "Client",
+    "Collection",
+    "AdminAPI",
+    "AdminClient",
+    "Database",
+    "HybridSearch",
+    "DOCUMENT",
+    "TEXT",
+    "EMBEDDINGS",
+    "K",
+    "IDS",
+    "DOCUMENTS",
+    "METADATAS",
+    "EMBEDDINGS_FIELD",
+    "SCORES",
+    "Version",
 ]
-

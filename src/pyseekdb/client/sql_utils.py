@@ -32,7 +32,11 @@ class SqlStringifier:
             # Check if it's a hex string (for varbinary IDs)
             # If it looks like a hex string (even length, only hex chars), use UNHEX
             # Otherwise, treat as regular string
-            if len(value) > 0 and len(value) % 2 == 0 and all(c in '0123456789abcdefABCDEF' for c in value):
+            if (
+                len(value) > 0
+                and len(value) % 2 == 0
+                and all(c in "0123456789abcdefABCDEF" for c in value)
+            ):
                 # Likely a hex string for varbinary, use UNHEX
                 return f"UNHEX('{value}')"
             # Use pymysql's escape_string for safe escaping
@@ -46,5 +50,7 @@ class SqlStringifier:
         if id_name is None:
             raise ValueError("Identifier shouldn't be null")
         if not isinstance(id_name, str):
-            raise ValueError(f"Identifier should be string type, but got {type(id_name).__name__}")
+            raise ValueError(
+                f"Identifier should be string type, but got {type(id_name).__name__}"
+            )
         return _quote_string(id_name, self._identifier)

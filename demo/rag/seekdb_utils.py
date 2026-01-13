@@ -1,5 +1,6 @@
 from pyseekdb import DefaultEmbeddingFunction, EmbeddingFunction, Client
 from typing import List, Dict, Any, Optional
+
 # Simple cache
 _client_cache = {}
 
@@ -14,34 +15,36 @@ def get_seekdb_client(db_dir: str = "./seekdb_rag", db_name: str = "test"):
     return _client_cache[cache_key]
 
 
-def get_seekdb_collection(client, collection_name: str = "embeddings", 
-                  embedding_function: Optional[EmbeddingFunction] = DefaultEmbeddingFunction(),
-                  drop_if_exists: bool = True):
+def get_seekdb_collection(
+    client,
+    collection_name: str = "embeddings",
+    embedding_function: Optional[EmbeddingFunction] = DefaultEmbeddingFunction(),
+    drop_if_exists: bool = True,
+):
     """
     Get or create a collection using pyseekdb's get_or_create_collection.
-    
+
     Args:
         client: seekdb client instance
         collection_name: Name of the collection
         embedding_function: Embedding function (required for automatic embedding generation)
         drop_if_exists: Whether to drop existing collection if it exists
-    
+
     Returns:
         Collection object
     """
     if drop_if_exists and client.has_collection(collection_name):
         print(f"Collection '{collection_name}' already exists, deleting old data...")
         client.delete_collection(collection_name)
-    
+
     if embedding_function is None:
         raise ValueError("embedding_function is required")
-    
+
     # Use pyseekdb's native get_or_create_collection
     collection = client.get_or_create_collection(
-        name=collection_name,
-        embedding_function=embedding_function
+        name=collection_name, embedding_function=embedding_function
     )
-    
+
     print(f"Collection '{collection_name}' ready!")
     return collection
 
@@ -56,16 +59,17 @@ def insert_embeddings(collection, data: List[Dict[str, Any]]):
     """
     try:
         ids = [f"{item['source_file']}_{item.get('chunk_index', 0)}" for item in data]
-        documents = [item['text'] for item in data]
-        metadatas = [{'source_file': item['source_file'],
-                     'chunk_index': item.get('chunk_index', 0)} for item in data]
+        documents = [item["text"] for item in data]
+        metadatas = [
+            {
+                "source_file": item["source_file"],
+                "chunk_index": item.get("chunk_index", 0),
+            }
+            for item in data
+        ]
 
         # Collection's embedding_function will automatically generate embeddings from documents
-        collection.add(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas
-        )
+        collection.add(ids=ids, documents=documents, metadatas=metadatas)
 
         print(f"Inserted {len(data)} items successfully")
     except Exception as e:
@@ -77,20 +81,25 @@ def get_database_stats(collection) -> Dict[str, Any]:
     """Get statistics about the collection."""
     try:
         results = collection.get(limit=10000, include=["metadatas"])
-        ids = results.get('ids', []) if isinstance(results, dict) else []
-        metadatas = results.get('metadatas', []) if isinstance(results, dict) else []
-        
-        unique_files = {m.get('source_file') for m in metadatas if m and m.get('source_file')}
-        
-        return {
-            "total_embeddings": len(ids),
-            "unique_source_files": len(unique_files)
+        ids = results.get("ids", []) if isinstance(results, dict) else []
+        metadatas = results.get("metadatas", []) if isinstance(results, dict) else []
+
+        unique_files = {
+            m.get("source_file") for m in metadatas if m and m.get("source_file")
         }
+
+        return {"total_embeddings": len(ids), "unique_source_files": len(unique_files)}
     except Exception as e:
         print(f"Error getting database stats: {e}")
         return {"total_embeddings": 0, "unique_source_files": 0}
 
-def seekdb_query(collection, query_context: str, n_results: int = 5, enable_hybrid_search: bool = False) -> Dict[str, Any]:
+
+def seekdb_query(
+    collection,
+    query_context: str,
+    n_results: int = 5,
+    enable_hybrid_search: bool = False,
+) -> Dict[str, Any]:
     """Query the collection."""
 
     if enable_hybrid_search:
@@ -98,21 +107,21 @@ def seekdb_query(collection, query_context: str, n_results: int = 5, enable_hybr
         results = collection.hybrid_search(
             query={
                 "where_document": {"$contains": query_context},
-                "n_results": n_results*2
+                "n_results": n_results * 2,
             },
             knn={
                 "query_texts": [query_context],  # Will be embedded automatically
-                "n_results": n_results*2
+                "n_results": n_results * 2,
             },
             rank={"rrf": {}},  # Reciprocal Rank Fusion
             n_results=n_results,
-            include=["documents", "metadatas", "distances"]
+            include=["documents", "metadatas", "distances"],
         )
     else:
         print("Performing vector search")
         results = collection.query(
             query_texts=query_context,
             n_results=n_results,
-            include=["documents", "metadatas", "distances"]
+            include=["documents", "metadatas", "distances"],
         )
     return results

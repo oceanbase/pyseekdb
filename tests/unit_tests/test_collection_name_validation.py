@@ -1,6 +1,7 @@
 """
 Unit tests for collection name validation.
 """
+
 import pytest
 import sys
 from pathlib import Path
@@ -70,7 +71,9 @@ class TestCollectionNameValidation:
             "名字",
         ]
         for name in invalid_names:
-            with pytest.raises(ValueError, match="Only letters, digits, and underscore"):
+            with pytest.raises(
+                ValueError, match="Only letters, digits, and underscore"
+            ):
                 _validate_collection_name(name)
 
 

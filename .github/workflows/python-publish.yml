@@ -22,12 +22,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up environment
       uses: ./.github/actions/setup-python-env
       with:
         python-version: '3.11'
-    
+
     - name: Build package
       run: |
         uv build
