@@ -1,23 +1,32 @@
-from pyseekdb.utils.embedding_functions.litellm_embedding_function import LiteLLMEmbeddingFunction
+from pyseekdb.utils.embedding_functions.openai_base_embedding_function import OpenAIBaseEmbeddingFunction
 from typing import Any, Optional
 
+# Known Qwen embedding model dimensions
+# Source: Qwen/DashScope documentation
+_QWEN_MODEL_DIMENSIONS = {
+    "text-embedding-v1": 1536,
+    "text-embedding-v2": 1536,
+    "text-embedding-v3": 1024,  # default
+    "text-embedding-v4": 1024,  # default
+}
 
-class QwenEmbeddingFunction(LiteLLMEmbeddingFunction):
+
+class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     """
     A convenient embedding function for Qwen (Alibaba Cloud) embedding models.
 
-    This class provides a simplified interface to Qwen embedding models using LiteLLM.
+    This class provides a simplified interface to Qwen embedding models using the OpenAI-compatible API.
     Qwen provides OpenAI-compatible API endpoints for embedding generation.
 
     Example:
-        pip install pyseekdb litellm
+        pip install pyseekdb openai
 
     .. code-block:: python
         import pyseekdb
         from pyseekdb.utils.embedding_functions import QwenEmbeddingFunction
 
         # Using Qwen embedding model
-        # Set QWEN_API_KEY environment variable first
+        # Set DASHSCOPE_API_KEY environment variable first
         ef = QwenEmbeddingFunction(
             model_name="text-embedding-v1"
         )
@@ -25,8 +34,14 @@ class QwenEmbeddingFunction(LiteLLMEmbeddingFunction):
         # Using with custom api_key_env and additional parameters
         ef = QwenEmbeddingFunction(
             model_name="text-embedding-v1",
-            api_key_env="QWEN_API_KEY",
+            api_key_env="DASHSCOPE_API_KEY",
             timeout=30
+        )
+
+        # Using with custom dimensions
+        ef = QwenEmbeddingFunction(
+            model_name="text-embedding-v3",
+            dimensions=512  # Reduce from default 1024 to 512
         )
 
         db = pyseekdb.Client(path="./seekdb.db")
@@ -43,6 +58,8 @@ class QwenEmbeddingFunction(LiteLLMEmbeddingFunction):
         self,
         model_name: str,
         api_key_env: Optional[str] = None,
+        api_base: Optional[str] = None,
+        dimensions: Optional[int] = None,
         **kwargs: Any,
     ):
         """Initialize QwenEmbeddingFunction.
@@ -50,43 +67,51 @@ class QwenEmbeddingFunction(LiteLLMEmbeddingFunction):
         Args:
             model_name (str): Name of the Qwen embedding model.
                 Examples:
-                - "text-embedding-v1" (common Qwen embedding model)
-                - "text-embedding-v2" (if available)
+                - "text-embedding-v1"
+                - "text-embedding-v2"
+                - "text-embedding-v3"
+                - "text-embedding-v4"
                 - See Qwen documentation for available models
             api_key_env (str, optional): Name of the environment variable containing the Qwen API key.
-                Defaults to "QWEN_API_KEY" if not provided.
-            **kwargs: Additional arguments to pass to the LiteLLM embedding function.
+                Defaults to "DASHSCOPE_API_KEY" if not provided.
+            api_base (str, optional): Base URL for the Qwen API endpoint.
+                Defaults to "https://dashscope.aliyuncs.com/compatible-mode/v1" if not provided.
+            dimensions (int, optional): The number of dimensions the resulting embeddings should have.
+                Can reduce dimensions from default. You can check the Qwen official documentation for details.
+            **kwargs: Additional arguments to pass to the OpenAI client.
                 Common options include:
-                - api_base: Base URL for the Qwen API endpoint.
-                    Defaults to "https://dashscope.aliyuncs.com/compatible-mode/v1" if not provided.
-                - encoding_format: Encoding format for embeddings. Defaults to "float".
-                    Qwen API supports "float" or "base64".
                 - timeout: Request timeout in seconds
                 - max_retries: Maximum number of retries
-                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
+                - See https://github.com/openai/openai-python for more options
         """
-        # Set default api_key_env if not provided
-        if api_key_env is None:
-            api_key_env = "QWEN_API_KEY"
-
-        # Set default api_base if not provided
-        api_base_provided = "api_base" in kwargs
-        if not api_base_provided:
-            kwargs["api_base"] = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-
-        # For OpenAI-compatible APIs, LiteLLM needs to know the provider
-        # Use custom_llm_provider parameter instead of modifying model name
-        if "custom_llm_provider" not in kwargs:
-            kwargs["custom_llm_provider"] = "openai"
-
-        # Qwen API requires encoding_format to be explicitly set to "float" or "base64"
-        # We use "float" since we need float embeddings
-        if "encoding_format" not in kwargs:
-            kwargs["encoding_format"] = "float"
-
-        # Initialize parent class with Qwen-specific defaults
         super().__init__(
             model_name=model_name,
             api_key_env=api_key_env,
+            api_base=api_base,
+            dimensions=dimensions,
             **kwargs
         )
+
+    def _get_default_api_base(self) -> str:
+        """Get the default API base URL for Qwen.
+
+        Returns:
+            str: Default Qwen API base URL
+        """
+        return "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+    def _get_default_api_key_env(self) -> str:
+        """Get the default API key environment variable name for Qwen.
+
+        Returns:
+            str: Default Qwen API key environment variable name
+        """
+        return "DASHSCOPE_API_KEY"
+
+    def _get_model_dimensions(self) -> dict[str, int]:
+        """Get a dictionary mapping Qwen model names to their default dimensions.
+
+        Returns:
+            dict[str, int]: Dictionary mapping model names to dimensions
+        """
+        return _QWEN_MODEL_DIMENSIONS
