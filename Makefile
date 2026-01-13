@@ -1,9 +1,22 @@
 UV ?= uv
 
 .PHONY: install
-install: ## Install the virtual environment
+install: ## Install the virtual environment and pre-commit hooks
 	@echo ">> Installing dependencies"
 	@$(UV) sync --all-groups
+	@$(UV) run prek install
+
+.PHONY: check
+check: ## Run code quality tools
+	@echo ">> Checking lock file consistency with 'pyproject.toml'"
+	@$(UV) lock --locked
+	@echo ">> Running pre-commit hooks"
+	@$(UV) run prek run -a
+
+.PHONY: pre-commit
+pre-commit: ## Run pre-commit hooks via prek
+	@echo ">> Running pre-commit hooks"
+	@$(UV) run prek run -a
 
 .PHONY: demo
 demo: ## Run RAG demo (Streamlit)
