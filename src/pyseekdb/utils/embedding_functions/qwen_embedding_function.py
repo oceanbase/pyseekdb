@@ -6,8 +6,8 @@ from typing import Any, Optional
 _QWEN_MODEL_DIMENSIONS = {
     "text-embedding-v1": 1536,
     "text-embedding-v2": 1536,
-    "text-embedding-v3": 1024,  # default
-    "text-embedding-v4": 1024,  # default
+    "text-embedding-v3": 1024,  # default and can be changed via dimensions parameter
+    "text-embedding-v4": 1024,  # default and can be changed via dimensions parameter
 }
 
 

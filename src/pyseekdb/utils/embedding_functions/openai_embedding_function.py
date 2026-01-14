@@ -25,7 +25,7 @@ class OpenAIEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         import pyseekdb
         from pyseekdb.utils.embedding_functions import OpenAIEmbeddingFunction
 
-        # Using default model (text-embedding-ada-002)
+        # Using default model (text-embedding-3-small)
         # Set OPENAI_API_KEY environment variable first
         ef = OpenAIEmbeddingFunction()
 
