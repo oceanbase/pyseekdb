@@ -49,7 +49,7 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         # Add documents
         collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
         # Query using semantic search
-        results = collection.query("How are you?", top_k=1)
+        results = collection.query("How are you?", n_results=1)
         print(results)
 
     """

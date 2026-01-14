@@ -50,14 +50,14 @@ class OpenAIEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         # Add documents
         collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
         # Query using semantic search
-        results = collection.query("How are you?", top_k=1)
+        results = collection.query("How are you?", n_results=1)
         print(results)
 
     """
 
     def __init__(
         self,
-        model_name: str = "text-embedding-ada-002",
+        model_name: str = "text-embedding-3-small",
         api_key_env: Optional[str] = None,
         api_base: Optional[str] = None,
         dimensions: Optional[int] = None,
@@ -67,9 +67,9 @@ class OpenAIEmbeddingFunction(OpenAIBaseEmbeddingFunction):
 
         Args:
             model_name (str, optional): Name of the OpenAI embedding model.
-                Defaults to "text-embedding-ada-002".
+                Defaults to "text-embedding-3-small".
                 Other options include:
-                - "text-embedding-ada-002" (1536 dimensions, default)
+                - "text-embedding-ada-002" (1536 dimensions)
                 - "text-embedding-3-small" (1536 dimensions by default, can be reduced via dimensions parameter)
                 - "text-embedding-3-large" (3072 dimensions by default, can be reduced via dimensions parameter)
             api_key_env (str, optional): Name of the environment variable containing the OpenAI API key.

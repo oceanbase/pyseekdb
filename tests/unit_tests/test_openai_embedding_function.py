@@ -46,7 +46,7 @@ class TestOpenAIEmbeddingFunction:
         ef = OpenAIEmbeddingFunction()
         
         assert ef is not None
-        assert ef.model_name == "text-embedding-ada-002"
+        assert ef.model_name == "text-embedding-3-small"
         assert ef.api_key_env == "OPENAI_API_KEY"
         assert ef.api_base == "https://api.openai.com/v1"
         assert ef._dimensions_param is None
@@ -75,7 +75,7 @@ class TestOpenAIEmbeddingFunction:
 
         custom_key_env = "CUSTOM_OPENAI_KEY"
         if not os.environ.get(custom_key_env):
-            pytest.skip(f"{custom_key_env} environment variable is not set")
+            os.environ[custom_key_env] = "your-custom-key"
         
         ef = OpenAIEmbeddingFunction(api_key_env=custom_key_env)
         assert ef.api_key_env == custom_key_env
