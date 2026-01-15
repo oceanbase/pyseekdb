@@ -89,7 +89,9 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
         self.model_name = model_name
         self.api_key_env = api_key_env
         for key, value in kwargs.items():
-            if not isinstance(value, (str, int, float, bool, list, dict, tuple, type(None))):
+            if not isinstance(
+                value, (str, int, float, bool, list, dict, tuple, type(None))
+            ):
                 raise ValueError(f"Keyword argument {key} is not a primitive type")
         self.kwargs = kwargs
         self._embedding_func = embedding
@@ -112,11 +114,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
             return []
 
         # Prepare arguments for LiteLLM embedding function
-        embedding_kwargs = {
-            "model": self.model_name,
-            "input": input,
-            **self.kwargs
-        }
+        embedding_kwargs = {"model": self.model_name, "input": input, **self.kwargs}
 
         # Read API key from environment variable if specified
         if self.api_key_env is not None:
@@ -137,9 +135,9 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
         embeddings = []
 
         # Handle EmbeddingResponse object (most common case)
-        if hasattr(response, 'data'):
+        if hasattr(response, "data"):
             for item in response.data:
-                if hasattr(item, 'embedding'):
+                if hasattr(item, "embedding"):
                     embeddings.append(item.embedding)
                 elif isinstance(item, dict) and "embedding" in item:
                     embeddings.append(item["embedding"])
@@ -147,7 +145,9 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                     # Some providers might return the embedding vector directly
                     embeddings.append(item)
                 else:
-                    raise ValueError(f"Unexpected item format in LiteLLM response: {type(item)}")
+                    raise ValueError(
+                        f"Unexpected item format in LiteLLM response: {type(item)}"
+                    )
         # Handle dict response (backward compatibility)
         elif isinstance(response, dict) and "data" in response:
             for item in response["data"]:
@@ -157,7 +157,9 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                     # Some providers might return the embedding vector directly
                     embeddings.append(item)
                 else:
-                    raise ValueError(f"Unexpected item format in LiteLLM response: {type(item)}")
+                    raise ValueError(
+                        f"Unexpected item format in LiteLLM response: {type(item)}"
+                    )
         # Handle list response (backward compatibility)
         elif isinstance(response, list):
             for item in response:
@@ -166,9 +168,13 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                 elif isinstance(item, list):
                     embeddings.append(item)
                 else:
-                    raise ValueError(f"Unexpected item format in LiteLLM response: {type(item)}")
+                    raise ValueError(
+                        f"Unexpected item format in LiteLLM response: {type(item)}"
+                    )
         else:
-            raise ValueError(f"Unexpected response format from LiteLLM: {type(response)}")
+            raise ValueError(
+                f"Unexpected response format from LiteLLM: {type(response)}"
+            )
 
         # Validate that we got the expected number of embeddings
         if len(embeddings) != len(input):

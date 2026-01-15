@@ -1,4 +1,6 @@
-from pyseekdb.utils.embedding_functions.openai_base_embedding_function import OpenAIBaseEmbeddingFunction
+from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
+    OpenAIBaseEmbeddingFunction,
+)
 from typing import Any, Optional
 
 # Known OpenAI embedding model dimensions
@@ -91,7 +93,7 @@ class OpenAIEmbeddingFunction(OpenAIBaseEmbeddingFunction):
             api_key_env=api_key_env,
             api_base=api_base,
             dimensions=dimensions,
-            **kwargs
+            **kwargs,
         )
 
     def _get_default_api_base(self) -> str:

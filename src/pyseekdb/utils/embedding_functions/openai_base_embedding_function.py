@@ -82,11 +82,7 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         self._client_kwargs = kwargs
 
         # Initialize OpenAI client
-        self._client = OpenAI(
-            api_key=api_key,
-            base_url=api_base,
-            **kwargs
-        )
+        self._client = OpenAI(api_key=api_key, base_url=api_base, **kwargs)
 
         # Store original model name for dimension lookup
         self._model_name = model_name
@@ -99,9 +95,7 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         Returns:
             str: Default API base URL
         """
-        raise NotImplementedError(
-            "Subclasses must implement _get_default_api_base()"
-        )
+        raise NotImplementedError("Subclasses must implement _get_default_api_base()")
 
     def _get_default_api_key_env(self) -> str:
         """Get the default API key environment variable name for this provider.
@@ -154,8 +148,14 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(f"Failed to determine embedding dimension via API call: {e}")
-        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
+            raise RuntimeError(
+                f"Failed to determine embedding dimension via API call: {e}"
+            )
+        if (
+            not embeddings
+            or not isinstance(embeddings, list)
+            or not isinstance(embeddings[0], list)
+        ):
             raise RuntimeError("Could not get embedding dimension from API response")
         return len(embeddings[0])
 
