@@ -53,7 +53,7 @@ class EmbeddingFunction(Protocol[D]):
     Implementations should convert text documents to vector embeddings.
 
     Example:
-        >>> class MyEmbeddingFunction:
+        >>> class MyEmbeddingFunction(EmbeddingFunction[Documents]):
         ...     def __call__(self, input: Documents) -> Embeddings:
         ...         # Convert documents to embeddings
         ...         return [[0.1, 0.2, ...], [0.3, 0.4, ...]]
@@ -97,7 +97,7 @@ def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
             )
 
 
-class DefaultEmbeddingFunction:
+class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
     """
     Default embedding function using ONNX runtime.
 
@@ -272,12 +272,12 @@ class DefaultEmbeddingFunction:
                     logger.warning(
                         f"Failed to download {hf_filename} from Hugging Face: {e}"
                     )
-                    # 如果下载失败，尝试删除部分下载的文件
+                    # If download fails, try to delete partially downloaded file
                     if os.path.exists(local_path):
                         os.remove(local_path)
                     return False
 
-            # 验证关键文件是否存在
+            # Verify critical files exist
             if not os.path.exists(os.path.join(extracted_folder, "model.onnx")):
                 logger.error("model.onnx not found after download")
                 return False
