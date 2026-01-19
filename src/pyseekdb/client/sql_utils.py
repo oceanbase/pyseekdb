@@ -8,6 +8,22 @@ from typing import Any, Sequence
 from pymysql.converters import escape_string
 
 
+def escape_percent_for_sql(value: str) -> str:
+    """
+    Escape percent signs in SQL string values to prevent format string interpretation.
+
+    When pymysql's cursor.execute() processes SQL strings, it may interpret % as format
+    specifiers. This function escapes % to %% to prevent that.
+
+    Args:
+        value: String value that may contain % characters
+
+    Returns:
+        String with % escaped as %%
+    """
+    return value.replace("%", "%%")
+
+
 def is_query_sql(sql: str) -> bool:
     if not sql:
         return False

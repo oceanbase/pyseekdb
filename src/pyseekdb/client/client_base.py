@@ -1794,7 +1794,9 @@ class BaseClient(BaseConnection, AdminAPI):
             for id_val in id_list:
                 if not isinstance(id_val, str):
                     id_val = str(id_val)
-                processed_ids.append(self._convert_id_to_sql(id_val))
+                id_sql, id_param = self._convert_id_to_sql_with_paramters(id_val)
+                processed_ids.append(id_sql)
+                params.append(id_param)
 
             where_clauses.append(f"_id IN ({','.join(processed_ids)})")
 
@@ -1857,6 +1859,12 @@ class BaseClient(BaseConnection, AdminAPI):
         id_val_escaped = escape_string(id_val)
         # Use CAST to convert string to binary for varbinary(512) field
         return f"CAST('{id_val_escaped}' AS BINARY)"
+
+    def _convert_id_to_sql_with_paramters(self, id_val: str) -> (str, str):
+        """
+        Convert ID to SQL format for varbinary(512) _id field with parameters
+        """
+        return f"CAST(%s AS BINARY)", escape_string(id_val)
 
     def _convert_id_from_bytes(self, record_id: Any) -> str:
         """
@@ -2318,7 +2326,7 @@ class BaseClient(BaseConnection, AdminAPI):
         if "embeddings" in include_fields:
             result["embeddings"] = result_embeddings
 
-        logger.info(
+        logger.debug(
             f"✅ Get completed for '{collection_name}', found {len(result_ids)} results"
         )
         return result
