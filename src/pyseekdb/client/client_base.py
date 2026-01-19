@@ -1878,7 +1878,7 @@ class BaseClient(BaseConnection, AdminAPI):
         """
         Convert ID to SQL format for varbinary(512) _id field with parameters
         """
-        return f"CAST(%s AS BINARY)", escape_string(id_val)
+        return f"CAST(%s AS BINARY)", (id_val)
 
     def _convert_id_from_bytes(self, record_id: Any) -> str:
         """
