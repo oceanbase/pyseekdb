@@ -87,3 +87,52 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         )
 
         return [embedding.tolist() for embedding in embeddings]
+
+    @staticmethod
+    def name() -> str:
+        """Get the unique name identifier for SentenceTransformerEmbeddingFunction.
+
+        Returns:
+            The name identifier for this embedding function type
+        """
+        return "sentence_transformer"
+
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for the SentenceTransformerEmbeddingFunction.
+
+        Returns:
+            Dictionary containing configuration needed to restore this embedding function
+        """
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "normalize_embeddings": self.normalize_embeddings,
+            "kwargs": self.kwargs,
+        }
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "SentenceTransformerEmbeddingFunction":
+        """Build a SentenceTransformerEmbeddingFunction from its configuration dictionary.
+
+        Args:
+            config: Dictionary containing the embedding function's configuration
+
+        Returns:
+            Restored SentenceTransformerEmbeddingFunction instance
+
+        Raises:
+            ValueError: If the configuration is invalid or missing required fields
+        """
+        model_name = config.get("model_name", "all-MiniLM-L6-v2")
+        device = config.get("device", "cpu")
+        normalize_embeddings = config.get("normalize_embeddings", False)
+        kwargs = config.get("kwargs", {})
+        if not isinstance(kwargs, dict):
+            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+
+        return SentenceTransformerEmbeddingFunction(
+            model_name=model_name,
+            device=device,
+            normalize_embeddings=normalize_embeddings,
+            **kwargs
+        )

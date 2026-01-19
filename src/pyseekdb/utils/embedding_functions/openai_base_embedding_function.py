@@ -1,5 +1,5 @@
 from pyseekdb.client.embedding_function import EmbeddingFunction, Embeddings, Documents
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 import os
 
 
@@ -199,3 +199,20 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
             )
 
         return embeddings
+
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Get the configuration dictionary for the OpenAIBaseEmbeddingFunction.
+
+        Subclasses should override the name() method to provide the correct name for routing.
+
+        Returns:
+            Dictionary containing configuration needed to restore this embedding function
+        """
+        return {
+            "model_name": self.model_name,
+            "api_key_env": self.api_key_env,
+            "api_base": self.api_base,
+            "dimensions": self._dimensions_param,
+            "client_kwargs": self._client_kwargs,
+        }

@@ -45,6 +45,10 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install depencies for unit tests
+        run: |
+          uv run pip install openai sentence-transformers torch torchvision torchaudio
+
       - name: Run unit tests
         run: |
           uv run pytest tests/unit_tests/ -v --log-cli-level=INFO

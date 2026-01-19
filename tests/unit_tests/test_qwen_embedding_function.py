@@ -15,12 +15,22 @@ import os
 
 from pyseekdb.utils.embedding_functions import QwenEmbeddingFunction
 from pyseekdb.client.embedding_function import dimension_of
+from .test_utils import env_guard
+import importlib.util
 
+def is_openai_available() -> bool:
+    """
+    Check if openai is available for testing.
+
+    Returns:
+        True if openai is available, False otherwise.
+    """
+    return importlib.util.find_spec("openai") is not None
 
 # Skip this test by default - it requires external API access and API keys
 @pytest.mark.skipif(
-    not os.environ.get("DASHSCOPE_API_KEY"),
-    reason="DASHSCOPE_API_KEY environment variable must be set",
+    not os.environ.get("DASHSCOPE_API_KEY") or not is_openai_available(),
+    reason="DASHSCOPE_API_KEY environment variable must be set"
 )
 class TestQwenEmbeddingFunction:
     """Test QwenEmbeddingFunction - skipped by default, requires manual execution"""
@@ -338,6 +348,117 @@ class TestQwenEmbeddingFunction:
         assert dimensions["text-embedding-v3"] == 1024
         assert dimensions["text-embedding-v4"] == 1024
         print(f"   Model dimensions: {dimensions}")
+
+@pytest.mark.skipif(
+    not is_openai_available(),
+    reason="openai is not available on this system"
+)
+class TestQwenEmbeddingFunctionPersistence:
+    """Test persistence for QwenEmbeddingFunction"""
+
+    def test_name(self):
+        """Test that name() returns the correct identifier"""
+        assert QwenEmbeddingFunction.name() == "qwen"
+
+    def test_get_config_with_defaults(self):
+        """Test that get_config() returns correct config with default values"""
+        with env_guard(DASHSCOPE_API_KEY="test-key"):
+            ef = QwenEmbeddingFunction(model_name="text-embedding-v1")
+            config = ef.get_config()
+
+            assert isinstance(config, dict)
+            assert config["model_name"] == "text-embedding-v1"
+            assert config["api_key_env"] == "DASHSCOPE_API_KEY"
+            assert config["api_base"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            assert config["dimensions"] is None
+            assert isinstance(config["client_kwargs"], dict)
+            # name should NOT be in config
+            assert "name" not in config
+
+    def test_get_config_with_custom_values(self):
+        """Test that get_config() returns correct config with custom values"""
+        with env_guard(CUSTOM_QWEN_KEY="test-key"):
+            ef = QwenEmbeddingFunction(
+                model_name="text-embedding-v3",
+                api_key_env="CUSTOM_QWEN_KEY",
+                api_base="https://custom-dashscope.com/v1",
+                dimensions=512,
+                timeout=60
+            )
+            config = ef.get_config()
+
+            assert config["model_name"] == "text-embedding-v3"
+            assert config["api_key_env"] == "CUSTOM_QWEN_KEY"
+            assert config["api_base"] == "https://custom-dashscope.com/v1"
+            assert config["dimensions"] == 512
+            assert config["client_kwargs"]["timeout"] == 60
+
+    def test_get_config_with_dimensions(self):
+        """Test that get_config() correctly includes dimensions parameter"""
+        with env_guard(DASHSCOPE_API_KEY="test-key"):
+            ef = QwenEmbeddingFunction(
+                model_name="text-embedding-v3",
+                dimensions=256
+            )
+            config = ef.get_config()
+
+            assert config["dimensions"] == 256
+
+    def test_build_from_config_with_defaults(self):
+        """Test that build_from_config() restores instance with default values"""
+        config = {
+            "model_name": "text-embedding-v1",
+            "api_key_env": "DASHSCOPE_API_KEY",
+            "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "dimensions": None,
+            "client_kwargs": {}
+        }
+
+        with env_guard(DASHSCOPE_API_KEY="test-key"):
+            restored_ef = QwenEmbeddingFunction.build_from_config(config)
+
+            assert isinstance(restored_ef, QwenEmbeddingFunction)
+            assert restored_ef.model_name == "text-embedding-v1"
+            assert restored_ef.api_key_env == "DASHSCOPE_API_KEY"
+            assert restored_ef.api_base == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            assert restored_ef._dimensions_param is None
+
+    def test_build_from_config_with_custom_values(self):
+        """Test that build_from_config() restores instance with custom values"""
+        config = {
+            "model_name": "text-embedding-v3",
+            "api_key_env": "CUSTOM_QWEN_KEY",
+            "api_base": "https://custom-dashscope.com/v1",
+            "dimensions": 512,
+            "client_kwargs": {"timeout": 60}
+        }
+
+        with env_guard(CUSTOM_QWEN_KEY="test-key"):
+            restored_ef = QwenEmbeddingFunction.build_from_config(config)
+
+            assert isinstance(restored_ef, QwenEmbeddingFunction)
+            assert restored_ef.model_name == "text-embedding-v3"
+            assert restored_ef.api_key_env == "CUSTOM_QWEN_KEY"
+            assert restored_ef.api_base == "https://custom-dashscope.com/v1"
+            assert restored_ef._dimensions_param == 512
+            assert restored_ef._client_kwargs["timeout"] == 60
+
+    def test_persistence_roundtrip(self):
+        """Test complete roundtrip: get_config -> build_from_config"""
+        with env_guard(DASHSCOPE_API_KEY="test-key"):
+            original_ef = QwenEmbeddingFunction(
+                model_name="text-embedding-v1",
+                dimensions=256
+            )
+
+            config = original_ef.get_config()
+            restored_ef = QwenEmbeddingFunction.build_from_config(config)
+
+            assert isinstance(restored_ef, QwenEmbeddingFunction)
+            assert restored_ef.model_name == original_ef.model_name
+            assert restored_ef.api_key_env == original_ef.api_key_env
+            assert restored_ef.api_base == original_ef.api_base
+            assert restored_ef._dimensions_param == original_ef._dimensions_param
 
 
 if __name__ == "__main__":

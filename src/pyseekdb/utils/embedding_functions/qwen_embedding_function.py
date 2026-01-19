@@ -117,3 +117,52 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
             dict[str, int]: Dictionary mapping model names to dimensions
         """
         return _QWEN_MODEL_DIMENSIONS
+
+    @staticmethod
+    def name() -> str:
+        """Get the unique name identifier for QwenEmbeddingFunction.
+
+        Returns:
+            The name identifier for this embedding function type
+        """
+        return "qwen"
+
+    def get_config(self) -> dict[str, Any]:
+        """Get the configuration dictionary for the QwenEmbeddingFunction.
+
+        Returns:
+            Dictionary containing configuration needed to restore this embedding function
+        """
+        return super().get_config()
+
+    @staticmethod
+    def build_from_config(config: dict[str, Any]) -> "QwenEmbeddingFunction":
+        """Build a QwenEmbeddingFunction from its configuration dictionary.
+
+        Args:
+            config: Dictionary containing the embedding function's configuration
+
+        Returns:
+            Restored QwenEmbeddingFunction instance
+
+        Raises:
+            ValueError: If the configuration is invalid or missing required fields
+        """
+        model_name = config.get("model_name")
+        if model_name is None:
+            raise ValueError("Missing required field 'model_name' in configuration")
+
+        api_key_env = config.get("api_key_env")
+        api_base = config.get("api_base")
+        dimensions = config.get("dimensions")
+        client_kwargs = config.get("client_kwargs", {})
+        if not isinstance(client_kwargs, dict):
+            raise ValueError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
+
+        return QwenEmbeddingFunction(
+            model_name=model_name,
+            api_key_env=api_key_env,
+            api_base=api_base,
+            dimensions=dimensions,
+            **client_kwargs
+        )

@@ -5,7 +5,7 @@ description = "A unified Python client for seekdb that supports embedded, server
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "OceanBase", email = "open_oceanbase@oceanbase.com" }]
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.11,<3.14"
 classifiers = [
     "Development Status :: 4 - Beta",
 ]

@@ -21,7 +21,9 @@ from typing import (
     TypeVar,
     cast,
     Any,
+    Dict
 )
+from abc import abstractmethod
 
 import numpy as np
 import numpy.typing as npt
@@ -52,16 +54,32 @@ class EmbeddingFunction(Protocol[D]):
     This is similar to Chroma's EmbeddingFunction interface.
     Implementations should convert text documents to vector embeddings.
 
+    Implementations should also provide:
+    - `name()`: Static method that returns a unique name identifier for routing (not persisted in config)
+    - `get_config()`: Instance method that returns a configuration dictionary
+    - `build_from_config(config)`: Static method that restores an instance from config
+
     Example:
         >>> class MyEmbeddingFunction(EmbeddingFunction[Documents]):
+        ...     @staticmethod
+        ...     def name() -> str:
+        ...         return "my_embedding_function"
         ...     def __call__(self, input: Documents) -> Embeddings:
         ...         # Convert documents to embeddings
         ...         return [[0.1, 0.2, ...], [0.3, 0.4, ...]]
+        ...     def get_config(self) -> Dict[str, Any]:
+        ...         return {...}  # Note: 'name' is not included
+        ...     @staticmethod
+        ...     def build_from_config(config: Dict[str, Any]) -> "MyEmbeddingFunction":
+        ...         return MyEmbeddingFunction(...)
         >>>
         >>> ef = MyEmbeddingFunction()
         >>> embeddings = ef(["Hello", "World"])
+        >>> config = ef.get_config()
+        >>> restored_ef = MyEmbeddingFunction.build_from_config(config)
     """
 
+    @abstractmethod
     def __call__(self, input: D) -> Embeddings:
         """
         Convert input documents to embeddings.
@@ -74,6 +92,19 @@ class EmbeddingFunction(Protocol[D]):
         """
         ...
 
+    @abstractmethod
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Get the configuration dictionary for the embedding function.
+
+        This method should return a dictionary that contains all the information
+        needed to restore the embedding function after restart.
+
+        Returns:
+            Dictionary containing the embedding function's configuration.
+            Note: The 'name' field is not included as it's handled by the upper layer for routing.
+        """
+        ...
 
 def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
     """
@@ -501,6 +532,17 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
 
         # Convert numpy arrays to lists
         return [embedding.tolist() for embedding in embeddings]
+
+    @staticmethod
+    def name() -> str:
+        return "default"
+
+    def get_config(self) -> Dict[str, Any]:
+        return {}
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "DefaultEmbeddingFunction":
+        return DefaultEmbeddingFunction()
 
     def __repr__(self) -> str:
         return f"DefaultEmbeddingFunction(model_name='{self.model_name}')"
