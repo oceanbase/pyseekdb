@@ -391,10 +391,10 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.info(f"Creating database: {name}{self._database_context(effective_tenant)}")
+        logger.debug(f"Creating database: {name}{self._database_context(effective_tenant)}")
         sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
         self._execute(sql)
-        logger.info(f"✅ Database created: {name}{self._database_context(effective_tenant)}")
+        logger.debug(f"✅ Database created: {name}{self._database_context(effective_tenant)}")
 
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
@@ -405,7 +405,7 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.info(f"Getting database: {name}{self._database_context(effective_tenant)}")
+        logger.debug(f"Getting database: {name}{self._database_context(effective_tenant)}")
         sql = (
             "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME "
             "FROM information_schema.SCHEMATA "
@@ -436,10 +436,10 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.info(f"Deleting database: {name}{self._database_context(effective_tenant)}")
+        logger.debug(f"Deleting database: {name}{self._database_context(effective_tenant)}")
         sql = f"DROP DATABASE IF EXISTS `{name}`"
         self._execute(sql)
-        logger.info(f"✅ Database deleted: {name}{self._database_context(effective_tenant)}")
+        logger.debug(f"✅ Database deleted: {name}{self._database_context(effective_tenant)}")
 
     def list_databases(
         self,
@@ -456,7 +456,7 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.info(f"Listing databases{self._database_context(effective_tenant)}")
+        logger.debug(f"Listing databases{self._database_context(effective_tenant)}")
         sql = "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA"
 
         if limit is not None:
@@ -479,7 +479,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 collation=collation,
             ))
 
-        logger.info(f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}")
+        logger.debug(f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}")
         return databases
     # ==================== Collection Management (User-facing) ====================
 
