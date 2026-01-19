@@ -366,8 +366,7 @@ class BaseClient(BaseConnection, AdminAPI):
         return f" in tenant: {tenant}" if tenant else ""
 
     def _parse_schema_row(
-        self,
-        row: Any
+        self, row: Any
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         if isinstance(row, dict):
             return (
@@ -391,10 +390,14 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.debug(f"Creating database: {name}{self._database_context(effective_tenant)}")
+        logger.debug(
+            f"Creating database: {name}{self._database_context(effective_tenant)}"
+        )
         sql = f"CREATE DATABASE IF NOT EXISTS `{name}`"
         self._execute(sql)
-        logger.debug(f"✅ Database created: {name}{self._database_context(effective_tenant)}")
+        logger.debug(
+            f"✅ Database created: {name}{self._database_context(effective_tenant)}"
+        )
 
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
@@ -405,7 +408,9 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.debug(f"Getting database: {name}{self._database_context(effective_tenant)}")
+        logger.debug(
+            f"Getting database: {name}{self._database_context(effective_tenant)}"
+        )
         sql = (
             "SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME "
             "FROM information_schema.SCHEMATA "
@@ -436,16 +441,20 @@ class BaseClient(BaseConnection, AdminAPI):
             tenant: tenant name (for OceanBase)
         """
         effective_tenant = self._database_tenant(tenant)
-        logger.debug(f"Deleting database: {name}{self._database_context(effective_tenant)}")
+        logger.debug(
+            f"Deleting database: {name}{self._database_context(effective_tenant)}"
+        )
         sql = f"DROP DATABASE IF EXISTS `{name}`"
         self._execute(sql)
-        logger.debug(f"✅ Database deleted: {name}{self._database_context(effective_tenant)}")
+        logger.debug(
+            f"✅ Database deleted: {name}{self._database_context(effective_tenant)}"
+        )
 
     def list_databases(
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        tenant: str = DEFAULT_TENANT
+        tenant: str = DEFAULT_TENANT,
     ) -> Sequence[Database]:
         """
         List all databases
@@ -472,15 +481,20 @@ class BaseClient(BaseConnection, AdminAPI):
             db_name, charset, collation = self._parse_schema_row(row)
             if not db_name:
                 continue
-            databases.append(Database(
-                name=db_name,
-                tenant=effective_tenant,
-                charset=charset,
-                collation=collation,
-            ))
+            databases.append(
+                Database(
+                    name=db_name,
+                    tenant=effective_tenant,
+                    charset=charset,
+                    collation=collation,
+                )
+            )
 
-        logger.debug(f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}")
+        logger.debug(
+            f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}"
+        )
         return databases
+
     # ==================== Collection Management (User-facing) ====================
 
     def create_collection(
@@ -2003,7 +2017,7 @@ class BaseClient(BaseConnection, AdminAPI):
             return None
         finally:
             cursor.close()
-    
+
     # -------------------- DQL Operations (Common Implementation) --------------------
 
     def _collection_query(

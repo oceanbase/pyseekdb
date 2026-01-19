@@ -157,12 +157,14 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         dimensions = config.get("dimensions")
         client_kwargs = config.get("client_kwargs", {})
         if not isinstance(client_kwargs, dict):
-            raise ValueError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
+            raise ValueError(
+                f"client_kwargs must be a dictionary, but got {client_kwargs}"
+            )
 
         return QwenEmbeddingFunction(
             model_name=model_name,
             api_key_env=api_key_env,
             api_base=api_base,
             dimensions=dimensions,
-            **client_kwargs
+            **client_kwargs,
         )

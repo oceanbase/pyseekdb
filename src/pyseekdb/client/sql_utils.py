@@ -42,9 +42,7 @@ def render_sql_with_params(sql: str, params: Sequence[Any]) -> str:
     parts = sql.split("%s")
     placeholder_count = len(parts) - 1
     if placeholder_count != len(params):
-        raise ValueError(
-            f"Expected {placeholder_count} parameters, got {len(params)}"
-        )
+        raise ValueError(f"Expected {placeholder_count} parameters, got {len(params)}")
     rendered_parts = [parts[0]]
     for param, part in zip(params, parts[1:]):
         if param is None:

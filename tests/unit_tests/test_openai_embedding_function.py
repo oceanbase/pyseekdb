@@ -18,6 +18,7 @@ from pyseekdb.client.embedding_function import dimension_of
 from .test_utils import env_guard
 import importlib.util
 
+
 def is_openai_available() -> bool:
     """
     Check if openai is available for testing.
@@ -27,10 +28,11 @@ def is_openai_available() -> bool:
     """
     return importlib.util.find_spec("openai") is not None
 
+
 # Skip this test by default - it requires external API access and API keys
 @pytest.mark.skipif(
     not os.environ.get("OPENAI_API_KEY") or not is_openai_available(),
-    reason="OPENAI_API_KEY environment variable must be set"
+    reason="OPENAI_API_KEY environment variable must be set",
 )
 class TestOpenAIEmbeddingFunction:
     """Test OpenAIEmbeddingFunction - skipped by default, requires manual execution"""
@@ -382,9 +384,9 @@ class TestOpenAIEmbeddingFunction:
             )
             print(f"   {model_name}: {ef.dimension} dimensions")
 
+
 @pytest.mark.skipif(
-    not is_openai_available(),
-    reason="openai is not available on this system"
+    not is_openai_available(), reason="openai is not available on this system"
 )
 class TestOpenAIEmbeddingFunctionPersistence:
     """Test persistence for OpenAIEmbeddingFunction"""
@@ -417,7 +419,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
                 api_base="https://custom-api.openai.com/v1",
                 dimensions=512,
                 timeout=60,
-                max_retries=5
+                max_retries=5,
             )
             config = ef.get_config()
 
@@ -432,8 +434,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
         """Test that get_config() correctly includes dimensions parameter"""
         with env_guard(OPENAI_API_KEY="test-key"):
             ef = OpenAIEmbeddingFunction(
-                model_name="text-embedding-3-small",
-                dimensions=256
+                model_name="text-embedding-3-small", dimensions=256
             )
             config = ef.get_config()
 
@@ -446,7 +447,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
             "api_key_env": "OPENAI_API_KEY",
             "api_base": "https://api.openai.com/v1",
             "dimensions": None,
-            "client_kwargs": {}
+            "client_kwargs": {},
         }
 
         with env_guard(OPENAI_API_KEY="test-key"):
@@ -465,7 +466,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
             "api_key_env": "CUSTOM_OPENAI_KEY",
             "api_base": "https://custom-api.openai.com/v1",
             "dimensions": 512,
-            "client_kwargs": {"timeout": 60, "max_retries": 5}
+            "client_kwargs": {"timeout": 60, "max_retries": 5},
         }
 
         with env_guard(CUSTOM_OPENAI_KEY="test-key"):
@@ -483,8 +484,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
         """Test complete roundtrip: get_config -> build_from_config"""
         with env_guard(OPENAI_API_KEY="test-key"):
             original_ef = OpenAIEmbeddingFunction(
-                model_name="text-embedding-3-small",
-                dimensions=256
+                model_name="text-embedding-3-small", dimensions=256
             )
 
             config = original_ef.get_config()
@@ -495,6 +495,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
             assert restored_ef.api_key_env == original_ef.api_key_env
             assert restored_ef.api_base == original_ef.api_base
             assert restored_ef._dimensions_param == original_ef._dimensions_param
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

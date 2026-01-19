@@ -3,6 +3,7 @@ Test utilities for pyseekdb unit tests.
 
 Provides helper classes and functions for testing, including environment variable management.
 """
+
 import os
 from contextlib import contextmanager
 from typing import Dict, Optional

@@ -111,7 +111,9 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         }
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "SentenceTransformerEmbeddingFunction":
+    def build_from_config(
+        config: Dict[str, Any],
+    ) -> "SentenceTransformerEmbeddingFunction":
         """Build a SentenceTransformerEmbeddingFunction from its configuration dictionary.
 
         Args:
@@ -134,5 +136,5 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
             model_name=model_name,
             device=device,
             normalize_embeddings=normalize_embeddings,
-            **kwargs
+            **kwargs,
         )

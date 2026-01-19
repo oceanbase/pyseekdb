@@ -97,7 +97,7 @@ class RemoteServerClient(BaseClient):
     def is_connected(self) -> bool:
         """Check connection status"""
         return self._connection is not None and self._connection.open
-    
+
     def get_raw_connection(self) -> pymysql.Connection:
         """Get raw connection object"""
         return self._ensure_connection()
@@ -146,7 +146,7 @@ class RemoteServerClient(BaseClient):
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
         return super().create_database(name=name, tenant=tenant)
-    
+
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
         Get database object (remote server has tenant concept, uses client's tenant)
@@ -162,7 +162,7 @@ class RemoteServerClient(BaseClient):
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
         return super().get_database(name=name, tenant=tenant)
-    
+
     def delete_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
         """
         Delete database (remote server has tenant concept, uses client's tenant)
@@ -175,7 +175,7 @@ class RemoteServerClient(BaseClient):
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
         return super().delete_database(name=name, tenant=tenant)
-    
+
     def list_databases(
         self,
         limit: Optional[int] = None,
@@ -204,7 +204,7 @@ class RemoteServerClient(BaseClient):
                 f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant"
             )
         return self.tenant
-    
+
     def __repr__(self):
         status = "connected" if self.is_connected() else "disconnected"
         return f"<RemoteServerClient {self.full_user}@{self.host}:{self.port}/{self.database} status={status}>"

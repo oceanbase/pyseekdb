@@ -47,6 +47,7 @@ from .hybrid_search import (
 
 logger = logging.getLogger(__name__)
 
+
 def _resolve_password(password: str) -> str:
     """Get password from env if not provided (keeps existing behavior)."""
     return password or os.environ.get("SEEKDB_PASSWORD", "")
@@ -77,9 +78,9 @@ def _create_server_client(
     """
     if path is not None:
         if is_admin:
-            logger.info(f"Creating embedded admin client: path={path}")
+            logger.debug(f"Creating embedded admin client: path={path}")
         else:
-            logger.info(f"Creating embedded client: path={path}, database={database}")
+            logger.debug(f"Creating embedded client: path={path}, database={database}")
         return SeekdbEmbeddedClient(path=path, database=database, **kwargs)
 
     if host is not None:
@@ -89,9 +90,13 @@ def _create_server_client(
         if user is None:
             user = "root"
         if is_admin:
-            logger.info(f"Creating remote server admin client: {user}@{tenant}@{host}:{port}")
+            logger.debug(
+                f"Creating remote server admin client: {user}@{tenant}@{host}:{port}"
+            )
         else:
-            logger.info(f"Creating remote server client: {user}@{tenant}@{host}:{port}/{database}")
+            logger.debug(
+                f"Creating remote server client: {user}@{tenant}@{host}:{port}/{database}"
+            )
         return RemoteServerClient(
             host=host,
             port=port,
@@ -108,15 +113,20 @@ def _create_server_client(
     if _PYLIBSEEKDB_AVAILABLE:
         default_path = _default_seekdb_path()
         if is_admin:
-            logger.info(f"Creating embedded admin client (default): path={default_path}")
+            logger.debug(
+                f"Creating embedded admin client (default): path={default_path}"
+            )
         else:
-            logger.info(f"Creating embedded client (default): path={default_path}, database={database}")
+            logger.debug(
+                f"Creating embedded client (default): path={default_path}, database={database}"
+            )
         return SeekdbEmbeddedClient(path=default_path, database=database, **kwargs)
 
     raise ValueError(
         "Default embedded mode is not available because pylibseekdb could not be imported. "
         "Please provide host/port parameters to use RemoteServerClient."
     )
+
 
 __all__ = [
     "BaseConnection",

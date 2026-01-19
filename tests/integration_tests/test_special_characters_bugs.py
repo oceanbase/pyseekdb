@@ -39,27 +39,23 @@ class TestSpecialCharactersBugs:
             "Single\\backslash",
             "\\Backslash at start",
             "Backslash at end\\",
-
             # Multiple consecutive backslashes
             "Double\\\\backslash",
             "Triple\\\\\\backslash",
             "Four\\\\\\\\backslashes",
             "Five\\\\\\\\\\backslashes",
             "Many\\\\\\\\\\\\backslashes",
-
             # Backslashes in paths (common use case)
             "Path: C:\\Users\\Documents\\file.txt",
             "Unix path: /home/user\\file.txt",
             "Network path: \\\\server\\share\\file.txt",
             "Relative path: ..\\..\\parent\\file.txt",
             "Deep path: C:\\Users\\Documents\\Projects\\2024\\file.txt",
-
             # Multiple backslashes in different positions
             "Multiple\\backslashes\\here",
             "Start\\middle\\end",
             "\\a\\b\\c\\d\\e",
             "Text\\with\\many\\separated\\backslashes",
-
             # Backslashes with escape sequences
             "Escaped\\nnewline",
             "Escaped\\ttab",
@@ -67,12 +63,10 @@ class TestSpecialCharactersBugs:
             "Mixed\\t\\r\\ncharacters",
             "All\\n\\t\\r\\v\\f",
             "test single quote: \\'",
-
             # Consecutive backslashes in escape sequences
             "Double\\\\nnewline",
             "Triple\\\\\\nnewline",
             "Mixed\\\\t\\n\\r",
-
             # Edge cases
             "Only\\\\backslashes",
             "\\",
@@ -80,21 +74,18 @@ class TestSpecialCharactersBugs:
             "\\\\\\",
             "\\\\\\\\",
             "\\\\\\\\\\",
-
             # Backslashes with other special characters
             "Backslash\\and%percent",
-            "Backslash\\and\"quote",
+            'Backslash\\and"quote',
             "Backslash\\and'apostrophe",
             "Backslash\\and\\backslash",
-
             # Long strings with many backslashes
             "\\".join(["part1", "part2", "part3", "part4", "part5"]),
             "C:\\" + "\\".join([f"folder{i}" for i in range(10)]),
-
             # Real-world scenarios
             "Windows path: C:\\Program Files\\MyApp\\config\\settings.ini",
             "Regex pattern: \\d+\\s+\\w+",
-            "JSON string: {\"path\": \"C:\\\\Users\\\\file.txt\"}",
+            'JSON string: {"path": "C:\\\\Users\\\\file.txt"}',
             "Command: cd C:\\Users\\Documents && dir",
         ]
 
@@ -114,11 +105,19 @@ class TestSpecialCharactersBugs:
 
                 # Verify insertion succeeded
                 results = collection.get(ids=test_id)
-                assert len(results["ids"]) == 1, f"Failed to insert document with backslash: {doc_with_backslash}"
-                assert results["documents"][0] == doc_with_backslash, f"Document content mismatch: expected {repr(doc_with_backslash)}, got {repr(results['documents'][0])}"
-                print(f"    ✅ Successfully inserted and verified: {repr(doc_with_backslash)}")
+                assert len(results["ids"]) == 1, (
+                    f"Failed to insert document with backslash: {doc_with_backslash}"
+                )
+                assert results["documents"][0] == doc_with_backslash, (
+                    f"Document content mismatch: expected {repr(doc_with_backslash)}, got {repr(results['documents'][0])}"
+                )
+                print(
+                    f"    ✅ Successfully inserted and verified: {repr(doc_with_backslash)}"
+                )
             except Exception as e:
-                print(f"    ❌ FAILED to insert document with backslash: {repr(doc_with_backslash)}")
+                print(
+                    f"    ❌ FAILED to insert document with backslash: {repr(doc_with_backslash)}"
+                )
                 print(f"       Error: {e}")
                 raise
 
@@ -164,23 +163,35 @@ class TestSpecialCharactersBugs:
 
                 # Verify insertion succeeded
                 results = collection.get(ids=id_with_percent)
-                assert len(results["ids"]) == 1, f"Failed to insert with ID containing percent: {id_with_percent}"
-                assert results["ids"][0] == id_with_percent, f"ID mismatch: expected {repr(id_with_percent)}, got {repr(results['ids'][0])}"
-                print(f"    ✅ Successfully inserted and verified ID: {repr(id_with_percent)}")
+                assert len(results["ids"]) == 1, (
+                    f"Failed to insert with ID containing percent: {id_with_percent}"
+                )
+                assert results["ids"][0] == id_with_percent, (
+                    f"ID mismatch: expected {repr(id_with_percent)}, got {repr(results['ids'][0])}"
+                )
+                print(
+                    f"    ✅ Successfully inserted and verified ID: {repr(id_with_percent)}"
+                )
             except ValueError as e:
                 # This is the expected bug - ValueError about unsupported format character
                 error_msg = str(e)
                 if "unsupported format character" in error_msg or "%" in error_msg:
-                    print(f"    ❌ BUG REPRODUCED: Failed to insert with ID containing percent: {repr(id_with_percent)}")
+                    print(
+                        f"    ❌ BUG REPRODUCED: Failed to insert with ID containing percent: {repr(id_with_percent)}"
+                    )
                     print(f"       Error type: {type(e).__name__}")
                     print(f"       Error message: {error_msg}")
-                    print(f"       This confirms the bug - percent signs in IDs cause formatting errors")
+                    print(
+                        f"       This confirms the bug - percent signs in IDs cause formatting errors"
+                    )
                     raise
                 else:
                     # Different ValueError, re-raise
                     raise
             except Exception as e:
-                print(f"    ❌ FAILED to insert with ID containing percent: {repr(id_with_percent)}")
+                print(
+                    f"    ❌ FAILED to insert with ID containing percent: {repr(id_with_percent)}"
+                )
                 print(f"       Error type: {type(e).__name__}")
                 print(f"       Error message: {e}")
                 raise
@@ -228,11 +239,19 @@ class TestSpecialCharactersBugs:
 
                 # Verify insertion succeeded
                 results = collection.get(ids=test_id)
-                assert len(results["ids"]) == 1, f"Failed to insert with metadata containing double quote: {metadata_with_quote}"
-                assert results["metadatas"][0] == metadata_with_quote, f"Metadata mismatch: expected {repr(metadata_with_quote)}, got {repr(results['metadatas'][0])}"
-                print(f"    ✅ Successfully inserted and verified metadata: {repr(metadata_with_quote)}")
+                assert len(results["ids"]) == 1, (
+                    f"Failed to insert with metadata containing double quote: {metadata_with_quote}"
+                )
+                assert results["metadatas"][0] == metadata_with_quote, (
+                    f"Metadata mismatch: expected {repr(metadata_with_quote)}, got {repr(results['metadatas'][0])}"
+                )
+                print(
+                    f"    ✅ Successfully inserted and verified metadata: {repr(metadata_with_quote)}"
+                )
             except Exception as e:
-                print(f"    ❌ FAILED to insert with metadata containing double quote: {repr(metadata_with_quote)}")
+                print(
+                    f"    ❌ FAILED to insert with metadata containing double quote: {repr(metadata_with_quote)}"
+                )
                 print(f"       Error: {e}")
                 raise
 
@@ -253,7 +272,10 @@ class TestSpecialCharactersBugs:
         print(f"\n🔍 Testing all special characters combined")
         test_id = "id_with_%_percent"
         test_document = "Path: C:\\Users\\Documents\\file.txt"
-        test_metadata = {"title": 'Book "The Great Gatsby"', "path": "C:\\Users\\Documents"}
+        test_metadata = {
+            "title": 'Book "The Great Gatsby"',
+            "path": "C:\\Users\\Documents",
+        }
 
         try:
             collection.add(
@@ -265,11 +287,15 @@ class TestSpecialCharactersBugs:
 
             # Verify insertion succeeded
             results = collection.get(ids=test_id)
-            assert len(results["ids"]) == 1, "Failed to insert with all special characters"
+            assert len(results["ids"]) == 1, (
+                "Failed to insert with all special characters"
+            )
             assert results["ids"][0] == test_id, f"ID mismatch"
             assert results["documents"][0] == test_document, f"Document mismatch"
             assert results["metadatas"][0] == test_metadata, f"Metadata mismatch"
-            print(f"    ✅ Successfully inserted and verified all special characters combined")
+            print(
+                f"    ✅ Successfully inserted and verified all special characters combined"
+            )
         except Exception as e:
             print(f"    ❌ FAILED to insert with all special characters combined")
             print(f"       Error: {e}")

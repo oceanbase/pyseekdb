@@ -1,6 +1,7 @@
 """
 Unit tests for DefaultEmbeddingFunction.
 """
+
 import pytest
 from typing import Dict, Any
 
@@ -55,6 +56,7 @@ class TestDefaultEmbeddingFunctionPersistence:
 
         assert isinstance(restored_ef, DefaultEmbeddingFunction)
         assert restored_ef.model_name == original_ef.model_name
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

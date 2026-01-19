@@ -3,6 +3,7 @@ Example tests demonstrating how to use EnvGuard for environment variable managem
 
 This file shows various usage patterns for the EnvGuard class.
 """
+
 import os
 import pytest
 
@@ -101,15 +102,14 @@ class TestEnvGuard:
         original_custom = os.environ.get("CUSTOM_OPENAI_KEY")
 
         # Simulate a test that needs a custom API key
-        with EnvGuard(
-            CUSTOM_OPENAI_KEY=original_key or "test-key"
-        ):
+        with EnvGuard(CUSTOM_OPENAI_KEY=original_key or "test-key"):
             # Test code that uses CUSTOM_OPENAI_KEY
             assert os.environ.get("CUSTOM_OPENAI_KEY") is not None
 
         # Original values restored
         assert os.environ.get("OPENAI_API_KEY") == original_key
         assert os.environ.get("CUSTOM_OPENAI_KEY") == original_custom
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

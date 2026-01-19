@@ -18,6 +18,7 @@ from pyseekdb.client.embedding_function import dimension_of
 from .test_utils import env_guard
 import importlib.util
 
+
 def is_openai_available() -> bool:
     """
     Check if openai is available for testing.
@@ -27,10 +28,11 @@ def is_openai_available() -> bool:
     """
     return importlib.util.find_spec("openai") is not None
 
+
 # Skip this test by default - it requires external API access and API keys
 @pytest.mark.skipif(
     not os.environ.get("DASHSCOPE_API_KEY") or not is_openai_available(),
-    reason="DASHSCOPE_API_KEY environment variable must be set"
+    reason="DASHSCOPE_API_KEY environment variable must be set",
 )
 class TestQwenEmbeddingFunction:
     """Test QwenEmbeddingFunction - skipped by default, requires manual execution"""
@@ -349,9 +351,9 @@ class TestQwenEmbeddingFunction:
         assert dimensions["text-embedding-v4"] == 1024
         print(f"   Model dimensions: {dimensions}")
 
+
 @pytest.mark.skipif(
-    not is_openai_available(),
-    reason="openai is not available on this system"
+    not is_openai_available(), reason="openai is not available on this system"
 )
 class TestQwenEmbeddingFunctionPersistence:
     """Test persistence for QwenEmbeddingFunction"""
@@ -369,7 +371,10 @@ class TestQwenEmbeddingFunctionPersistence:
             assert isinstance(config, dict)
             assert config["model_name"] == "text-embedding-v1"
             assert config["api_key_env"] == "DASHSCOPE_API_KEY"
-            assert config["api_base"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            assert (
+                config["api_base"]
+                == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            )
             assert config["dimensions"] is None
             assert isinstance(config["client_kwargs"], dict)
             # name should NOT be in config
@@ -383,7 +388,7 @@ class TestQwenEmbeddingFunctionPersistence:
                 api_key_env="CUSTOM_QWEN_KEY",
                 api_base="https://custom-dashscope.com/v1",
                 dimensions=512,
-                timeout=60
+                timeout=60,
             )
             config = ef.get_config()
 
@@ -396,10 +401,7 @@ class TestQwenEmbeddingFunctionPersistence:
     def test_get_config_with_dimensions(self):
         """Test that get_config() correctly includes dimensions parameter"""
         with env_guard(DASHSCOPE_API_KEY="test-key"):
-            ef = QwenEmbeddingFunction(
-                model_name="text-embedding-v3",
-                dimensions=256
-            )
+            ef = QwenEmbeddingFunction(model_name="text-embedding-v3", dimensions=256)
             config = ef.get_config()
 
             assert config["dimensions"] == 256
@@ -411,7 +413,7 @@ class TestQwenEmbeddingFunctionPersistence:
             "api_key_env": "DASHSCOPE_API_KEY",
             "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "dimensions": None,
-            "client_kwargs": {}
+            "client_kwargs": {},
         }
 
         with env_guard(DASHSCOPE_API_KEY="test-key"):
@@ -420,7 +422,10 @@ class TestQwenEmbeddingFunctionPersistence:
             assert isinstance(restored_ef, QwenEmbeddingFunction)
             assert restored_ef.model_name == "text-embedding-v1"
             assert restored_ef.api_key_env == "DASHSCOPE_API_KEY"
-            assert restored_ef.api_base == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            assert (
+                restored_ef.api_base
+                == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            )
             assert restored_ef._dimensions_param is None
 
     def test_build_from_config_with_custom_values(self):
@@ -430,7 +435,7 @@ class TestQwenEmbeddingFunctionPersistence:
             "api_key_env": "CUSTOM_QWEN_KEY",
             "api_base": "https://custom-dashscope.com/v1",
             "dimensions": 512,
-            "client_kwargs": {"timeout": 60}
+            "client_kwargs": {"timeout": 60},
         }
 
         with env_guard(CUSTOM_QWEN_KEY="test-key"):
@@ -447,8 +452,7 @@ class TestQwenEmbeddingFunctionPersistence:
         """Test complete roundtrip: get_config -> build_from_config"""
         with env_guard(DASHSCOPE_API_KEY="test-key"):
             original_ef = QwenEmbeddingFunction(
-                model_name="text-embedding-v1",
-                dimensions=256
+                model_name="text-embedding-v1", dimensions=256
             )
 
             config = original_ef.get_config()

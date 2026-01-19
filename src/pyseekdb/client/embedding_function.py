@@ -21,7 +21,7 @@ from typing import (
     TypeVar,
     cast,
     Any,
-    Dict
+    Dict,
 )
 from abc import abstractmethod
 
@@ -105,6 +105,7 @@ class EmbeddingFunction(Protocol[D]):
             Note: The 'name' field is not included as it's handled by the upper layer for routing.
         """
         ...
+
 
 def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
     """

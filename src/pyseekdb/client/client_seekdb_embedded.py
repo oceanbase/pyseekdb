@@ -144,7 +144,7 @@ class SeekdbEmbeddedClient(BaseClient):
             # Check if this is a query statement (SELECT, SHOW, DESCRIBE, DESC)
             # Only query statements return result sets that need fetchall()
             is_query = self._should_fetch_results(cursor, embedded_sql)
-            
+
             if not is_query:
                 # For non-query statements (DELETE, UPDATE, INSERT, etc.), return empty list
                 return []
@@ -238,7 +238,7 @@ class SeekdbEmbeddedClient(BaseClient):
             tenant: ignored for embedded mode (no tenant concept)
         """
         return super().create_database(name=name, tenant=tenant)
-    
+
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
         Get database object (tenant parameter ignored for embedded mode)
@@ -248,7 +248,7 @@ class SeekdbEmbeddedClient(BaseClient):
             tenant: ignored for embedded mode (no tenant concept)
         """
         return super().get_database(name=name, tenant=tenant)
-    
+
     def delete_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
         """
         Delete database (tenant parameter ignored for embedded mode)
@@ -258,7 +258,7 @@ class SeekdbEmbeddedClient(BaseClient):
             tenant: ignored for embedded mode (no tenant concept)
         """
         return super().delete_database(name=name, tenant=tenant)
-    
+
     def list_databases(
         self,
         limit: Optional[int] = None,
@@ -274,7 +274,7 @@ class SeekdbEmbeddedClient(BaseClient):
             tenant: ignored for embedded mode (no tenant concept)
         """
         return super().list_databases(limit=limit, offset=offset, tenant=tenant)
-    
+
     def __repr__(self):
         status = "connected" if self.is_connected() else "disconnected"
         return f"<SeekdbEmbeddedClient path={self.path} database={self.database} status={status}>"
