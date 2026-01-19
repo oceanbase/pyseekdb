@@ -2,6 +2,7 @@
 Collection hybrid search tests using HybridSearch builder with db_client fixture
 Mirrors test_collection_hybrid_search.py but passes HybridSearch instances to collection.hybrid_search().
 """
+
 import pytest
 import time
 import json
@@ -31,24 +32,27 @@ class TestCollectionHybridSearchWithBuilder:
         hs = build(hs)
         return collection.hybrid_search(hs)
 
-    def _create_test_collection(self, client, collection_name: str, dimension: int = None):
+    def _create_test_collection(
+        self, client, collection_name: str, dimension: int = None
+    ):
         """Helper method to create a test collection"""
         from pyseekdb import HNSWConfiguration
+
         if dimension is not None:
-            config = HNSWConfiguration(dimension=dimension, distance='l2')
+            config = HNSWConfiguration(dimension=dimension, distance="l2")
             collection = client.create_collection(
-                name=collection_name,
-                configuration=config,
-                embedding_function=None
+                name=collection_name, configuration=config, embedding_function=None
             )
         else:
             collection = client.create_collection(name=collection_name)
         return collection, collection.dimension
 
-    def _generate_query_vector(self, dimension: int, base_vector: List[float] = None) -> List[float]:
+    def _generate_query_vector(
+        self, dimension: int, base_vector: List[float] = None
+    ) -> List[float]:
         if base_vector is None:
             base_vector = [1.0, 2.0, 3.0]
-        
+
         if dimension <= len(base_vector):
             return base_vector[:dimension]
         extended = base_vector * ((dimension // len(base_vector)) + 1)
@@ -56,6 +60,7 @@ class TestCollectionHybridSearchWithBuilder:
 
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
         from pyseekdb.client.meta_info import CollectionNames
+
         table_name = CollectionNames.table_name(collection_name)
         base_vectors = [
             [1.0, 2.0, 3.0],
@@ -65,50 +70,65 @@ class TestCollectionHybridSearchWithBuilder:
             [1.2, 2.2, 3.2],
             [1.3, 2.3, 3.3],
             [2.2, 3.2, 4.2],
-            [1.4, 2.4, 3.4]
+            [1.4, 2.4, 3.4],
         ]
 
         test_data = [
             {
                 "document": "Machine learning is a subset of artificial intelligence",
                 "base_vector": base_vectors[0],
-                "metadata": {"category": "AI", "page": 1, "score": 95, "tag": "ml"}
+                "metadata": {"category": "AI", "page": 1, "score": 95, "tag": "ml"},
             },
             {
                 "document": "Python programming language is widely used in data science",
                 "base_vector": base_vectors[1],
-                "metadata": {"category": "Programming", "page": 2, "score": 88, "tag": "python"}
+                "metadata": {
+                    "category": "Programming",
+                    "page": 2,
+                    "score": 88,
+                    "tag": "python",
+                },
             },
             {
                 "document": "Deep learning algorithms for neural networks",
                 "base_vector": base_vectors[2],
-                "metadata": {"category": "AI", "page": 3, "score": 92, "tag": "ml"}
+                "metadata": {"category": "AI", "page": 3, "score": 92, "tag": "ml"},
             },
             {
                 "document": "Data science with Python and machine learning",
                 "base_vector": base_vectors[3],
-                "metadata": {"category": "Data Science", "page": 4, "score": 90, "tag": "python"}
+                "metadata": {
+                    "category": "Data Science",
+                    "page": 4,
+                    "score": 90,
+                    "tag": "python",
+                },
             },
             {
                 "document": "Introduction to artificial intelligence and neural networks",
                 "base_vector": base_vectors[4],
-                "metadata": {"category": "AI", "page": 5, "score": 85, "tag": "neural"}
+                "metadata": {"category": "AI", "page": 5, "score": 85, "tag": "neural"},
             },
             {
                 "document": "Advanced machine learning techniques and algorithms",
                 "base_vector": base_vectors[5],
-                "metadata": {"category": "AI", "page": 6, "score": 93, "tag": "ml"}
+                "metadata": {"category": "AI", "page": 6, "score": 93, "tag": "ml"},
             },
             {
                 "document": "Python tutorial for beginners in programming",
                 "base_vector": base_vectors[6],
-                "metadata": {"category": "Programming", "page": 7, "score": 87, "tag": "python"}
+                "metadata": {
+                    "category": "Programming",
+                    "page": 7,
+                    "score": 87,
+                    "tag": "python",
+                },
             },
             {
                 "document": "Natural language processing with machine learning",
                 "base_vector": base_vectors[7],
-                "metadata": {"category": "AI", "page": 8, "score": 91, "tag": "nlp"}
-            }
+                "metadata": {"category": "AI", "page": 8, "score": 91, "tag": "nlp"},
+            },
         ]
 
         inserted_ids = []
@@ -125,10 +145,12 @@ class TestCollectionHybridSearchWithBuilder:
                 embedding = embedding[:dimension]
 
             vector_str = "[" + ",".join(map(str, embedding)) + "]"
-            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
+            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace(
+                "'", "\\'"
+            )
             document_str = data["document"].replace("'", "\\'")
 
-            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
+            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
                      VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
             client._server._execute(sql)
 
@@ -138,11 +160,13 @@ class TestCollectionHybridSearchWithBuilder:
     def test_hybrid_search_full_text_only(self, db_client):
         """
         Test hybrid_search with only full-text search using HybridSearch builder.
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_ft_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(
+            db_client, collection_name
+        )
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -150,10 +174,9 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"\n✅ Testing hybrid_search with full-text search only")
         results = self._hs(
             collection,
-            lambda hs: hs
-            .query(DOCUMENT.contains("machine learning"))
+            lambda hs: hs.query(DOCUMENT.contains("machine learning"))
             .limit(5)
-            .select(DOCUMENTS, METADATAS)
+            .select(DOCUMENTS, METADATAS),
         )
 
         assert results is not None
@@ -168,10 +191,9 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"   Testing hybrid_search with $not_contains filter")
         results_not = self._hs(
             collection,
-            lambda hs: hs
-            .query(DOCUMENT.not_contains(forbidden_phrase))
+            lambda hs: hs.query(DOCUMENT.not_contains(forbidden_phrase))
             .limit(5)
-            .select(DOCUMENTS, METADATAS)
+            .select(DOCUMENTS, METADATAS),
         )
 
         assert results_not is not None
@@ -184,11 +206,13 @@ class TestCollectionHybridSearchWithBuilder:
     def test_hybrid_search_vector_only(self, db_client):
         """
         Test hybrid_search with only vector search using HybridSearch builder.
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_vec_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(
+            db_client, collection_name
+        )
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -196,10 +220,11 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"\n✅ Testing hybrid_search with vector search only")
         results = self._hs(
             collection,
-            lambda hs: hs
-            .knn(EMBEDDINGS(self._generate_query_vector(actual_dimension)), n_results=5)
+            lambda hs: hs.knn(
+                EMBEDDINGS(self._generate_query_vector(actual_dimension)), n_results=5
+            )
             .limit(5)
-            .select(DOCUMENTS, METADATAS, EMBEDDINGS_FIELD)
+            .select(DOCUMENTS, METADATAS, EMBEDDINGS_FIELD),
         )
 
         assert results is not None
@@ -218,11 +243,13 @@ class TestCollectionHybridSearchWithBuilder:
     def test_hybrid_search_combined(self, db_client):
         """
         Test hybrid_search with both full-text and vector search using HybridSearch builder.
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_comb_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(
+            db_client, collection_name
+        )
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -230,12 +257,17 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"\n✅ Testing hybrid_search with both full-text and vector search")
         results = self._hs(
             collection,
-            lambda hs: hs
-            .query(DOCUMENT.contains("machine learning"), n_results=10, boost=0.4)
-            .knn(EMBEDDINGS(self._generate_query_vector(actual_dimension)), n_results=10, boost=1.6)
+            lambda hs: hs.query(
+                DOCUMENT.contains("machine learning"), n_results=10, boost=0.4
+            )
+            .knn(
+                EMBEDDINGS(self._generate_query_vector(actual_dimension)),
+                n_results=10,
+                boost=1.6,
+            )
             .rank("rrf", rank_window_size=60, rank_constant=60)
             .limit(5)
-            .select(DOCUMENTS, METADATAS, EMBEDDINGS_FIELD)
+            .select(DOCUMENTS, METADATAS, EMBEDDINGS_FIELD),
         )
 
         assert results is not None
@@ -247,11 +279,13 @@ class TestCollectionHybridSearchWithBuilder:
     def test_hybrid_search_with_metadata_filter(self, db_client):
         """
         Test hybrid_search with metadata filters using HybridSearch builder.
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_meta_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(
+            db_client, collection_name
+        )
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -259,22 +293,21 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"\n✅ Testing hybrid_search with metadata filter")
         results = self._hs(
             collection,
-            lambda hs: hs
-            .query(
+            lambda hs: hs.query(
                 DOCUMENT.contains("machine"),
                 K("category") == "AI",
                 K("page") >= 1,
                 K("page") <= 5,
-                n_results=10
+                n_results=10,
             )
             .knn(
                 EMBEDDINGS(self._generate_query_vector(actual_dimension)),
                 K("category") == "AI",
                 K("score") >= 90,
-                n_results=10
+                n_results=10,
             )
             .limit(5)
-            .select(DOCUMENTS, METADATAS)
+            .select(DOCUMENTS, METADATAS),
         )
 
         assert results is not None
@@ -288,11 +321,13 @@ class TestCollectionHybridSearchWithBuilder:
     def test_hybrid_search_with_logical_operators(self, db_client):
         """
         Test hybrid_search with logical operators using HybridSearch builder.
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_logic_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(
+            db_client, collection_name
+        )
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -300,20 +335,19 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"\n✅ Testing hybrid_search with logical operators")
         results = self._hs(
             collection,
-            lambda hs: hs
-            .query(
+            lambda hs: hs.query(
                 DOCUMENT.contains(["machine", "learning"]),
                 (K("tag") == "ml") | (K("tag") == "python"),
-                n_results=10
+                n_results=10,
             )
             .knn(
                 EMBEDDINGS(self._generate_query_vector(actual_dimension)),
                 K("tag").is_in(["ml", "python"]),
-                n_results=10
+                n_results=10,
             )
             .rank()
             .limit(5)
-            .select(DOCUMENTS, METADATAS)
+            .select(DOCUMENTS, METADATAS),
         )
 
         assert results is not None
@@ -327,22 +361,25 @@ class TestCollectionHybridSearchWithBuilder:
     def test_hybrid_search_scalar_in_nin_and_id(self, db_client):
         """
         Test hybrid_search with $in/$nin and #id using HybridSearch builder.
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_scalar_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(
+            db_client, collection_name
+        )
 
-        inserted_ids = self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
+        inserted_ids = self._insert_test_data(
+            db_client, collection_name, dimension=actual_dimension
+        )
         time.sleep(1)
 
         print(f"\n✅ Testing hybrid_search with $in operator")
         results_in = self._hs(
             collection,
-            lambda hs: hs
-            .query(K("tag").is_in(["ml", "python"]), n_results=10)
+            lambda hs: hs.query(K("tag").is_in(["ml", "python"]), n_results=10)
             .limit(5)
-            .select(METADATAS)
+            .select(METADATAS),
         )
         assert results_in and results_in.get("metadatas")
         for metadata in results_in["metadatas"][0]:
@@ -353,10 +390,9 @@ class TestCollectionHybridSearchWithBuilder:
         print(f"   Testing hybrid_search with $nin operator")
         results_nin = self._hs(
             collection,
-            lambda hs: hs
-            .query(K("tag").not_in(["ml", "python"]), n_results=10)
+            lambda hs: hs.query(K("tag").not_in(["ml", "python"]), n_results=10)
             .limit(5)
-            .select(METADATAS)
+            .select(METADATAS),
         )
         assert results_nin and results_nin.get("metadatas")
         for metadata in results_nin["metadatas"][0]:
@@ -368,10 +404,9 @@ class TestCollectionHybridSearchWithBuilder:
         target_id = inserted_ids[0]
         results_id = self._hs(
             collection,
-            lambda hs: hs
-            .query(K("#id").is_in([target_id]), n_results=5)
+            lambda hs: hs.query(K("#id").is_in([target_id]), n_results=5)
             .limit(5)
-            .select(METADATAS)
+            .select(METADATAS),
         )
         assert results_id and results_id.get("ids") and len(results_id["ids"][0]) > 0
         assert target_id in results_id["ids"][0]
@@ -380,5 +415,5 @@ class TestCollectionHybridSearchWithBuilder:
 
 if __name__ == "__main__":
     import pytest
-    pytest.main([__file__, "-v", "-s"])
 
+    pytest.main([__file__, "-v", "-s"])

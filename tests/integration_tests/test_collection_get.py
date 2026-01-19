@@ -1,6 +1,7 @@
 """
 Collection get tests - testing collection.get() interface for all three modes using db_client fixture
 """
+
 import pytest
 import time
 import json
@@ -13,15 +14,15 @@ import pyseekdb
 # ==================== Simple 3D Embedding Function for Testing ====================
 class Simple3DEmbeddingFunction:
     """Simple embedding function that returns 3-dimensional vectors for testing"""
-    
+
     def __init__(self):
         self.dimension = 3
-    
+
     def __call__(self, input: Union[str, List[str]]) -> List[List[float]]:
         """Convert documents to 3D embeddings (simple hash-based)"""
         if isinstance(input, str):
             input = [input]
-        
+
         embeddings = []
         for doc in input:
             # Simple hash-based 3D embedding for testing
@@ -29,90 +30,91 @@ class Simple3DEmbeddingFunction:
             embedding = [
                 float((hash_val % 10) / 10.0),
                 float(((hash_val // 10) % 10) / 10.0),
-                float(((hash_val // 100) % 10) / 10.0)
+                float(((hash_val // 100) % 10) / 10.0),
             ]
             embeddings.append(embedding)
-        
+
         return embeddings
 
 
 class TestCollectionGet:
     """Test collection.get() interface for all three modes"""
-    
+
     def _insert_test_data(self, client, collection_name: str):
         """Helper method to insert test data and return inserted IDs"""
         from pyseekdb.client.meta_info import CollectionNames
+
         table_name = CollectionNames.table_name(collection_name)
-        
+
         # Insert test data with vectors, documents, and metadata
         test_data = [
             {
                 "_id": str(uuid.uuid4()),
                 "document": "This is a test document about machine learning",
                 "embedding": [1.0, 2.0, 3.0],
-                "metadata": {"category": "AI", "score": 95, "tag": "ml"}
+                "metadata": {"category": "AI", "score": 95, "tag": "ml"},
             },
             {
                 "_id": str(uuid.uuid4()),
                 "document": "Python programming tutorial for beginners",
                 "embedding": [2.0, 3.0, 4.0],
-                "metadata": {"category": "Programming", "score": 88, "tag": "python"}
+                "metadata": {"category": "Programming", "score": 88, "tag": "python"},
             },
             {
                 "_id": str(uuid.uuid4()),
                 "document": "Advanced machine learning algorithms",
                 "embedding": [1.1, 2.1, 3.1],
-                "metadata": {"category": "AI", "score": 92, "tag": "ml"}
+                "metadata": {"category": "AI", "score": 92, "tag": "ml"},
             },
             {
                 "_id": str(uuid.uuid4()),
                 "document": "Data science with Python",
                 "embedding": [2.1, 3.1, 4.1],
-                "metadata": {"category": "Data Science", "score": 90, "tag": "python"}
+                "metadata": {"category": "Data Science", "score": 90, "tag": "python"},
             },
             {
                 "_id": str(uuid.uuid4()),
                 "document": "Introduction to neural networks",
                 "embedding": [1.2, 2.2, 3.2],
-                "metadata": {"category": "AI", "score": 85, "tag": "neural"}
-            }
+                "metadata": {"category": "AI", "score": 85, "tag": "neural"},
+            },
         ]
-        
+
         # Store inserted IDs for return (using generated UUIDs)
         inserted_ids = []
-        
+
         # Insert all data with generated UUIDs
         for data in test_data:
             # Use string ID directly (support any string format)
             id_str = data["_id"]
             inserted_ids.append(id_str)  # Store original ID string for return
-            
+
             # Escape single quotes in ID
             id_str_escaped = id_str.replace("'", "''")
-            
+
             # Convert vector to string format: [1.0,2.0,3.0]
             vector_str = "[" + ",".join(map(str, data["embedding"])) + "]"
             # Convert metadata to JSON string
             metadata_str = json.dumps(data["metadata"]).replace("'", "\\'")
             # Escape single quotes in document
             document_str = data["document"].replace("'", "\\'")
-            
+
             # Use CAST to convert string to binary for varbinary(512) field
-            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata) 
+            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
                      VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
             client._server._execute(sql)
-        
+
         return inserted_ids
 
     def test_metadata_array_in_nin_overlap(self, db_client):
         """
         Regression test for JSON array $in/$nin operators.
-        
+
         Tests:
         - $in with overlap, disjoint, empty list
         - $nin with complementary expectations
         - Handles missing fields, null values, empty arrays
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_tags_in_{int(time.time() * 1000)}"
@@ -127,11 +129,14 @@ class TestCollectionGet:
                 ids=["id_overlap", "id_disjoint", "id_missing", "id_null", "id_empty"],
                 documents=["", "", "", "", ""],
                 metadatas=[
-                    {"category": "AI", "tags": ["ml", "ai"]},       # overlaps with ["ml", "python"]
-                    {"category": "Web", "tags": ["java", "cpp"]},   # disjoint
-                    {"category": "Missing"},                       # tags missing
-                    {"category": "Null", "tags": None},            # tags explicit null
-                    {"category": "Empty", "tags": []},             # tags empty array
+                    {
+                        "category": "AI",
+                        "tags": ["ml", "ai"],
+                    },  # overlaps with ["ml", "python"]
+                    {"category": "Web", "tags": ["java", "cpp"]},  # disjoint
+                    {"category": "Missing"},  # tags missing
+                    {"category": "Null", "tags": None},  # tags explicit null
+                    {"category": "Empty", "tags": []},  # tags empty array
                 ],
             )
 
@@ -166,22 +171,28 @@ class TestCollectionGet:
             )
             assert result and "ids" in result
             assert set(result["ids"]) == {"id_disjoint", "id_null", "id_empty"}
-            
+
             # Additional $nin test with two records
             collection_name_2 = f"test_tags_nin_{int(time.time() * 1000)}"
             collection_2 = db_client.get_or_create_collection(
                 name=collection_name_2,
                 embedding_function=pyseekdb.DefaultEmbeddingFunction(),
             )
-            
+
             try:
                 # Insert two records: one with overlap, one without
                 collection_2.add(
                     ids=["id1", "id2"],
                     documents=["", ""],
                     metadatas=[
-                        {"category": "AI", "tags": ["ml", "ai"]},  # has overlap with ["ml", "python"]
-                        {"category": "Web", "tags": ["java", "cpp"]},  # no overlap with ["ml", "python"]
+                        {
+                            "category": "AI",
+                            "tags": ["ml", "ai"],
+                        },  # has overlap with ["ml", "python"]
+                        {
+                            "category": "Web",
+                            "tags": ["java", "cpp"],
+                        },  # no overlap with ["ml", "python"]
                     ],
                 )
 
@@ -202,7 +213,7 @@ class TestCollectionGet:
                     db_client.delete_collection(name=collection_name_2)
                 except Exception:
                     pass
-                    
+
         finally:
             try:
                 db_client.delete_collection(name=collection_name)
@@ -212,7 +223,7 @@ class TestCollectionGet:
     def test_eq_ne_operators_with_array_fields(self, db_client):
         """
         Regression test for $eq and $ne operators with array fields.
-        
+
         Tests:
         - $eq with array membership check (like $in)
         - $ne with array exclusion (like $nin)
@@ -220,7 +231,7 @@ class TestCollectionGet:
         - Scalar fields still work correctly
         - Edge cases: empty array, null, missing field
         - Consistency: $eq behavior matches $in with single value
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_eq_ne_{int(time.time() * 1000)}"
@@ -233,16 +244,28 @@ class TestCollectionGet:
             # Insert comprehensive test data
             collection.add(
                 ids=["id1", "id2", "id3", "id4", "id5", "id6", "id7", "id8"],
-                documents=["doc1", "doc2", "doc3", "doc4", "doc5", "doc6", "doc7", "doc8"],
+                documents=[
+                    "doc1",
+                    "doc2",
+                    "doc3",
+                    "doc4",
+                    "doc5",
+                    "doc6",
+                    "doc7",
+                    "doc8",
+                ],
                 metadatas=[
-                    {"tags": ["ml", "ai"], "category": "AI"},       # id1: array with ml
-                    {"tags": ["java"], "category": "Backend"},      # id2: array without ml
-                    {"tags": "ml", "category": "ML"},               # id3: scalar ml
-                    {"tags": "python", "category": "Scripting"},    # id4: different scalar
-                    {"category": "Other"},                          # id5: missing tags field
-                    {"tags": [], "category": "Empty"},              # id6: empty array
-                    {"tags": None, "category": "Null"},             # id7: null value
-                    {"tags": ["ml"], "category": "Single"},         # id8: single-element array
+                    {"tags": ["ml", "ai"], "category": "AI"},  # id1: array with ml
+                    {"tags": ["java"], "category": "Backend"},  # id2: array without ml
+                    {"tags": "ml", "category": "ML"},  # id3: scalar ml
+                    {
+                        "tags": "python",
+                        "category": "Scripting",
+                    },  # id4: different scalar
+                    {"category": "Other"},  # id5: missing tags field
+                    {"tags": [], "category": "Empty"},  # id6: empty array
+                    {"tags": None, "category": "Null"},  # id7: null value
+                    {"tags": ["ml"], "category": "Single"},  # id8: single-element array
                 ],
             )
 
@@ -253,9 +276,12 @@ class TestCollectionGet:
                 include=["ids", "metadatas"],
             )
             assert result and "ids" in result
-            assert set(result["ids"]) == {"id1", "id3", "id8"}, \
+            assert set(result["ids"]) == {"id1", "id3", "id8"}, (
                 f"Expected id1, id3, id8 (array+scalar+single), got {result['ids']}"
-            print(f"   Matched: {sorted(result['ids'])} (array with ml, scalar ml, single-element array)")
+            )
+            print(
+                f"   Matched: {sorted(result['ids'])} (array with ml, scalar ml, single-element array)"
+            )
 
             # Test 2: $eq with non-matching value
             print("\n✅ Test 2: $eq with non-matching value")
@@ -294,8 +320,9 @@ class TestCollectionGet:
                 where={"tags": {"$eq": "ml"}},
                 include=["ids"],
             )
-            assert set(result_direct["ids"]) == set(result_eq["ids"]), \
+            assert set(result_direct["ids"]) == set(result_eq["ids"]), (
                 f"Direct equality should match $eq: {result_direct['ids']} vs {result_eq['ids']}"
+            )
             print(f"   Direct equality matches $eq: {sorted(result_direct['ids'])}")
 
             # Test 5: $eq consistency with $in (single value)
@@ -308,8 +335,9 @@ class TestCollectionGet:
                 where={"tags": {"$in": ["ml"]}},
                 include=["ids"],
             )
-            assert set(result_eq["ids"]) == set(result_in["ids"]), \
+            assert set(result_eq["ids"]) == set(result_in["ids"]), (
                 f"$eq should match $in with single value: {result_eq['ids']} vs {result_in['ids']}"
+            )
             print(f"   $eq matches $in: {sorted(result_eq['ids'])}")
 
             # Test 6: Scalar field still works correctly
@@ -319,15 +347,17 @@ class TestCollectionGet:
                 include=["ids"],
             )
             assert result_scalar_eq and "ids" in result_scalar_eq
-            assert set(result_scalar_eq["ids"]) == {"id1"}, \
+            assert set(result_scalar_eq["ids"]) == {"id1"}, (
                 f"Scalar $eq should still work, got {result_scalar_eq['ids']}"
-            
+            )
+
             result_scalar_direct = collection.get(
                 where={"category": "AI"},
                 include=["ids"],
             )
-            assert set(result_scalar_direct["ids"]) == {"id1"}, \
+            assert set(result_scalar_direct["ids"]) == {"id1"}, (
                 f"Scalar direct equality should still work, got {result_scalar_direct['ids']}"
+            )
             print(f"   Scalar fields work correctly")
 
             # Test 7: Edge case - $eq with java (single-element array vs scalar)
@@ -344,21 +374,20 @@ class TestCollectionGet:
             print("\n✅ Test 8: Combined $eq and $ne")
             result = collection.get(
                 where={
-                    "$and": [
-                        {"tags": {"$ne": "ml"}},
-                        {"category": {"$ne": "Empty"}}
-                    ]
+                    "$and": [{"tags": {"$ne": "ml"}}, {"category": {"$ne": "Empty"}}]
                 },
                 include=["ids"],
             )
             assert result and "ids" in result
             # Should exclude: id1/id3/id8 (have ml), id6 (category=Empty)
             matched_ids = set(result["ids"])
-            assert "id2" in matched_ids or "id4" in matched_ids, \
+            assert "id2" in matched_ids or "id4" in matched_ids, (
                 f"Should match id2 or id4, got {result['ids']}"
+            )
             for excluded_id in ["id1", "id3", "id8", "id6"]:
-                assert excluded_id not in matched_ids, \
+                assert excluded_id not in matched_ids, (
                     f"{excluded_id} should be excluded, got {result['ids']}"
+                )
             print(f"   Combined filters work: {sorted(result['ids'])}")
 
             print("\n✅ All $eq/$ne operator tests passed!")
@@ -372,7 +401,7 @@ class TestCollectionGet:
     def test_collection_get(self, db_client):
         """
         Test collection.get() interface with various query patterns.
-        
+
         Tests:
         - Get by single/multiple IDs
         - Get with metadata/document filters
@@ -380,25 +409,29 @@ class TestCollectionGet:
         - Get with limit/offset
         - Get with include parameter
         - Get with scalar $in/$nin operators
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         # Create test collection
         collection_name = f"test_get_{int(time.time() * 1000)}"
-        config = pyseekdb.HNSWConfiguration(dimension=3, distance='l2')
+        config = pyseekdb.HNSWConfiguration(dimension=3, distance="l2")
         # Use a simple 3D embedding function to match the dimension
         embedding_function = Simple3DEmbeddingFunction()
         collection = db_client.create_collection(
             name=collection_name,
             configuration=config,
-            embedding_function=embedding_function
+            embedding_function=embedding_function,
         )
-        
+
         try:
             inserted_ids = self._insert_test_data(db_client, collection_name)
-            assert len(inserted_ids) > 0, f"Failed to get inserted IDs. Expected at least 1, got {len(inserted_ids)}"
+            assert len(inserted_ids) > 0, (
+                f"Failed to get inserted IDs. Expected at least 1, got {len(inserted_ids)}"
+            )
             if len(inserted_ids) < 5:
-                print(f"   Warning: Expected 5 inserted IDs, but got {len(inserted_ids)}")
+                print(
+                    f"   Warning: Expected 5 inserted IDs, but got {len(inserted_ids)}"
+                )
 
             # Test 1: Get by single ID
             print("\n✅ Testing get by single ID")
@@ -415,7 +448,9 @@ class TestCollectionGet:
                 assert results is not None
                 assert "ids" in results
                 assert len(results["ids"]) <= 3
-                print(f"   Found {len(results['ids'])} results for IDs={inserted_ids[:3]}")
+                print(
+                    f"   Found {len(results['ids'])} results for IDs={inserted_ids[:3]}"
+                )
 
             # Test 3: Get by metadata filter
             print("✅ Testing get with metadata filter (category=AI)")
@@ -440,9 +475,13 @@ class TestCollectionGet:
 
             # Test 5: Get by document filter
             print("✅ Testing get with document filter")
-            results = collection.get(where_document={"$contains": "machine learning"}, limit=10)
+            results = collection.get(
+                where_document={"$contains": "machine learning"}, limit=10
+            )
             assert results is not None
-            print(f"   Found {len(results['ids'])} results containing 'machine learning'")
+            print(
+                f"   Found {len(results['ids'])} results containing 'machine learning'"
+            )
 
             # Test 6: Get with combined filters
             print("✅ Testing get with combined filters")
@@ -481,7 +520,9 @@ class TestCollectionGet:
             assert "documents" in results
             assert "metadatas" in results
             assert len(results["ids"]) == 2
-            print(f"   Found {len(results['ids'])} results with documents and metadatas")
+            print(
+                f"   Found {len(results['ids'])} results with documents and metadatas"
+            )
 
             # Test 10: Get by multiple IDs (should return dict)
             print("✅ Testing get by multiple IDs (returns dict)")
@@ -491,7 +532,9 @@ class TestCollectionGet:
                 assert isinstance(results, dict), "Should return dict"
                 assert "ids" in results
                 assert len(results["ids"]) <= 3
-                print(f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs")
+                print(
+                    f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs"
+                )
 
             # Test 11: Single ID returns dict format
             print("✅ Testing single ID returns dict format")
@@ -516,16 +559,22 @@ class TestCollectionGet:
             assert results is not None
             assert "ids" in results
             assert len(results["ids"]) > 0
-            print(f"   Found {len(results['ids'])} results with tag in ['ml', 'python']")
+            print(
+                f"   Found {len(results['ids'])} results with tag in ['ml', 'python']"
+            )
 
             # Test 14: Get with scalar $nin operator
             print("✅ Testing get with scalar $nin operator")
-            results = collection.get(where={"tag": {"$nin": ["ml", "python"]}}, limit=10)
+            results = collection.get(
+                where={"tag": {"$nin": ["ml", "python"]}}, limit=10
+            )
             assert results is not None
             assert "ids" in results
             # Should return rows with tag='neural' (excluded 'ml' and 'python')
-            print(f"   Found {len(results['ids'])} results with tag not in ['ml', 'python']")
-            
+            print(
+                f"   Found {len(results['ids'])} results with tag not in ['ml', 'python']"
+            )
+
         finally:
             # Cleanup
             try:

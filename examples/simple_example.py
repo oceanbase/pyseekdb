@@ -10,6 +10,7 @@ This example demonstrates the most common operations with embedding functions:
 
 This is a minimal example to get you started quickly with embedding functions.
 """
+
 import pyseekdb
 from pyseekdb import DefaultEmbeddingFunction
 
@@ -18,10 +19,7 @@ from pyseekdb import DefaultEmbeddingFunction
 # For this example, we'll use server mode (you can change to embedded or OceanBase)
 
 # Embedded mode (local seekdb)
-client = pyseekdb.Client(
-    path="./seekdb.db",
-    database="test"
-)
+client = pyseekdb.Client(path="./seekdb.db", database="test")
 # Alternative: Server mode (connecting to remote seekdb server)
 # client = pyseekdb.Client(
 #     host="127.0.0.1",
@@ -49,7 +47,7 @@ collection_name = "my_simple_collection"
 # The embedding function will automatically convert documents to embeddings
 collection = client.create_collection(
     name=collection_name,
-    #embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
+    # embedding_function=DefaultEmbeddingFunction()  # Uses default model (384 dimensions)
 )
 
 print(f"Created collection '{collection_name}' with dimension: {collection.dimension}")
@@ -64,7 +62,7 @@ documents = [
     "Python is a popular programming language",
     "Vector databases enable semantic search",
     "Neural networks are inspired by the human brain",
-    "Natural language processing helps computers understand text"
+    "Natural language processing helps computers understand text",
 ]
 
 ids = ["id1", "id2", "id3", "id4", "id5"]
@@ -78,12 +76,14 @@ collection.add(
         {"category": "Programming", "index": 1},
         {"category": "Database", "index": 2},
         {"category": "AI", "index": 3},
-        {"category": "NLP", "index": 4}
-    ]
+        {"category": "NLP", "index": 4},
+    ],
 )
 
 print(f"\nAdded {len(documents)} documents to collection")
-print("Note: Embeddings were automatically generated from documents using the embedding function")
+print(
+    "Note: Embeddings were automatically generated from documents using the embedding function"
+)
 
 # ==================== Step 4: Query the Collection ====================
 # With embedding function, you can query using text directly
@@ -94,20 +94,20 @@ query_text = "artificial intelligence and machine learning"
 
 results = collection.query(
     query_texts=query_text,  # Query text - will be embedded automatically
-    n_results=3  # Return top 3 most similar documents
+    n_results=3,  # Return top 3 most similar documents
 )
 
 print(f"\nQuery: '{query_text}'")
 print(f"Query results: {len(results['ids'][0])} items found")
 
 # ==================== Step 5: Print Query Results ====================
-for i in range(len(results['ids'][0])):
-    print(f"\nResult {i+1}:")
+for i in range(len(results["ids"][0])):
+    print(f"\nResult {i + 1}:")
     print(f"  ID: {results['ids'][0][i]}")
     print(f"  Distance: {results['distances'][0][i]:.4f}")
-    if results.get('documents'):
+    if results.get("documents"):
         print(f"  Document: {results['documents'][0][i]}")
-    if results.get('metadatas'):
+    if results.get("metadatas"):
         print(f"  Metadata: {results['metadatas'][0][i]}")
 
 # ==================== Step 6: Cleanup ====================

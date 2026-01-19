@@ -2,6 +2,7 @@
 Pytest configuration and shared fixtures for pyseekdb tests.
 Provides parameterized client fixtures for testing across embedded, server, and oceanbase modes.
 """
+
 import pytest
 import os
 import sys
@@ -16,23 +17,23 @@ import pyseekdb
 
 # ==================== Environment Variable Configuration ====================
 # Embedded mode
-SEEKDB_PATH = os.environ.get('SEEKDB_PATH', os.path.join(project_root, "seekdb.db"))
-SEEKDB_DATABASE = os.environ.get('SEEKDB_DATABASE', 'test')
+SEEKDB_PATH = os.environ.get("SEEKDB_PATH", os.path.join(project_root, "seekdb.db"))
+SEEKDB_DATABASE = os.environ.get("SEEKDB_DATABASE", "test")
 
 # Server mode
-SERVER_HOST = os.environ.get('SERVER_HOST', '127.0.0.1')
-SERVER_PORT = int(os.environ.get('SERVER_PORT', '2881'))
-SERVER_DATABASE = os.environ.get('SERVER_DATABASE', 'test')
-SERVER_USER = os.environ.get('SERVER_USER', 'root')
-SERVER_PASSWORD = os.environ.get('SERVER_PASSWORD', '')
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
+SERVER_PORT = int(os.environ.get("SERVER_PORT", "2881"))
+SERVER_DATABASE = os.environ.get("SERVER_DATABASE", "test")
+SERVER_USER = os.environ.get("SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("SERVER_PASSWORD", "")
 
 # OceanBase mode
-OB_HOST = os.environ.get('OB_HOST', 'localhost')
-OB_PORT = int(os.environ.get('OB_PORT', '11202'))
-OB_TENANT = os.environ.get('OB_TENANT', 'mysql')
-OB_DATABASE = os.environ.get('OB_DATABASE', 'test')
-OB_USER = os.environ.get('OB_USER', 'root')
-OB_PASSWORD = os.environ.get('OB_PASSWORD', '')
+OB_HOST = os.environ.get("OB_HOST", "localhost")
+OB_PORT = int(os.environ.get("OB_PORT", "11202"))
+OB_TENANT = os.environ.get("OB_TENANT", "mysql")
+OB_DATABASE = os.environ.get("OB_DATABASE", "test")
+OB_USER = os.environ.get("OB_USER", "root")
+OB_PASSWORD = os.environ.get("OB_PASSWORD", "")
 
 
 # ==================== Client Factory Functions ====================
@@ -42,11 +43,8 @@ def create_embedded_client():
         import pylibseekdb  # noqa: F401
     except ImportError:
         pytest.skip("seekdb embedded package is not installed")
-    
-    return pyseekdb.Client(
-        path=SEEKDB_PATH,
-        database=SEEKDB_DATABASE
-    )
+
+    return pyseekdb.Client(path=SEEKDB_PATH, database=SEEKDB_DATABASE)
 
 
 def create_server_client():
@@ -57,16 +55,18 @@ def create_server_client():
         tenant="sys",
         database=SERVER_DATABASE,
         user=SERVER_USER,
-        password=SERVER_PASSWORD
+        password=SERVER_PASSWORD,
     )
-    
+
     # Test connection
     try:
         result = client._server._execute("SELECT 1 as test")
         assert result and result[0].get("test") == 1
     except Exception as exc:
-        pytest.fail(f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}")
-    
+        pytest.fail(
+            f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}"
+        )
+
     return client
 
 
@@ -78,16 +78,16 @@ def create_oceanbase_client():
         tenant=OB_TENANT,
         database=OB_DATABASE,
         user=OB_USER,
-        password=OB_PASSWORD
+        password=OB_PASSWORD,
     )
-    
+
     # Test connection
     try:
         result = client._server._execute("SELECT 1 as test")
         assert result and result[0].get("test") == 1
     except Exception as exc:
         pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {exc}")
-    
+
     return client
 
 
@@ -98,7 +98,7 @@ def create_embedded_admin_client():
         import pylibseekdb  # noqa: F401
     except ImportError:
         pytest.skip("seekdb embedded package is not installed")
-    
+
     return pyseekdb.AdminClient(path=SEEKDB_PATH)
 
 
@@ -109,52 +109,50 @@ def create_server_admin_client():
         port=SERVER_PORT,
         tenant="sys",
         user=SERVER_USER,
-        password=SERVER_PASSWORD
+        password=SERVER_PASSWORD,
     )
-    
+
     # Test connection
     try:
         result = admin._server._execute("SELECT 1 as test")
         assert result and result[0].get("test") == 1
     except Exception as exc:
-        pytest.fail(f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}")
-    
+        pytest.fail(
+            f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}"
+        )
+
     return admin
 
 
 def create_oceanbase_admin_client():
     """Create an OceanBase admin client instance."""
     admin = pyseekdb.AdminClient(
-        host=OB_HOST,
-        port=OB_PORT,
-        tenant=OB_TENANT,
-        user=OB_USER,
-        password=OB_PASSWORD
+        host=OB_HOST, port=OB_PORT, tenant=OB_TENANT, user=OB_USER, password=OB_PASSWORD
     )
-    
+
     # Test connection
     try:
         result = admin._server._execute("SELECT 1 as test")
         assert result and result[0].get("test") == 1
     except Exception as exc:
         pytest.fail(f"OceanBase connection failed ({OB_HOST}:{OB_PORT}): {exc}")
-    
+
     return admin
 
 
 # ==================== Parameterized Client Fixtures ====================
-@pytest.fixture(params=['embedded', 'server', 'oceanbase'])
+@pytest.fixture(params=["embedded", "server", "oceanbase"])
 def db_client(request):
     """
     Parameterized fixture that provides clients for all three modes.
-    
+
     This fixture automatically creates test variants for embedded, server, and oceanbase modes.
-    
+
     Usage:
         def test_my_feature(db_client):
             collection = db_client.get_or_create_collection(...)
             # test logic here
-    
+
     This will automatically run 3 times: once for each client mode.
     Generated test names will be:
         - test_my_feature[embedded]
@@ -162,20 +160,20 @@ def db_client(request):
         - test_my_feature[oceanbase]
     """
     mode = request.param
-    
-    if mode == 'embedded':
+
+    if mode == "embedded":
         client = create_embedded_client()
-    elif mode == 'server':
+    elif mode == "server":
         client = create_server_client()
-    elif mode == 'oceanbase':
+    elif mode == "oceanbase":
         client = create_oceanbase_client()
     else:
         raise ValueError(f"Unknown client mode: {mode}")
-    
+
     yield client
-    
+
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
@@ -187,7 +185,7 @@ def embedded_client():
     client = create_embedded_client()
     yield client
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
@@ -199,7 +197,7 @@ def server_client():
     client = create_server_client()
     yield client
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
@@ -211,25 +209,25 @@ def oceanbase_client():
     client = create_oceanbase_client()
     yield client
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
 
 
 # ==================== Parameterized AdminClient Fixtures ====================
-@pytest.fixture(params=['embedded', 'server', 'oceanbase'])
+@pytest.fixture(params=["embedded", "server", "oceanbase"])
 def admin_client(request):
     """
     Parameterized fixture that provides admin clients for all three modes.
-    
+
     This fixture automatically creates test variants for embedded, server, and oceanbase modes.
-    
+
     Usage:
         def test_my_admin_feature(admin_client):
             admin_client.create_database("test_db")
             # test logic here
-    
+
     This will automatically run 3 times: once for each client mode.
     Generated test names will be:
         - test_my_admin_feature[embedded]
@@ -237,20 +235,20 @@ def admin_client(request):
         - test_my_admin_feature[oceanbase]
     """
     mode = request.param
-    
-    if mode == 'embedded':
+
+    if mode == "embedded":
         client = create_embedded_admin_client()
-    elif mode == 'server':
+    elif mode == "server":
         client = create_server_admin_client()
-    elif mode == 'oceanbase':
+    elif mode == "oceanbase":
         client = create_oceanbase_admin_client()
     else:
         raise ValueError(f"Unknown admin client mode: {mode}")
-    
+
     yield client
-    
+
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
@@ -262,7 +260,7 @@ def embedded_admin_client():
     client = create_embedded_admin_client()
     yield client
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
@@ -274,7 +272,7 @@ def server_admin_client():
     client = create_server_admin_client()
     yield client
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
@@ -286,10 +284,7 @@ def oceanbase_admin_client():
     client = create_oceanbase_admin_client()
     yield client
     try:
-        if hasattr(client, 'close'):
+        if hasattr(client, "close"):
             client.close()
     except:
         pass
-
-
-

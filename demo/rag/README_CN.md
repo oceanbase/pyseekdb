@@ -60,7 +60,7 @@ uv sync
 uv sync --extra local
 ```
 
-> **提示：** 
+> **提示：**
 > - `local` 额外依赖包含 `sentence-transformers` 及相关依赖（约 2-3GB）。
 > - 如果您在中国大陆，可以使用国内镜像源加速下载：
 >   - 基础安装（清华源）：`uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
@@ -138,7 +138,7 @@ COLLECTION_NAME=embeddings
 | SEEKDB_NAME                     | 数据库名称                                     | test                                             | 可选                        |
 | COLLECTION_NAME                 | 嵌入表名称                                     | embeddings                                       | 可选                        |
 
-> **提示：** 
+> **提示：**
 > - 如果使用 `default` 类型，只需配置 `EMBEDDING_FUNCTION_TYPE=default` 和 LLM 相关配置即可
 > - 如果使用 `api` 类型，需要额外配置 Embedding API 相关变量
 > - 如果使用 `local` 类型，需要安装 `sentence-transformers` 库，并可选择配置模型名称

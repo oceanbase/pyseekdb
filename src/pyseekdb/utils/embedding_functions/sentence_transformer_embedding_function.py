@@ -1,5 +1,10 @@
-from pyseekdb.client.embedding_function import EmbeddingFunction, Space, Embeddings, Documents
-from typing import Dict, Any
+from typing import Any, Dict
+
+from pyseekdb.client.embedding_function import (
+    Documents,
+    EmbeddingFunction,
+    Embeddings,
+)
 
 
 class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -9,19 +14,22 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
     Example:
         pip install pyseekdb sentence-transformers
 
-        >>> import pyseekdb
-        >>> from pyseekdb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-        >>> ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-        >>> db = pyseekdb.Client(
-        ...     path="./mydb"
-        ... )
-        >>> collection = db.create_collection(name="my_collection", embedding_function=ef)
-        >>> # Add documents
-        >>> collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
-        >>> # Query using semantic search
-        >>> results = collection.query("How are you?", top_k=1)
-        >>> print(results)
+    .. code-block:: python
+        import pyseekdb
+        from pyseekdb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+        ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+        db = pyseekdb.Client(
+            path="./seekdb.db"
+        )
+        collection = db.create_collection(name="my_collection", embedding_function=ef)
+        # Add documents
+        collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
+        # Query using semantic search
+        results = collection.query("How are you?", top_k=1)
+        print(results)
+
     """
+
     # Since we do dynamic imports we have to type this as Any
     models: Dict[str, Any] = {}
 
@@ -79,3 +87,52 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         )
 
         return [embedding.tolist() for embedding in embeddings]
+
+    @staticmethod
+    def name() -> str:
+        """Get the unique name identifier for SentenceTransformerEmbeddingFunction.
+
+        Returns:
+            The name identifier for this embedding function type
+        """
+        return "sentence_transformer"
+
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for the SentenceTransformerEmbeddingFunction.
+
+        Returns:
+            Dictionary containing configuration needed to restore this embedding function
+        """
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "normalize_embeddings": self.normalize_embeddings,
+            "kwargs": self.kwargs,
+        }
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "SentenceTransformerEmbeddingFunction":
+        """Build a SentenceTransformerEmbeddingFunction from its configuration dictionary.
+
+        Args:
+            config: Dictionary containing the embedding function's configuration
+
+        Returns:
+            Restored SentenceTransformerEmbeddingFunction instance
+
+        Raises:
+            ValueError: If the configuration is invalid or missing required fields
+        """
+        model_name = config.get("model_name", "all-MiniLM-L6-v2")
+        device = config.get("device", "cpu")
+        normalize_embeddings = config.get("normalize_embeddings", False)
+        kwargs = config.get("kwargs", {})
+        if not isinstance(kwargs, dict):
+            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+
+        return SentenceTransformerEmbeddingFunction(
+            model_name=model_name,
+            device=device,
+            normalize_embeddings=normalize_embeddings,
+            **kwargs
+        )

@@ -12,6 +12,7 @@ author = "OceanBase <open_oceanbase@oceanbase.com>"
 
 try:
     import importlib.metadata
+
     release = importlib.metadata.version("pyseekdb")
 except importlib.metadata.PackageNotFoundError:
     release = "0.0.1.dev1"
@@ -39,7 +40,16 @@ autodoc_default_options = {
 
 autosummary_generate = True
 autosummary_imported_members = True
-autodoc_mock_imports = ["pylibseekdb", "pymysql", "onnxruntime", "tokenizers", "httpx", "tqdm", "tenacity", "numpy"]
+autodoc_mock_imports = [
+    "pylibseekdb",
+    "pymysql",
+    "onnxruntime",
+    "tokenizers",
+    "httpx",
+    "tqdm",
+    "tenacity",
+    "numpy",
+]
 
 # Source files
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}

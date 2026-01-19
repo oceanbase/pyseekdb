@@ -20,19 +20,12 @@ import os
 import logging
 from typing import Optional, Any
 from .base_connection import BaseConnection
-from .client_base import (
-    BaseClient,
-    ClientAPI
-)
-from .configuration import (
-    Configuration,
-    HNSWConfiguration,
-    FulltextParserConfig
-)
+from .client_base import BaseClient, ClientAPI
+from .configuration import Configuration, HNSWConfiguration, FulltextParserConfig
 from .embedding_function import (
     EmbeddingFunction,
     DefaultEmbeddingFunction,
-    get_default_embedding_function
+    get_default_embedding_function,
 )
 from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
@@ -126,33 +119,34 @@ def _create_server_client(
     )
 
 __all__ = [
-    'BaseConnection',
-    'BaseClient',
-    'ClientAPI',
-    'HNSWConfiguration',
-    'Configuration',
-    'FulltextParserConfig',
-    'EmbeddingFunction',
-    'DefaultEmbeddingFunction',
-    'get_default_embedding_function',
-    'SeekdbEmbeddedClient',
-    'RemoteServerClient',
-    'Client',
-    'AdminAPI',
-    'AdminClient',
-    'Database',
-    'HybridSearch',
-    'DOCUMENT',
-    'TEXT',
-    'EMBEDDINGS',
-    'K',
-    'IDS',
-    'DOCUMENTS',
-    'METADATAS',
-    'EMBEDDINGS_FIELD',
-    'SCORES',
-    'Version',
+    "BaseConnection",
+    "BaseClient",
+    "ClientAPI",
+    "HNSWConfiguration",
+    "Configuration",
+    "FulltextParserConfig",
+    "EmbeddingFunction",
+    "DefaultEmbeddingFunction",
+    "get_default_embedding_function",
+    "SeekdbEmbeddedClient",
+    "RemoteServerClient",
+    "Client",
+    "AdminAPI",
+    "AdminClient",
+    "Database",
+    "HybridSearch",
+    "DOCUMENT",
+    "TEXT",
+    "EMBEDDINGS",
+    "K",
+    "IDS",
+    "DOCUMENTS",
+    "METADATAS",
+    "EMBEDDINGS_FIELD",
+    "SCORES",
+    "Version",
 ]
+
 
 def Client(
     path: Optional[str] = None,
@@ -161,8 +155,8 @@ def Client(
     tenant: str = "sys",
     database: str = "test",
     user: Optional[str] = None,
-    password: str = "", # Can be retrieved from SEEKDB_PASSWORD environment variable
-    **kwargs
+    password: str = "",  # Can be retrieved from SEEKDB_PASSWORD environment variable
+    **kwargs,
 ) -> _ClientProxy:
     """
     Smart client factory function (returns ClientProxy for collection operations only)
@@ -241,19 +235,19 @@ def AdminClient(
     port: Optional[int] = None,
     tenant: str = "sys",
     user: Optional[str] = None,
-    password: str = "", # Can be retrieved from SEEKDB_PASSWORD environment variable
-    **kwargs
+    password: str = "",  # Can be retrieved from SEEKDB_PASSWORD environment variable
+    **kwargs,
 ) -> _AdminClientProxy:
     """
     Smart admin client factory function (proxy pattern)
-    
+
     Automatically selects embedded or remote server mode based on parameters:
     - If path is provided, uses embedded mode
     - If host/port is provided, uses remote server mode (supports both seekdb Server and OceanBase Server)
-    
+
     Returns a lightweight AdminClient proxy that only exposes database operations.
     For collection management, use Client().
-    
+
     Args:
         path: seekdb data directory path (embedded mode)
         host: server address (remote server mode)
@@ -262,16 +256,16 @@ def AdminClient(
         user: username (remote server mode, without tenant suffix)
         password: password (remote server mode). If not provided, will be retrieved from SEEKDB_PASSWORD environment variable
         **kwargs: other parameters
-    
+
     Returns:
         _AdminClientProxy: A proxy that only exposes database operations
-    
+
     Examples:
         >>> # Embedded mode
         >>> admin = AdminClient(path="/path/to/seekdb")
         >>> admin.create_database("new_db")  # ✅ Available
         >>> # admin.create_collection("coll")  # ❌ Not available
-        
+
         >>> # Remote server mode (seekdb Server)
         >>> admin = AdminClient(
         ...     host='localhost',
@@ -280,7 +274,7 @@ def AdminClient(
         ...     user="root",
         ...     password="pass"
         ... )
-        
+
         >>> # Remote server mode (OceanBase Server)
         >>> admin = AdminClient(
         ...     host='localhost',

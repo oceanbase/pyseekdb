@@ -8,6 +8,7 @@ The scenario mirrors `pyseekdb/examples/official_example.py` and covers:
 3. Upserting only documents/metadatas/ids (relying on default embedding function)
 4. Querying with query_texts + metadata filter + document filter
 """
+
 import time
 import pytest
 
@@ -22,8 +23,20 @@ PRODUCT_DOCUMENTS = [
 ]
 
 PRODUCT_METADATA = [
-    {"category": "laptop", "ram": 16, "storage": 512, "price": 12000, "type": "professional"},
-    {"category": "laptop", "ram": 32, "storage": 1000, "price": 25000, "type": "gaming"},
+    {
+        "category": "laptop",
+        "ram": 16,
+        "storage": 512,
+        "price": 12000,
+        "type": "professional",
+    },
+    {
+        "category": "laptop",
+        "ram": 32,
+        "storage": 1000,
+        "price": 25000,
+        "type": "gaming",
+    },
     {"category": "laptop", "ram": 8, "storage": 256, "price": 9000, "type": "business"},
     {"category": "tablet", "ram": 6, "storage": 128, "price": 6000, "type": "consumer"},
 ]
@@ -75,18 +88,17 @@ class TestOfficialExample:
     def test_official_example(self, db_client):
         """
         Official example using client (automatic mode selection).
-        
+
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"official_example_{int(time.time() * 1000)}"
         collection = db_client.get_or_create_collection(name=collection_name)
-        
+
         # Run the official example workflow
         _run_official_example(collection)
-        
+
         # Note: cleanup is handled automatically by the db_client fixture
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
-

@@ -14,6 +14,26 @@ on:
       - 'demo/**'
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: '3.11'
+
+      - name: Cache prek
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/prek
+          key: prek-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run checks
+        run: make check
+
   unit-test:
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +44,10 @@ jobs:
         uses: ./.github/actions/setup-python-env
         with:
           python-version: '3.11'
+
+      - name: Install depencies for unit tests
+        run: |
+          uv run pip install openai sentence-transformers torch torchvision torchaudio
 
       - name: Run unit tests
         run: |
@@ -83,4 +107,4 @@ jobs:
           SERVER_PORT: 2881
         run: |
           # Run integration tests filtered by test mode
-          uv run pytest tests/integration_tests/ -v --log-cli-level=INFO -k "${{ matrix.test_mode }}" 
+          uv run pytest tests/integration_tests/ -v --log-cli-level=INFO -k "${{ matrix.test_mode }}"

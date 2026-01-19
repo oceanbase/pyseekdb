@@ -60,7 +60,7 @@ uv sync
 uv sync --extra local
 ```
 
-> **Note:** 
+> **Note:**
 > - The `local` extra includes `sentence-transformers` and related dependencies (~2-3GB).
 > - If you experience slow download speeds, you can use mirror sources to accelerate:
 >   - Basic installation (Tsinghua mirror): `uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple`
@@ -138,7 +138,7 @@ COLLECTION_NAME=embeddings
 | SEEKDB_NAME                        | Database name                                        | test                                             | Optional                               |
 | COLLECTION_NAME                    | Collection name                                     | embeddings                                       | Optional                               |
 
-> **Tip:** 
+> **Tip:**
 > - If using `default` type, only configure `EMBEDDING_FUNCTION_TYPE=default` and LLM-related settings
 > - If using `api` type, additional Embedding API variables need to be configured
 > - If using `local` type, install the `sentence-transformers` library and optionally configure the model name
