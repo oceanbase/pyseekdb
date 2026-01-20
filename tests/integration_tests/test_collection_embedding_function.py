@@ -97,6 +97,16 @@ class TestCollectionEmbeddingFunction:
         print(f"   Collection dimension: {collection.dimension}")
         print(f"   Embedding function: {collection.embedding_function}")
 
+        collection_get = db_client.get_collection(
+            name=collection_name, embedding_function=None
+        )
+        assert collection_get is not None
+        assert collection_get.name == collection_name
+        assert collection_get.embedding_function is None
+        assert collection_get.dimension == 128
+        print(f"   Collection dimension: {collection_get.dimension}")
+        print(f"   Embedding function: {collection_get.embedding_function}")
+
         # Cleanup
         try:
             db_client.delete_collection(name=collection_name)
@@ -127,6 +137,17 @@ class TestCollectionEmbeddingFunction:
         assert collection.dimension == 3
         print(f"   Collection dimension: {collection.dimension}")
         print(f"   Embedding function: {collection.embedding_function}")
+
+        collection_get = db_client.get_collection(
+            name=collection_name, embedding_function=custom_ef
+        )
+        assert collection_get is not None
+        assert collection_get.name == collection_name
+        assert collection_get.embedding_function is not None
+        assert collection_get.embedding_function == custom_ef
+        assert collection_get.dimension == 3
+        print(f"   Collection dimension: {collection_get.dimension}")
+        print(f"   Embedding function: {collection_get.embedding_function}")
 
         # Cleanup
         try:
@@ -744,7 +765,7 @@ class TestCollectionEmbeddingFunction:
             # Create first collection
             ef1 = FirstEmbeddingFunction(param="custom_first")
             config = HNSWConfiguration(dimension=3, distance="cosine")
-            coll1 = db_client.create_collection(
+            db_client.create_collection(
                 name=collection_name_1,
                 configuration=config,
                 embedding_function=ef1,
@@ -752,7 +773,7 @@ class TestCollectionEmbeddingFunction:
 
             # Create second collection
             ef2 = SecondEmbeddingFunction(param="custom_second")
-            coll2 = db_client.create_collection(
+            db_client.create_collection(
                 name=collection_name_2,
                 configuration=config,
                 embedding_function=ef2,
@@ -827,7 +848,7 @@ class TestCollectionEmbeddingFunction:
 
             @staticmethod
             def build_from_config(
-                config: Dict[str, Any],
+                _config: Dict[str, Any],
             ) -> "UnregisteredEmbeddingFunction":
                 return UnregisteredEmbeddingFunction()
 
@@ -861,6 +882,52 @@ class TestCollectionEmbeddingFunction:
                 db_client.delete_collection(name=collection_name)
             except Exception:
                 pass
+
+    def test_providing_embedding_function_from_parameter_and_persistence_raises_error(
+        self, db_client
+    ):
+        """
+        Test that providing embedding function from parameter and persistence raises error.
+
+        Automatically runs for: embedded, server, oceanbase
+        """
+        collection_name = f"test_ef_parameter_and_persistence_{int(time.time() * 1000)}"
+        print(
+            f"\n✅ Testing providing embedding function from parameter and persistence raises error"
+        )
+
+        # Create collection
+        custom_ef = Simple3DEmbeddingFunction()
+        db_client.create_collection(
+            name=collection_name,
+            # use default embedding function
+        )
+
+        # Get collection
+        with pytest.raises(ValueError):
+            db_client.get_collection(name=collection_name, embedding_function=custom_ef)
+
+        with pytest.raises(ValueError):
+            db_client.get_or_create_collection(
+                name=collection_name, embedding_function=None
+            )
+
+        collection_name = f"test_ef_parameter_and_persistence_{int(time.time() * 1000)}"
+        db_client.create_collection(
+            name=collection_name,
+            configuration=HNSWConfiguration(dimension=3, distance="cosine"),
+            embedding_function=None,
+        )
+        collection_get = db_client.get_collection(
+            name=collection_name, embedding_function=custom_ef
+        )
+        assert collection_get is not None
+        assert collection_get.name == collection_name
+        assert collection_get.embedding_function is not None
+        assert collection_get.embedding_function == custom_ef
+        assert collection_get.dimension == 3
+        print(f"   Collection dimension: {collection_get.dimension}")
+        print(f"   Embedding function: {collection_get.embedding_function}")
 
 
 if __name__ == "__main__":
