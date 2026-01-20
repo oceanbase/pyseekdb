@@ -13,7 +13,6 @@ This is a complete reference for all client capabilities.
 """
 
 import uuid
-import random
 import pyseekdb
 
 # ============================================================================
@@ -22,7 +21,7 @@ import pyseekdb
 
 # Option 1: Embedded mode (local seekdb)
 client = pyseekdb.Client(
-    # path="./seekdb",
+    # path="./seekdb.db",
     # database="test"
 )
 
@@ -50,28 +49,35 @@ client = pyseekdb.Client(
 # ============================================================================
 
 collection_name = "comprehensive_example"
-dimension = 128
+dimension = 384
 
 # 2.1 Create a collection
 from pyseekdb import HNSWConfiguration
 
+# create a collection with default configuration and default embedding function
+collection = client.get_or_create_collection(
+    name=collection_name,
+)
+
+# 2.2 Create a collection with custom configuration and no embedding function
 config = HNSWConfiguration(dimension=dimension, distance="cosine")
+default_ef = pyseekdb.DefaultEmbeddingFunction()
 collection = client.get_or_create_collection(
     name=collection_name,
     configuration=config,
-    embedding_function=None,  # Explicitly set to None since we're using custom 128-dim embeddings
+    embedding_function=None,  # Explicitly set to None since we're using custom 384-dim embeddings
 )
 
-# 2.2 Check if collection exists
+# 2.3 Check if collection exists
 exists = client.has_collection(collection_name)
 
-# 2.3 Get collection object
+# 2.4 Get collection object
 retrieved_collection = client.get_collection(collection_name, embedding_function=None)
 
-# 2.4 List all collections
+# 2.5 List all collections
 all_collections = client.list_collections()
 
-# 2.5 Get or create collection (creates if doesn't exist)
+# 2.6 Get or create collection (creates if doesn't exist)
 config2 = HNSWConfiguration(dimension=64, distance="cosine")
 collection2 = client.get_or_create_collection(
     name="another_collection",
@@ -79,12 +85,41 @@ collection2 = client.get_or_create_collection(
     embedding_function=None,  # Explicitly set to None since we're using custom 64-dim embeddings
 )
 
+
+# 2.7 Create a collection with custom embedding function
+@pyseekdb.register_embedding_function
+class CustomEmbeddingFunction(pyseekdb.EmbeddingFunction):
+    def __init__(self):
+        self._ef = (
+            pyseekdb.DefaultEmbeddingFunction()
+        )  # use the default embedding function
+
+    def __call__(self, input: pyseekdb.Documents) -> pyseekdb.Embeddings:
+        return self._ef(input)
+
+    def get_config(self) -> dict:
+        return self._ef.get_config()
+
+    @staticmethod
+    def build_from_config(config: dict) -> "CustomEmbeddingFunction":
+        return CustomEmbeddingFunction(config=config)
+
+    @staticmethod
+    def name() -> str:
+        return "custom_embedding"
+
+
+custom_ef = CustomEmbeddingFunction()
+collection3 = client.create_collection(
+    name="custom_embedding_collection",
+    embedding_function=custom_ef,
+)
+
 # ============================================================================
 # PART 3: DML OPERATIONS - ADD DATA
 # ============================================================================
 
 # Generate sample data
-random.seed(42)
 documents = [
     "Machine learning is transforming the way we solve problems",
     "Python programming language is widely used in data science",
@@ -98,18 +133,19 @@ documents = [
 
 # Generate embeddings (in real usage, use an embedding model)
 embeddings = []
-for i in range(len(documents)):
-    vector = [random.random() for _ in range(dimension)]
+for document in documents:
+    vector = default_ef(document)
     embeddings.append(vector)
 
 ids = [str(uuid.uuid4()) for _ in documents]
 
 # 3.1 Add single item
 single_id = str(uuid.uuid4())
+document = "This is a single document"
 collection.add(
     ids=single_id,
     documents="This is a single document",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=default_ef(document),
     metadatas={"type": "single", "category": "test"},
 )
 
@@ -158,7 +194,7 @@ collection.update(
 collection.update(
     ids=ids[1:3],
     documents=["Updated document 1", "Updated document 2"],
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=embeddings,
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True},
@@ -166,8 +202,13 @@ collection.update(
 )
 
 # 4.3 Update embeddings
-new_embeddings = [[random.random() for _ in range(dimension)] for _ in range(2)]
-collection.update(ids=ids[2:4], embeddings=new_embeddings)
+update_documents = [
+    "Search engines find relevant documents using semantic vectors",
+    "Deep learning architectures are inspired by biological neurons",
+    "Text analytics empowers machines to interpret and extract meaning from language",
+]
+update_embeddings = [default_ef(document) for document in update_documents]
+collection.update(ids=ids[2:4], embeddings=update_embeddings)
 
 # ============================================================================
 # PART 5: DML OPERATIONS - UPSERT DATA
@@ -177,25 +218,31 @@ collection.update(ids=ids[2:4], embeddings=new_embeddings)
 collection.upsert(
     ids=ids[0],
     documents="Upserted document (was updated)",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=default_ef(document),
     metadatas={"category": "AI", "upserted": True},
 )
 
 # 5.2 Upsert new item (will insert)
 new_id = str(uuid.uuid4())
+new_document = "This is a new document from upsert"
 collection.upsert(
     ids=new_id,
     documents="This is a new document from upsert",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=default_ef(new_document),
     metadatas={"category": "New", "upserted": True},
 )
 
 # 5.3 Upsert multiple items
 upsert_ids = [ids[4], str(uuid.uuid4())]  # One existing, one new
+upsert_documents = [
+    "Upserted document 1",
+    "Upserted document 2",
+]
+upsert_embeddings = [default_ef(document) for document in upsert_documents]
 collection.upsert(
     ids=upsert_ids,
-    documents=["Upserted doc 1", "Upserted doc 2"],
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    documents=upsert_documents,
+    embeddings=upsert_embeddings,
     metadatas=[{"upserted": True}, {"upserted": True}],
 )
 
