@@ -764,7 +764,9 @@ class BaseClient(BaseConnection, AdminAPI):
             query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
             rows = self._execute(query_sql)
             if not rows or len(rows) == 0:
-                raise ValueError(f"Failed to create collection metadata: cannot find collection name in sdk_collections table")
+                raise ValueError(
+                    f"Failed to create collection metadata: cannot find collection name in sdk_collections table"
+                )
             row = rows[0]
             # Extract collection id
             if isinstance(row, dict):

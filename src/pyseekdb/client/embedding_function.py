@@ -730,8 +730,9 @@ class EmbeddingFunctionRegistry:
         """
         cls._initialize()
 
-        if (not hasattr(embedding_function_class, "name")
-            or not hasattr(embedding_function_class, "build_from_config")):
+        if not hasattr(embedding_function_class, "name") or not hasattr(
+            embedding_function_class, "build_from_config"
+        ):
             raise ValueError(
                 f"Embedding function class {embedding_function_class.__name__} "
                 f"must have a static name() method, static build_from_config() method"
