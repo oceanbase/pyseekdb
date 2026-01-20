@@ -112,7 +112,7 @@ class EmbeddingFunction(Protocol[D]):
         """
         Check if the embedding function supports persistence.
         """
-        if not embedding_function:
+        if embedding_function is None:
             return False
         if (
             not hasattr(embedding_function, "name")
@@ -730,12 +730,11 @@ class EmbeddingFunctionRegistry:
         """
         cls._initialize()
 
-        if not hasattr(embedding_function_class, "name") or not hasattr(
-            embedding_function_class, "build_from_config"
-        ):
+        if (not hasattr(embedding_function_class, "name")
+            or not hasattr(embedding_function_class, "build_from_config")):
             raise ValueError(
                 f"Embedding function class {embedding_function_class.__name__} "
-                f"must have a static name() method, static build_from_config() method method"
+                f"must have a static name() method, static build_from_config() method"
             )
 
         name = embedding_function_class.name()

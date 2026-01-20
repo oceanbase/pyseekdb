@@ -753,17 +753,18 @@ class BaseClient(BaseConnection, AdminAPI):
                     "properties": embedding_function.get_config(),
                 }
 
-            settings_str = json.dumps(settings)
+            settings_str = escape_string(json.dumps(settings))
 
             self._create_sdk_collections_if_not_exists()
-            delete_sql = f"DELETE FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{collection_name}'"
+            collection_name_in_table = escape_string(collection_name)
+            delete_sql = f"DELETE FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
             self._execute(delete_sql)
-            insert_sql = f"INSERT INTO {CollectionNames.sdk_collections_table_name()} (COLLECTION_NAME, SETTINGS) VALUES ('{collection_name}', '{settings_str}')"
+            insert_sql = f"INSERT INTO `{CollectionNames.sdk_collections_table_name()}` (COLLECTION_NAME, SETTINGS) VALUES ('{collection_name_in_table}', '{settings_str}')"
             self._execute(insert_sql)
-            query_sql = f"SELECT COLLECTION_ID FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{collection_name}'"
+            query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
             rows = self._execute(query_sql)
             if not rows or len(rows) == 0:
-                raise ValueError(f"Failed to create collection metadata: {e}")
+                raise ValueError(f"Failed to create collection metadata: cannot find collection name in sdk_collections table")
             row = rows[0]
             # Extract collection id
             if isinstance(row, dict):
@@ -930,7 +931,7 @@ class BaseClient(BaseConnection, AdminAPI):
             and not embedding_function is _NOT_PROVIDED
         ):
             raise ValueError(
-                f"Embedding function provided and embedding function persistence provided, both cannot be provided"
+                f"Both embedding function from parameter (not _NOT_PROVIDED, default value) and embedding function from persistence provided."
             )
         if embedding_function is _NOT_PROVIDED:
             return (
@@ -945,7 +946,8 @@ class BaseClient(BaseConnection, AdminAPI):
         self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
     ) -> "Collection":
         try:
-            query_sql = f"SELECT COLLECTION_ID, COLLECTION_NAME, SETTINGS FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{name}'"
+            name_in_table = escape_string(name)
+            query_sql = f"SELECT COLLECTION_ID, COLLECTION_NAME, SETTINGS FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{name_in_table}'"
             rows = self._execute(query_sql)
             if not rows or len(rows) == 0:
                 raise ValueError(f"Collection '{name}' not found")
@@ -1039,7 +1041,7 @@ class BaseClient(BaseConnection, AdminAPI):
         if not collection:
             raise ValueError(f"Collection '{name}' does not exist")
         drop_table_sql = f"DROP TABLE `{CollectionNames.table_name_v2(collection.id)}`"
-        query_sql = f"DELETE FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{name}'"
+        query_sql = f"DELETE FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{name}'"
         self._execute(drop_table_sql)
         self._execute(query_sql)
         logger.debug(

@@ -13,6 +13,7 @@ from pyseekdb import DefaultEmbeddingFunction, HNSWConfiguration
 from pyseekdb.client.embedding_function import (
     EmbeddingFunction,
     Documents,
+    EmbeddingFunctionRegistry,
     Embeddings,
     register_embedding_function,
 )
@@ -850,12 +851,10 @@ class TestCollectionEmbeddingFunction:
             # Now unregister it
             # Note: We can't easily unregister, but we can test what happens
             # when the registry doesn't have it by checking the error handling
+            EmbeddingFunctionRegistry._registry.pop(ef.name())
 
             # Actually, since we registered it, getting should work
-            retrieved_collection = db_client.get_collection(name=collection_name)
-            assert retrieved_collection.embedding_function is not None
-
-            print(f"   Collection created and retrieved successfully")
+            pytest.raises(ValueError, db_client.get_collection, name=collection_name)
         finally:
             # Cleanup
             try:
