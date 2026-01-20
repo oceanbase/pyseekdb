@@ -23,15 +23,15 @@ logging.basicConfig(level=logging.DEBUG)
 # ============================================================================
 
 # Option 1: Embedded mode (local seekdb)
-# client = pyseekdb.Client(
-#     # path="./seekdb.db",
-#     # database="test"
-# )
+client = pyseekdb.Client(
+    # path="./seekdb.db",
+    # database="test"
+)
 
 # Option 2: Server mode (remote seekdb server)
-client = pyseekdb.Client(
-    host="6.12.233.133", port=10202, database="test", user="root", password=""
-)
+# client = pyseekdb.Client(
+#     host="127.0.0.1", port=2881, database="test", user="root", password=""
+# )
 
 # Option 3: Remote server mode (OceanBase Server)
 # client = pyseekdb.Client(
