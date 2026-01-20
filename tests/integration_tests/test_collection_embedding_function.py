@@ -513,6 +513,18 @@ class TestCollectionEmbeddingFunction:
             f"   Embedding function model: {retrieved_collection.embedding_function.model_name}"
         )
 
+        collection_get = db_client.get_or_create_collection(
+            name=collection_name, embedding_function=custom_ef
+        )
+        assert collection_get is not None
+        assert collection_get.embedding_function is not None
+        assert collection_get.embedding_function == custom_ef
+        assert collection_get.dimension == 5
+        assert collection_get.name == collection_name
+        assert collection_get.configuration == config
+        assert collection_get.embedding_function.model_name == "my-test-model"
+        assert collection_get.embedding_function.dimension == 5
+
         # Cleanup
         try:
             db_client.delete_collection(name=collection_name)
@@ -606,6 +618,18 @@ class TestCollectionEmbeddingFunction:
             embeddings = retrieved_collection.embedding_function(["test"])
             assert len(embeddings) == 1
             assert len(embeddings[0]) == 4
+
+            collection_get = db_client.get_collection(
+                name=collection_name, embedding_function=custom_ef
+            )
+            assert collection_get is not None
+            assert collection_get.embedding_function is not None
+            assert collection_get.embedding_function == custom_ef
+            assert collection_get.dimension == 4
+            assert collection_get.name == collection_name
+            assert collection_get.configuration == config
+            assert collection_get.embedding_function.model_name == "custom-manual-model"
+            assert collection_get.embedding_function.dimension == 4
 
             print(f"   Successfully restored manually registered embedding function")
         finally:

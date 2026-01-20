@@ -8,7 +8,6 @@ import time
 import uuid
 
 import pyseekdb
-from pyseekdb.client.meta_info import CollectionNames, CollectionFieldNames
 
 
 class TestCollectionDML:
@@ -22,23 +21,13 @@ class TestCollectionDML:
         """
         # Create test collection using execute
         collection_name = f"test_dml_{int(time.time() * 1000)}"
-        table_name = CollectionNames.table_name(collection_name)
         dimension = 3
 
-        # Create table using execute
-        create_table_sql = f"""CREATE TABLE `{table_name}` (
-            {CollectionFieldNames.ID} varbinary(512) PRIMARY KEY NOT NULL,
-            {CollectionFieldNames.DOCUMENT} string,
-            {CollectionFieldNames.EMBEDDING} vector({dimension}),
-            {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=cosine, type=hnsw, lib=vsag)
-        ) ORGANIZATION = HEAP;"""
-        db_client._server._execute(create_table_sql)
-
         # Get collection object
-        collection = db_client.get_collection(
-            name=collection_name, embedding_function=None
+        collection = db_client.get_or_create_collection(
+            name=collection_name,
+            configuration=pyseekdb.HNSWConfiguration(dimension=dimension),
+            embedding_function=None,
         )
 
         # Test 1: collection.add - Add single item

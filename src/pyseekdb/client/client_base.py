@@ -794,9 +794,10 @@ class BaseClient(BaseConnection, AdminAPI):
         self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
     ) -> "Collection":
         try:
-            collection = self._get_collection_v2(name, embedding_function)
-        except ValueError:
             collection = self._get_collection_v1(name, embedding_function)
+        except ValueError as e:
+            logger.debug(f"Failed to get collection v1: {e}, trying v2...")
+            collection = self._get_collection_v2(name, embedding_function)
         return collection
 
     def _resolve_collection_metadata_from_table(
@@ -932,9 +933,15 @@ class BaseClient(BaseConnection, AdminAPI):
             embedding_function_persistence is not None
             and not embedding_function is _NOT_PROVIDED
         ):
-            raise ValueError(
-                f"Both embedding function from parameter (not _NOT_PROVIDED, default value) and embedding function from persistence provided."
-            )
+            if (
+                embedding_function
+                and embedding_function_persistence.name() != embedding_function.name()
+            ):
+                raise ValueError(
+                    f"Both embedding function from parameter (not _NOT_PROVIDED, default value) and embedding function from persistence provided."
+                )
+            else:
+                return embedding_function_persistence
         if embedding_function is _NOT_PROVIDED:
             return (
                 embedding_function_persistence

@@ -15,24 +15,23 @@ This is a complete reference for all client capabilities.
 import uuid
 import pyseekdb
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 # ============================================================================
 # PART 1: CLIENT CONNECTION
 # ============================================================================
 
 # Option 1: Embedded mode (local seekdb)
-client = pyseekdb.Client(
-    # path="./seekdb.db",
-    # database="test"
-)
+# client = pyseekdb.Client(
+#     # path="./seekdb.db",
+#     # database="test"
+# )
 
 # Option 2: Server mode (remote seekdb server)
-# client = pyseekdb.Client(
-#     host="127.0.0.1",
-#     port=2881,
-#     database="test",
-#     user="root",
-#     password=""
-# )
+client = pyseekdb.Client(
+    host="6.12.233.133", port=10202, database="test", user="root", password=""
+)
 
 # Option 3: Remote server mode (OceanBase Server)
 # client = pyseekdb.Client(
@@ -56,7 +55,7 @@ from pyseekdb import HNSWConfiguration
 
 # create a collection with default configuration and default embedding function
 collection = client.get_or_create_collection(
-    name=collection_name,
+    name="demo_default_collection",
 )
 
 # 2.2 Create a collection with custom configuration and no embedding function
@@ -74,10 +73,7 @@ exists = client.has_collection(collection_name)
 # 2.4 Get collection object
 retrieved_collection = client.get_collection(collection_name, embedding_function=None)
 
-# 2.5 List all collections
-all_collections = client.list_collections()
-
-# 2.6 Get or create collection (creates if doesn't exist)
+# 2.5 Get or create collection (creates if doesn't exist)
 config2 = HNSWConfiguration(dimension=64, distance="cosine")
 collection2 = client.get_or_create_collection(
     name="another_collection",
@@ -86,7 +82,7 @@ collection2 = client.get_or_create_collection(
 )
 
 
-# 2.7 Create a collection with custom embedding function
+# 2.6 Create a collection with custom embedding function
 @pyseekdb.register_embedding_function
 class CustomEmbeddingFunction(pyseekdb.EmbeddingFunction):
     def __init__(self):
@@ -94,15 +90,15 @@ class CustomEmbeddingFunction(pyseekdb.EmbeddingFunction):
             pyseekdb.DefaultEmbeddingFunction()
         )  # use the default embedding function
 
-    def __call__(self, input: pyseekdb.Documents) -> pyseekdb.Embeddings:
+    def __call__(self, input):
         return self._ef(input)
 
     def get_config(self) -> dict:
         return self._ef.get_config()
 
     @staticmethod
-    def build_from_config(config: dict) -> "CustomEmbeddingFunction":
-        return CustomEmbeddingFunction(config=config)
+    def build_from_config(_config: dict) -> "CustomEmbeddingFunction":
+        return CustomEmbeddingFunction()
 
     @staticmethod
     def name() -> str:
@@ -110,10 +106,13 @@ class CustomEmbeddingFunction(pyseekdb.EmbeddingFunction):
 
 
 custom_ef = CustomEmbeddingFunction()
-collection3 = client.create_collection(
+collection3 = client.get_or_create_collection(
     name="custom_embedding_collection",
     embedding_function=custom_ef,
 )
+
+# 2.7 List all collections
+all_collections = client.list_collections()
 
 # ============================================================================
 # PART 3: DML OPERATIONS - ADD DATA
@@ -132,10 +131,7 @@ documents = [
 ]
 
 # Generate embeddings (in real usage, use an embedding model)
-embeddings = []
-for document in documents:
-    vector = default_ef(document)
-    embeddings.append(vector)
+embeddings = default_ef(documents)
 
 ids = [str(uuid.uuid4()) for _ in documents]
 
@@ -170,7 +166,7 @@ collection.add(
 vector_only_ids = [str(uuid.uuid4()) for _ in range(2)]
 collection.add(
     ids=vector_only_ids,
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=default_ef([str(i) for i in range(2)]),
     metadatas=[{"type": "vector_only"}, {"type": "vector_only"}],
 )
 
@@ -191,10 +187,14 @@ collection.update(
 )
 
 # 4.2 Update multiple items
+update_documents = [
+    "Updated document 1",
+    "Updated document 2",
+]
 collection.update(
     ids=ids[1:3],
-    documents=["Updated document 1", "Updated document 2"],
-    embeddings=embeddings,
+    documents=update_documents,
+    embeddings=default_ef(update_documents),
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True},
@@ -205,9 +205,8 @@ collection.update(
 update_documents = [
     "Search engines find relevant documents using semantic vectors",
     "Deep learning architectures are inspired by biological neurons",
-    "Text analytics empowers machines to interpret and extract meaning from language",
 ]
-update_embeddings = [default_ef(document) for document in update_documents]
+update_embeddings = default_ef(update_documents)
 collection.update(ids=ids[2:4], embeddings=update_embeddings)
 
 # ============================================================================
@@ -218,7 +217,7 @@ collection.update(ids=ids[2:4], embeddings=update_embeddings)
 collection.upsert(
     ids=ids[0],
     documents="Upserted document (was updated)",
-    embeddings=default_ef(document),
+    embeddings=default_ef("Upserted document (was updated)"),
     metadatas={"category": "AI", "upserted": True},
 )
 
@@ -228,7 +227,7 @@ new_document = "This is a new document from upsert"
 collection.upsert(
     ids=new_id,
     documents="This is a new document from upsert",
-    embeddings=default_ef(new_document),
+    embeddings=default_ef("This is a new document from upsert"),
     metadatas={"category": "New", "upserted": True},
 )
 
@@ -238,7 +237,7 @@ upsert_documents = [
     "Upserted document 1",
     "Upserted document 2",
 ]
-upsert_embeddings = [default_ef(document) for document in upsert_documents]
+upsert_embeddings = default_ef(upsert_documents)
 collection.upsert(
     ids=upsert_ids,
     documents=upsert_documents,
