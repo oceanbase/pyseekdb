@@ -27,7 +27,7 @@ class TestFulltextParserConfig:
         test_dimension = 128
 
         # Create configuration with fulltext parser
-        fulltext_config = FulltextParserConfig(parser=parser_name, params=params)
+        fulltext_config = FulltextParserConfig(analyzer=parser_name, properties=params)
         config = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
             fulltext_config=fulltext_config,

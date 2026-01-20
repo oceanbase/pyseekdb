@@ -133,15 +133,15 @@ def _get_fulltext_index_sql(
         # Default to IK parser for backward compatibility
         return "WITH PARSER ik"
 
-    parser_name = fulltext_config.parser
-    params = fulltext_config.params or {}
+    parser_name = fulltext_config.analyzer
+    properties = fulltext_config.properties or {}
 
     # Build SQL clause with parser name
-    if params:
+    if properties:
         # Format parameters as key=value pairs
         # Quote string values, leave numbers and booleans as-is
         param_parts = []
-        for k, v in params.items():
+        for k, v in properties.items():
             if isinstance(v, str):
                 param_parts.append(f"{k}='{v}'")
             else:
@@ -511,11 +511,11 @@ class BaseClient(BaseConnection, AdminAPI):
         Args:
             name: Collection name
             configuration: Index configuration (Configuration or HNSWConfiguration).
-                          If not provided, uses default configuration (dimension=384, distance='cosine', parser='ik').
+                          If not provided, uses default configuration (dimension=384, distance='cosine', analyzer='ik').
                           If explicitly set to None, will try to calculate dimension from embedding_function.
                           If embedding_function is also None, will raise an error.
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext parser configuration (FulltextParserConfig with parser='ik', 'space', 'ngram', 'ngram2', or 'beng').
+                          Configuration can include fulltext parser configuration (FulltextParserConfig with analyzer='ik', 'space', 'ngram', 'ngram2', or 'beng').
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -552,21 +552,21 @@ class BaseClient(BaseConnection, AdminAPI):
             >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextParserConfig
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextParserConfig(parser='ik')
+            ...     fulltext_config=FulltextParserConfig(analyzer='ik')
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Using Space parser
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextParserConfig(parser='space')
+            ...     fulltext_config=FulltextParserConfig(analyzer='space')
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Using Ngram parser with parameters
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextParserConfig(parser='ngram', params={'size': 2})
+            ...     fulltext_config=FulltextParserConfig(analyzer='ngram', properties={'size': 2})
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 

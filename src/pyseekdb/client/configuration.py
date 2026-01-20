@@ -28,12 +28,12 @@ class FulltextParserConfig:
     Fulltext parser configuration for fulltext indexing.
 
     Args:
-        parser: Parser name, can be 'space', 'ngram', 'ngram2', 'beng', 'ik' and so on (default: 'ik')
-        params: Optional dictionary of parser-specific parameters (key: string, value: primitive type)
+        analyzer: Analyzer name, can be 'space', 'ngram', 'ngram2', 'beng', 'ik' and so on (default: 'ik')
+        properties: Optional dictionary of parser-specific parameters (key: string, value: primitive type)
     """
 
-    parser: str = "ik"
-    params: Optional[Dict[str, Union[str, int, float, bool]]] = None
+    analyzer: str = "ik"
+    properties: Optional[Dict[str, Union[str, int, float, bool]]] = None
 
 
 @dataclass
@@ -65,7 +65,7 @@ class Configuration:
 
     Args:
         hnsw: HNSWConfiguration or None
-        fulltext_config: FulltextParserConfig or None. If None, defaults to FulltextParserConfig(parser='ik')
+        fulltext_config: FulltextParserConfig or None. If None, defaults to FulltextParserConfig(analyzer='ik')
     """
 
     def __init__(

@@ -200,7 +200,7 @@ collection = client.create_collection(
 # Using IK parser (default for Chinese text)
 config = Configuration(
     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-    fulltext_config=FulltextParserConfig(parser='ik')
+    fulltext_config=FulltextParserConfig(analyzer='ik')
 )
 collection = client.create_collection(
     name="my_collection",
@@ -221,7 +221,7 @@ collection = client.create_collection(
 # Create a collection with Space parser (for space-separated languages)
 config = Configuration(
     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-    fulltext_config=FulltextParserConfig(parser='space')
+    fulltext_config=FulltextParserConfig(analyzer='space')
 )
 collection = client.create_collection(
     name="my_collection",
@@ -232,7 +232,7 @@ collection = client.create_collection(
 # Create a collection with Ngram parser and custom parameters
 config = Configuration(
     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-    fulltext_config=FulltextParserConfig(parser='ngram', params={'ngram_token_size': 3})
+    fulltext_config=FulltextParserConfig(analyzer='ngram', properties={'ngram_token_size': 3})
 )
 collection = client.create_collection(
     name="my_collection",
@@ -264,7 +264,7 @@ collection = client.get_or_create_collection(
     - Use `Configuration(hnsw=HNSWConfiguration(...))` even when only vector index config is needed
     - Allows easy addition of fulltext parser config later
   - `HNSWConfiguration`: Vector index configuration with `dimension` and `distance` metric (backward compatibility)
-  - If not provided, uses default (dimension=384, distance='cosine', parser='ik')
+  - If not provided, uses default (dimension=384, distance='cosine', analyzer='ik')
   - If set to `None`, dimension will be calculated from `embedding_function`
 - `embedding_function` (EmbeddingFunction, optional): Function to convert documents to embeddings
   - If not provided, uses `DefaultEmbeddingFunction()` (384 dimensions)
