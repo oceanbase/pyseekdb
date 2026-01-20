@@ -434,14 +434,18 @@ class TestCollectionEmbeddingFunction:
                 }
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "TestPersistentEmbeddingFunction":
+            def build_from_config(
+                config: Dict[str, Any],
+            ) -> "TestPersistentEmbeddingFunction":
                 return TestPersistentEmbeddingFunction(
                     model_name=config.get("model_name", "test-model"),
                     dimension=config.get("dimension", 5),
                 )
 
         # Create collection with the custom embedding function
-        custom_ef = TestPersistentEmbeddingFunction(model_name="my-test-model", dimension=5)
+        custom_ef = TestPersistentEmbeddingFunction(
+            model_name="my-test-model", dimension=5
+        )
         config = HNSWConfiguration(dimension=5, distance="cosine")
 
         created_collection = db_client.create_collection(
@@ -476,8 +480,12 @@ class TestCollectionEmbeddingFunction:
         assert len(embeddings[0]) == 5
 
         print(f"   Collection dimension: {retrieved_collection.dimension}")
-        print(f"   Restored embedding function: {retrieved_collection.embedding_function}")
-        print(f"   Embedding function model: {retrieved_collection.embedding_function.model_name}")
+        print(
+            f"   Restored embedding function: {retrieved_collection.embedding_function}"
+        )
+        print(
+            f"   Embedding function model: {retrieved_collection.embedding_function.model_name}"
+        )
 
         # Cleanup
         try:
@@ -525,7 +533,9 @@ class TestCollectionEmbeddingFunction:
                 }
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "ManualRegisteredEmbeddingFunction":
+            def build_from_config(
+                config: Dict[str, Any],
+            ) -> "ManualRegisteredEmbeddingFunction":
                 return ManualRegisteredEmbeddingFunction(
                     model_name=config.get("model_name", "manual-model"),
                     dimension=config.get("dimension", 4),
@@ -547,16 +557,23 @@ class TestCollectionEmbeddingFunction:
                 embedding_function=custom_ef,
             )
 
-            assert created_collection.embedding_function.model_name == "custom-manual-model"
+            assert (
+                created_collection.embedding_function.model_name
+                == "custom-manual-model"
+            )
 
             # Get the collection - should restore embedding function
             retrieved_collection = db_client.get_collection(name=collection_name)
 
             assert retrieved_collection.embedding_function is not None
             assert isinstance(
-                retrieved_collection.embedding_function, ManualRegisteredEmbeddingFunction
+                retrieved_collection.embedding_function,
+                ManualRegisteredEmbeddingFunction,
             )
-            assert retrieved_collection.embedding_function.model_name == "custom-manual-model"
+            assert (
+                retrieved_collection.embedding_function.model_name
+                == "custom-manual-model"
+            )
             assert retrieved_collection.embedding_function.dimension == 4
 
             # Verify it works
@@ -745,10 +762,14 @@ class TestCollectionEmbeddingFunction:
             retrieved_coll2 = db_client.get_collection(name=collection_name_2)
 
             # Verify each has the correct embedding function
-            assert isinstance(retrieved_coll1.embedding_function, FirstEmbeddingFunction)
+            assert isinstance(
+                retrieved_coll1.embedding_function, FirstEmbeddingFunction
+            )
             assert retrieved_coll1.embedding_function.param == "custom_first"
 
-            assert isinstance(retrieved_coll2.embedding_function, SecondEmbeddingFunction)
+            assert isinstance(
+                retrieved_coll2.embedding_function, SecondEmbeddingFunction
+            )
             assert retrieved_coll2.embedding_function.param == "custom_second"
 
             # Verify they produce different embeddings
@@ -758,7 +779,9 @@ class TestCollectionEmbeddingFunction:
             assert emb1[0] == [1.0, 2.0, 3.0]
             assert emb2[0] == [4.0, 5.0, 6.0]
 
-            print(f"   Successfully restored different embedding functions for different collections")
+            print(
+                f"   Successfully restored different embedding functions for different collections"
+            )
         finally:
             # Cleanup
             try:
@@ -802,7 +825,9 @@ class TestCollectionEmbeddingFunction:
                 return {}
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "UnregisteredEmbeddingFunction":
+            def build_from_config(
+                config: Dict[str, Any],
+            ) -> "UnregisteredEmbeddingFunction":
                 return UnregisteredEmbeddingFunction()
 
         # Try to create collection - this should work (registration happens at get time)

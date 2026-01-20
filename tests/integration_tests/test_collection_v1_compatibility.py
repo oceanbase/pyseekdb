@@ -466,11 +466,18 @@ class TestCollectionV1Compatibility:
 
         # Create v1 collection
         hnsw_config = pyseekdb.HNSWConfiguration(dimension=3, distance="cosine")
-        v1_collection = db_client.create_collection(name=v1_name, configuration=hnsw_config, embedding_function=None, _collection_version=1)
+        v1_collection = db_client.create_collection(
+            name=v1_name,
+            configuration=hnsw_config,
+            embedding_function=None,
+            _collection_version=1,
+        )
         assert v1_collection.id is None
 
         # Create v2 collection (default)
-        v2_collection = db_client.create_collection(name=v2_name, configuration=hnsw_config, embedding_function=None)
+        v2_collection = db_client.create_collection(
+            name=v2_name, configuration=hnsw_config, embedding_function=None
+        )
         assert v2_collection.id is not None
 
         # Both should be in list
@@ -492,6 +499,7 @@ class TestCollectionV1Compatibility:
         # Cleanup
         db_client.delete_collection(v1_name)
         db_client.delete_collection(v2_name)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

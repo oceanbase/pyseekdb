@@ -59,7 +59,6 @@ class TestCollectionHybridSearchWithBuilder:
         return extended[:dimension]
 
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
-
         collection = client.get_collection(collection_name)
         base_vectors = [
             [1.0, 2.0, 3.0],

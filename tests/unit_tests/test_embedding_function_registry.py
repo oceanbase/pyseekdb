@@ -30,7 +30,9 @@ class TestEmbeddingFunctionRegistry:
         EmbeddingFunctionRegistry._initialize()
 
         assert "default" in EmbeddingFunctionRegistry._registry
-        assert EmbeddingFunctionRegistry._registry["default"] == DefaultEmbeddingFunction
+        assert (
+            EmbeddingFunctionRegistry._registry["default"] == DefaultEmbeddingFunction
+        )
         assert EmbeddingFunctionRegistry._initialized is True
 
     def test_initialization_idempotent(self):
@@ -79,7 +81,9 @@ class TestEmbeddingFunctionRegistry:
 
             @staticmethod
             def build_from_config(config: Dict[str, Any]) -> "TestEmbeddingFunction":
-                return TestEmbeddingFunction(model_name=config.get("model_name", "test-model"))
+                return TestEmbeddingFunction(
+                    model_name=config.get("model_name", "test-model")
+                )
 
         # Register the class
         EmbeddingFunctionRegistry.register(TestEmbeddingFunction)
@@ -120,7 +124,9 @@ class TestEmbeddingFunctionRegistry:
             def get_config(self) -> Dict[str, Any]:
                 return {}
 
-        with pytest.raises(ValueError, match="must have.*build_from_config\\(\\) method"):
+        with pytest.raises(
+            ValueError, match="must have.*build_from_config\\(\\) method"
+        ):
             EmbeddingFunctionRegistry.register(InvalidEmbeddingFunction)
 
     def test_register_duplicate_name_raises_error(self):
@@ -191,7 +197,10 @@ class TestEmbeddingFunctionRegistry:
 
         # Should still be registered once
         assert first_count == second_count
-        assert EmbeddingFunctionRegistry.get_class("test_embedding") == TestEmbeddingFunction
+        assert (
+            EmbeddingFunctionRegistry.get_class("test_embedding")
+            == TestEmbeddingFunction
+        )
 
     def test_list_registered_returns_all_names(self):
         """Test that list_registered returns all registered names"""
@@ -260,7 +269,9 @@ class TestRegisterEmbeddingFunctionDecorator:
                 return {}
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "DecoratedEmbeddingFunction":
+            def build_from_config(
+                config: Dict[str, Any],
+            ) -> "DecoratedEmbeddingFunction":
                 return DecoratedEmbeddingFunction()
 
         # Verify it's registered
@@ -284,7 +295,9 @@ class TestRegisterEmbeddingFunctionDecorator:
                 return {}
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "DecoratedEmbeddingFunction":
+            def build_from_config(
+                config: Dict[str, Any],
+            ) -> "DecoratedEmbeddingFunction":
                 return DecoratedEmbeddingFunction()
 
         # The decorator should return the class itself
@@ -311,7 +324,9 @@ class TestRegisterEmbeddingFunctionDecorator:
 
             @staticmethod
             def build_from_config(config: Dict[str, Any]) -> "TypedEmbeddingFunction":
-                return TypedEmbeddingFunction(model_name=config.get("model_name", "test"))
+                return TypedEmbeddingFunction(
+                    model_name=config.get("model_name", "test")
+                )
 
         # Type should be preserved - can instantiate and access attributes
         instance = TypedEmbeddingFunction(model_name="custom")
@@ -333,7 +348,9 @@ class TestRegisterEmbeddingFunctionDecorator:
                     return {}
 
                 @staticmethod
-                def build_from_config(config: Dict[str, Any]) -> "InvalidEmbeddingFunction":
+                def build_from_config(
+                    config: Dict[str, Any],
+                ) -> "InvalidEmbeddingFunction":
                     return InvalidEmbeddingFunction()
 
     def test_decorator_works_with_initialization(self):
@@ -409,6 +426,7 @@ class TestRegisterEmbeddingFunctionDecorator:
 
         assert first_cls == FirstEmbeddingFunction
         assert second_cls == SecondEmbeddingFunction
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

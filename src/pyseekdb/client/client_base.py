@@ -683,7 +683,7 @@ class BaseClient(BaseConnection, AdminAPI):
             # No embedding function, use configuration dimension
             dimension = hnsw_config.dimension
 
-        logger.info(f'actual dimension: {dimension}, hnsw_config: {hnsw_config}')
+        logger.info(f"actual dimension: {dimension}, hnsw_config: {hnsw_config}")
         # Extract distance from configuration
         distance = hnsw_config.distance
 
@@ -698,7 +698,7 @@ class BaseClient(BaseConnection, AdminAPI):
             table_name = self._create_collection_meta_v1(name)
         else:
             collection_meta = self._create_collection_meta_v2(name, embedding_function)
-            collection_id = collection_meta.get('collection_id')
+            collection_id = collection_meta.get("collection_id")
             table_name = collection_meta["table_name"]
 
         # Construct CREATE TABLE SQL statement with HEAP organization
@@ -740,18 +740,17 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError(f"Failed to create sdk_collections table: {e}") from e
 
     def _create_collection_meta_v2(
-        self,
-        collection_name: str,
-        embedding_function) -> Dict[str, str]:
+        self, collection_name: str, embedding_function
+    ) -> Dict[str, str]:
         try:
             results = {}
-            settings = {
-                "version": 2
-            }
-            if embedding_function is not None and EmbeddingFunction.support_persistence(embedding_function):
+            settings = {"version": 2}
+            if embedding_function is not None and EmbeddingFunction.support_persistence(
+                embedding_function
+            ):
                 settings["embedding_function"] = {
                     "name": embedding_function.name(),
-                    "properties": embedding_function.get_config()
+                    "properties": embedding_function.get_config(),
                 }
 
             settings_str = json.dumps(settings)
@@ -781,9 +780,7 @@ class BaseClient(BaseConnection, AdminAPI):
         except Exception as e:
             raise ValueError(f"Failed to create collection metadata: {e}") from e
 
-    def _create_collection_meta_v1(
-        self,
-        collection_name: str) -> str:
+    def _create_collection_meta_v1(self, collection_name: str) -> str:
         try:
             table_name = CollectionNames.table_name(collection_name)
             return table_name
@@ -799,7 +796,9 @@ class BaseClient(BaseConnection, AdminAPI):
             collection = self._get_collection_v1(name, embedding_function)
         return collection
 
-    def _resolve_collection_metadata_from_table(self, table_name: str, collection_name: str) -> Dict[str, Any]:
+    def _resolve_collection_metadata_from_table(
+        self, table_name: str, collection_name: str
+    ) -> Dict[str, Any]:
         metadata = {
             "dimension": None,
             "distance": None,
@@ -893,7 +892,9 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return metadata
 
-    def _resolve_embedding_function(self, settings: Optional[str]) -> EmbeddingFunction[EmbeddingDocuments]:
+    def _resolve_embedding_function(
+        self, settings: Optional[str]
+    ) -> EmbeddingFunction[EmbeddingDocuments]:
         if not settings:
             return None
         settings_json = json.loads(settings)
@@ -904,9 +905,15 @@ class BaseClient(BaseConnection, AdminAPI):
         embedding_function_class = EmbeddingFunctionRegistry.get_class(ef_name)
         if not embedding_function_class:
             raise ValueError(f"Embedding function class '{ef_name}' not found")
-        return embedding_function_class.build_from_config(ef_settings.get("properties", {}))
+        return embedding_function_class.build_from_config(
+            ef_settings.get("properties", {})
+        )
 
-    def _validate_embedding_function(self, embedding_function: Optional[EmbeddingFunction], embedding_function_persistence: Optional[EmbeddingFunction]) -> EmbeddingFunction[EmbeddingDocuments]:
+    def _validate_embedding_function(
+        self,
+        embedding_function: Optional[EmbeddingFunction],
+        embedding_function_persistence: Optional[EmbeddingFunction],
+    ) -> EmbeddingFunction[EmbeddingDocuments]:
         """
         Validate embedding function
 
@@ -918,10 +925,19 @@ class BaseClient(BaseConnection, AdminAPI):
             Embedding function
         """
 
-        if embedding_function_persistence is not None and not embedding_function is _NOT_PROVIDED:
-            raise ValueError(f"Embedding function provided and embedding function persistence provided, both cannot be provided")
+        if (
+            embedding_function_persistence is not None
+            and not embedding_function is _NOT_PROVIDED
+        ):
+            raise ValueError(
+                f"Embedding function provided and embedding function persistence provided, both cannot be provided"
+            )
         if embedding_function is _NOT_PROVIDED:
-            return embedding_function_persistence if embedding_function_persistence is not None else get_default_embedding_function()
+            return (
+                embedding_function_persistence
+                if embedding_function_persistence is not None
+                else get_default_embedding_function()
+            )
         else:
             return embedding_function
 
@@ -946,15 +962,19 @@ class BaseClient(BaseConnection, AdminAPI):
                 settings = row[2] if len(row) > 2 else ""
 
             embedding_function_persistence = self._resolve_embedding_function(settings)
-            embedding_function = self._validate_embedding_function(embedding_function, embedding_function_persistence)
-            metadata = self._resolve_collection_metadata_from_table(CollectionNames.table_name_v2(collection_id), collection_name)
+            embedding_function = self._validate_embedding_function(
+                embedding_function, embedding_function_persistence
+            )
+            metadata = self._resolve_collection_metadata_from_table(
+                CollectionNames.table_name_v2(collection_id), collection_name
+            )
             return Collection(
                 client=self,
                 name=collection_name,
                 collection_id=collection_id,
-                embedding_function = embedding_function,
-                dimension = metadata["dimension"],
-                distance = metadata["distance"]
+                embedding_function=embedding_function,
+                dimension=metadata["dimension"],
+                distance=metadata["distance"],
             )
         except Exception as e:
             raise ValueError(f"Failed to get collection: {e}")
@@ -989,10 +1009,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Create and return Collection object
         return Collection(
-            client=self,
-            name=name,
-            embedding_function=embedding_function,
-            **metadata
+            client=self, name=name, embedding_function=embedding_function, **metadata
         )
 
     def delete_collection(self, name: str) -> None:
@@ -1004,7 +1021,9 @@ class BaseClient(BaseConnection, AdminAPI):
         """
         try:
             self._delete_collection_v2(name)
-            logger.debug(f"✅ Successfully deleted collection v2 '{name}' from sdk_collections table")
+            logger.debug(
+                f"✅ Successfully deleted collection v2 '{name}' from sdk_collections table"
+            )
         except ValueError:
             self._delete_collection_v1(name)
             logger.debug(f"✅ Successfully deleted collection v1 '{name}' from table")
@@ -1018,14 +1037,14 @@ class BaseClient(BaseConnection, AdminAPI):
         """
         collection = self._get_collection_v2(name)
         if not collection:
-            raise ValueError(
-                f"Collection '{name}' does not exist"
-            )
+            raise ValueError(f"Collection '{name}' does not exist")
         drop_table_sql = f"DROP TABLE `{CollectionNames.table_name_v2(collection.id)}`"
         query_sql = f"DELETE FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{name}'"
         self._execute(drop_table_sql)
         self._execute(query_sql)
-        logger.debug(f"✅ Successfully deleted collection '{name}' from sdk_collections table")
+        logger.debug(
+            f"✅ Successfully deleted collection '{name}' from sdk_collections table"
+        )
 
     def _delete_collection_v1(self, name: str) -> None:
         """
@@ -1042,9 +1061,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Check if table exists first
         if not self._has_collection_v1(name):
-            raise ValueError(
-                f"Collection '{name}' does not exist"
-            )
+            raise ValueError(f"Collection '{name}' does not exist")
 
         # Execute DROP TABLE SQL
         self._execute(f"DROP TABLE IF EXISTS `{table_name}`")
@@ -1092,7 +1109,9 @@ class BaseClient(BaseConnection, AdminAPI):
                         collection = self.get_collection(collection_name)
                         collections.append(collection)
                     except Exception as e:
-                        logger.warning(f"Failed to get collection. The data may be corrupted. The collection name: '{collection_name}': {e}")
+                        logger.warning(
+                            f"Failed to get collection. The data may be corrupted. The collection name: '{collection_name}': {e}"
+                        )
                         continue
 
         except Exception as e:
