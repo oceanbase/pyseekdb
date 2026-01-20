@@ -2,6 +2,8 @@
 Metadata information for collection fields.
 """
 
+from typing import ClassVar
+
 
 class CollectionFieldNames:
     ID = "_id"
@@ -9,7 +11,7 @@ class CollectionFieldNames:
     EMBEDDING = "embedding"
     METADATA = "metadata"
 
-    ALL_FIELDS = [ID, DOCUMENT, EMBEDDING, METADATA]
+    ALL_FIELDS: ClassVar[list[str]] = [ID, DOCUMENT, EMBEDDING, METADATA]
 
 
 class CollectionNames:

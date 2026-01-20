@@ -37,7 +37,7 @@ class TestVersion:
         assert str(version1) == "1.0.1.0"
         assert str(version4) == "1.2.3.0"  # Full version preserved
 
-        print(f"\n✅ Version comparison tests passed")
+        print("\n✅ Version comparison tests passed")
         print(f"   version1={version1}, version2={version2}")
         print(f"   version1 > version2: {version1 > version2}")
 

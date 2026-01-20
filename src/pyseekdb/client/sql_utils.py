@@ -4,7 +4,9 @@ Utility functions and classes for SQL string generation and escaping in seekdb c
 Provides helpers to safely stringify values and SQL identifiers for insertion into SQL expressions.
 """
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
+
 from pymysql.converters import escape_string
 
 
@@ -44,7 +46,7 @@ def render_sql_with_params(sql: str, params: Sequence[Any]) -> str:
     if placeholder_count != len(params):
         raise ValueError(f"Expected {placeholder_count} parameters, got {len(params)}")
     rendered_parts = [parts[0]]
-    for param, part in zip(params, parts[1:]):
+    for param, part in zip(params, parts[1:], strict=True):
         if param is None:
             replacement = "NULL"
         elif isinstance(param, (bytes, bytearray, memoryview)):

@@ -12,7 +12,6 @@ This is a minimal example to get you started quickly with embedding functions.
 """
 
 import pyseekdb
-from pyseekdb import DefaultEmbeddingFunction
 
 # ==================== Step 1: Create Client Connection ====================
 # You can use embedded mode, server mode, or OceanBase mode
@@ -81,9 +80,7 @@ collection.add(
 )
 
 print(f"\nAdded {len(documents)} documents to collection")
-print(
-    "Note: Embeddings were automatically generated from documents using the embedding function"
-)
+print("Note: Embeddings were automatically generated from documents using the embedding function")
 
 # ==================== Step 4: Query the Collection ====================
 # With embedding function, you can query using text directly

@@ -5,6 +5,7 @@ This file shows various usage patterns for the EnvGuard class.
 """
 
 import os
+
 import pytest
 
 from .test_utils import EnvGuard, env_guard

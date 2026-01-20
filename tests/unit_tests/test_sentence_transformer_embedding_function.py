@@ -9,9 +9,9 @@ To run this test:
     pytest tests/unit_tests/test_sentence_transformer_embedding_function_persistence.py -v
 """
 
-import pytest
-from typing import Dict, Any
 import importlib.util
+
+import pytest
 
 from pyseekdb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
@@ -69,9 +69,7 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         # name should NOT be in config
         assert "name" not in config
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_get_config_with_custom_values(self):
         """Test that get_config() returns correct config with custom values"""
         ef = SentenceTransformerEmbeddingFunction(
@@ -94,12 +92,12 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
             device="cpu",
             normalize_embeddings=False,
             trust_remote_code=True,
-            use_auth_token="test-token",
+            use_auth_token="test-token",  # noqa: S106
         )
         config = ef.get_config()
 
         assert config["kwargs"]["trust_remote_code"] is True
-        assert config["kwargs"]["use_auth_token"] == "test-token"
+        assert config["kwargs"]["use_auth_token"] == "test-token"  # noqa: S105
 
     def test_build_from_config_with_defaults(self):
         """Test that build_from_config() restores instance with default values"""
@@ -118,9 +116,7 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         assert restored_ef.normalize_embeddings is False
         assert restored_ef.kwargs == {}
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_build_from_config_with_custom_values(self):
         """Test that build_from_config() restores instance with custom values"""
         config = {
@@ -182,26 +178,18 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         assert restored_ef.normalize_embeddings == original_ef.normalize_embeddings
         assert restored_ef.kwargs == original_ef.kwargs
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_initialization_with_cuda(self):
         """Test that SentenceTransformerEmbeddingFunction can be initialized with CUDA device"""
-        ef = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2", device="cuda"
-        )
+        ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2", device="cuda")
 
         assert ef.device == "cuda"
         assert ef.model_name == "all-MiniLM-L6-v2"
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_embeddings_with_cuda(self):
         """Test that embeddings can be generated using CUDA"""
-        ef = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2", device="cuda"
-        )
+        ef = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2", device="cuda")
 
         # Generate embeddings
         embeddings = ef(["Hello world", "How are you?"])
@@ -211,9 +199,7 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         assert len(embeddings[1]) > 0
         assert len(embeddings[0]) == len(embeddings[1])  # Same dimension
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_get_config_with_cuda(self):
         """Test that get_config() correctly saves CUDA device setting"""
         ef = SentenceTransformerEmbeddingFunction(
@@ -226,9 +212,7 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         assert config["model_name"] == "all-MiniLM-L6-v2"
         assert config["normalize_embeddings"] is True
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_build_from_config_with_cuda(self):
         """Test that build_from_config() correctly restores CUDA device setting"""
         config = {
@@ -244,9 +228,7 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         assert restored_ef.device == "cuda"
         assert restored_ef.model_name == "all-MiniLM-L6-v2"
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_persistence_roundtrip_with_cuda(self):
         """Test complete roundtrip with CUDA: get_config -> build_from_config"""
         original_ef = SentenceTransformerEmbeddingFunction(
@@ -261,17 +243,11 @@ class TestSentenceTransformerEmbeddingFunctionPersistence:
         assert restored_ef.device == original_ef.device
         assert restored_ef.normalize_embeddings == original_ef.normalize_embeddings
 
-    @pytest.mark.skipif(
-        not is_cuda_available(), reason="CUDA is not available on this system"
-    )
+    @pytest.mark.skipif(not is_cuda_available(), reason="CUDA is not available on this system")
     def test_cuda_vs_cpu_config_consistency(self):
         """Test that CUDA and CPU configs are handled consistently"""
-        ef_cuda = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2", device="cuda"
-        )
-        ef_cpu = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2", device="cpu"
-        )
+        ef_cuda = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2", device="cuda")
+        ef_cpu = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2", device="cpu")
 
         config_cuda = ef_cuda.get_config()
         config_cpu = ef_cpu.get_config()

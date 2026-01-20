@@ -12,9 +12,20 @@ This example demonstrates all available operations:
 This is a complete reference for all client capabilities.
 """
 
-import uuid
 import random
+import uuid
+
 import pyseekdb
+from pyseekdb import HNSWConfiguration
+
+
+def _random_vector(dimension: int) -> list[float]:
+    return [random.random() for _ in range(dimension)]  # noqa: S311
+
+
+def _random_vectors(count: int, dimension: int) -> list[list[float]]:
+    return [_random_vector(dimension) for _ in range(count)]
+
 
 # ============================================================================
 # PART 1: CLIENT CONNECTION
@@ -53,8 +64,6 @@ collection_name = "comprehensive_example"
 dimension = 128
 
 # 2.1 Create a collection
-from pyseekdb import HNSWConfiguration
-
 config = HNSWConfiguration(dimension=dimension, distance="cosine")
 collection = client.get_or_create_collection(
     name=collection_name,
@@ -97,10 +106,7 @@ documents = [
 ]
 
 # Generate embeddings (in real usage, use an embedding model)
-embeddings = []
-for i in range(len(documents)):
-    vector = [random.random() for _ in range(dimension)]
-    embeddings.append(vector)
+embeddings = [_random_vector(dimension) for _ in documents]
 
 ids = [str(uuid.uuid4()) for _ in documents]
 
@@ -109,7 +115,7 @@ single_id = str(uuid.uuid4())
 collection.add(
     ids=single_id,
     documents="This is a single document",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=_random_vector(dimension),
     metadatas={"type": "single", "category": "test"},
 )
 
@@ -134,7 +140,7 @@ collection.add(
 vector_only_ids = [str(uuid.uuid4()) for _ in range(2)]
 collection.add(
     ids=vector_only_ids,
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=_random_vectors(2, dimension),
     metadatas=[{"type": "vector_only"}, {"type": "vector_only"}],
 )
 
@@ -158,7 +164,7 @@ collection.update(
 collection.update(
     ids=ids[1:3],
     documents=["Updated document 1", "Updated document 2"],
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=_random_vectors(2, dimension),
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True},
@@ -166,7 +172,7 @@ collection.update(
 )
 
 # 4.3 Update embeddings
-new_embeddings = [[random.random() for _ in range(dimension)] for _ in range(2)]
+new_embeddings = _random_vectors(2, dimension)
 collection.update(ids=ids[2:4], embeddings=new_embeddings)
 
 # ============================================================================
@@ -177,7 +183,7 @@ collection.update(ids=ids[2:4], embeddings=new_embeddings)
 collection.upsert(
     ids=ids[0],
     documents="Upserted document (was updated)",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=_random_vector(dimension),
     metadatas={"category": "AI", "upserted": True},
 )
 
@@ -186,7 +192,7 @@ new_id = str(uuid.uuid4())
 collection.upsert(
     ids=new_id,
     documents="This is a new document from upsert",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=_random_vector(dimension),
     metadatas={"category": "New", "upserted": True},
 )
 
@@ -195,7 +201,7 @@ upsert_ids = [ids[4], str(uuid.uuid4())]  # One existing, one new
 collection.upsert(
     ids=upsert_ids,
     documents=["Upserted doc 1", "Upserted doc 2"],
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=_random_vectors(2, dimension),
     metadatas=[{"upserted": True}, {"upserted": True}],
 )
 
@@ -209,14 +215,10 @@ results = collection.query(query_embeddings=query_vector, n_results=3)
 print(f"Query results: {len(results['ids'][0])} items")
 
 # 6.2 Query with metadata filter (simplified equality)
-results = collection.query(
-    query_embeddings=query_vector, where={"category": "AI"}, n_results=5
-)
+results = collection.query(query_embeddings=query_vector, where={"category": "AI"}, n_results=5)
 
 # 6.3 Query with comparison operators
-results = collection.query(
-    query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5
-)
+results = collection.query(query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5)
 
 # 6.4 Query with $in operator
 results = collection.query(
@@ -291,9 +293,7 @@ results = collection.get(where={"score": {"$gte": 90}}, limit=5)
 results = collection.get(where={"tag": {"$in": ["ml", "python"]}}, limit=5)
 
 # 7.6 Get with logical operators (simplified equality)
-results = collection.get(
-    where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5
-)
+results = collection.get(where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5)
 
 # 7.7 Get by document filter
 results = collection.get(where_document={"$contains": "Python"}, limit=5)
@@ -349,9 +349,7 @@ collection.delete(where={"type": {"$eq": "vector_only"}})
 collection.delete(where_document={"$contains": "Updated document"})
 
 # 9.4 Delete with combined filters
-collection.delete(
-    where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"}
-)
+collection.delete(where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"})
 
 # ============================================================================
 # PART 10: COLLECTION INFORMATION

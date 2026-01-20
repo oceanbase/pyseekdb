@@ -38,7 +38,7 @@ class TestDetectDbTypeAndVersion:
         assert str(version1) == "1.0.1.0"
         assert str(version4) == "1.2.3.0"  # Full version preserved
 
-        print(f"\n✅ Version comparison tests passed")
+        print("\n✅ Version comparison tests passed")
         print(f"   version1={version1}, version2={version2}")
         print(f"   version1 > version2: {version1 > version2}")
 
@@ -57,11 +57,11 @@ class TestDetectDbTypeAndVersion:
         assert version is not None
         assert isinstance(version, Version)
         # Test version comparison
-        assert version > Version("0.0.0.0"), (
+        assert version > Version("0.0.0.0"), (  # noqa: S104
             f"Version should be greater than 0.0.0.0, got: {version}"
         )
 
-        print(f"\n✅ Successfully detected seekdb Server")
+        print("\n✅ Successfully detected seekdb Server")
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
@@ -80,11 +80,11 @@ class TestDetectDbTypeAndVersion:
         assert version is not None
         assert isinstance(version, Version)
         # Test version comparison
-        assert version > Version("0.0.0.0"), (
+        assert version > Version("0.0.0.0"), (  # noqa: S104
             f"Version should be greater than 0.0.0.0, got: {version}"
         )
 
-        print(f"\n✅ Successfully detected OceanBase Server")
+        print("\n✅ Successfully detected OceanBase Server")
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
@@ -103,7 +103,7 @@ class TestDetectDbTypeAndVersion:
         assert db_type in ["seekdb", "oceanbase"]
         assert version is not None
 
-        print(f"\n✅ detect_db_type_and_version successfully works with connection")
+        print("\n✅ detect_db_type_and_version successfully works with connection")
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
@@ -122,9 +122,9 @@ class TestDetectDbTypeAndVersion:
         assert isinstance(db_type, str)
         assert isinstance(version, Version)
         assert db_type in ["seekdb", "oceanbase"]
-        assert version > Version("0.0.0.0")
+        assert version > Version("0.0.0.0")  # noqa: S104
 
-        print(f"\n✅ detect_db_type_and_version returns correct tuple format")
+        print("\n✅ detect_db_type_and_version returns correct tuple format")
         print(f"   Result: {result}")
         print(f"   Type: {type(result)}")
         print(f"   Length: {len(result)}")

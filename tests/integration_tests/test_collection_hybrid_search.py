@@ -3,36 +3,28 @@ Collection hybrid search tests using db_client fixture
 Demonstrates how to eliminate code duplication using parameterized fixtures
 """
 
-import pytest
-import time
 import json
+import time
 import uuid
-from typing import List
 
-import pyseekdb
+import pytest
 
 
 class TestCollectionHybridSearch:
     """Test collection.hybrid_search() interface using parameterized db_client fixture"""
 
-    def _create_test_collection(
-        self, client, collection_name: str, dimension: int = None
-    ):
+    def _create_test_collection(self, client, collection_name: str, dimension: int | None = None):
         """Helper method to create a test collection"""
         from pyseekdb import HNSWConfiguration
 
         if dimension is not None:
             config = HNSWConfiguration(dimension=dimension, distance="l2")
-            collection = client.create_collection(
-                name=collection_name, configuration=config, embedding_function=None
-            )
+            collection = client.create_collection(name=collection_name, configuration=config, embedding_function=None)
         else:
             collection = client.create_collection(name=collection_name)
         return collection, collection.dimension
 
-    def _generate_query_vector(
-        self, dimension: int, base_vector: List[float] = None
-    ) -> List[float]:
+    def _generate_query_vector(self, dimension: int, base_vector: list[float] | None = None) -> list[float]:
         """Generate a query vector with the correct dimension"""
         if base_vector is None:
             base_vector = [1.0, 2.0, 3.0]
@@ -132,13 +124,11 @@ class TestCollectionHybridSearch:
                 embedding = embedding[:dimension]
 
             vector_str = "[" + ",".join(map(str, embedding)) + "]"
-            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace(
-                "'", "\\'"
-            )
+            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
             document_str = data["document"].replace("'", "\\'")
 
             sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
-                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
+                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""  # noqa: S608
             client._server._execute(sql)
 
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
@@ -151,15 +141,13 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_ft_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(
-            db_client, collection_name
-        )
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
 
         # Test 1: Full-text search only
-        print(f"\n✅ Testing hybrid_search with full-text search only")
+        print("\n✅ Testing hybrid_search with full-text search only")
         results = collection.hybrid_search(
             query={"where_document": {"$contains": "machine learning"}},
             n_results=5,
@@ -180,7 +168,7 @@ class TestCollectionHybridSearch:
                 assert "machine" in doc.lower() or "learning" in doc.lower()
 
         # Test 1b: Full-text search with $not_contains
-        print(f"   Testing hybrid_search with $not_contains filter")
+        print("   Testing hybrid_search with $not_contains filter")
         forbidden_phrase = "machine learning"
         results_not = collection.hybrid_search(
             query={"where_document": {"$not_contains": forbidden_phrase}},
@@ -202,15 +190,13 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_vec_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(
-            db_client, collection_name
-        )
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
 
         # Test: Vector search only
-        print(f"\n✅ Testing hybrid_search with vector search only")
+        print("\n✅ Testing hybrid_search with vector search only")
         results = collection.hybrid_search(
             knn={
                 "query_embeddings": self._generate_query_vector(actual_dimension),
@@ -233,9 +219,7 @@ class TestCollectionHybridSearch:
         for dist in distances:
             assert dist >= 0, f"Distance should be non-negative, got {dist}"
         min_distance = min(distances)
-        assert min_distance < 10.0, (
-            f"At least one distance should be reasonable, got min={min_distance}"
-        )
+        assert min_distance < 10.0, f"At least one distance should be reasonable, got min={min_distance}"
 
     def test_hybrid_search_combined(self, db_client):
         """
@@ -244,15 +228,13 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_comb_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(
-            db_client, collection_name
-        )
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
 
         # Test: Combined full-text and vector search
-        print(f"\n✅ Testing hybrid_search with both full-text and vector search")
+        print("\n✅ Testing hybrid_search with both full-text and vector search")
         results = collection.hybrid_search(
             query={
                 "where_document": {"$contains": "machine learning"},
@@ -282,15 +264,13 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_meta_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(
-            db_client, collection_name
-        )
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
 
         # Test: Hybrid search with metadata filter
-        print(f"\n✅ Testing hybrid_search with metadata filter")
+        print("\n✅ Testing hybrid_search with metadata filter")
         results = collection.hybrid_search(
             query={
                 "where_document": {"$contains": "machine"},
@@ -305,9 +285,7 @@ class TestCollectionHybridSearch:
             },
             knn={
                 "query_embeddings": self._generate_query_vector(actual_dimension),
-                "where": {
-                    "$and": [{"category": {"$eq": "AI"}}, {"score": {"$gte": 90}}]
-                },
+                "where": {"$and": [{"category": {"$eq": "AI"}}, {"score": {"$gte": 90}}]},
                 "n_results": 10,
             },
             n_results=5,
@@ -331,20 +309,16 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_logic_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(
-            db_client, collection_name
-        )
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
 
         # Test: Hybrid search with logical operators ($or, $in)
-        print(f"\n✅ Testing hybrid_search with logical operators")
+        print("\n✅ Testing hybrid_search with logical operators")
         results = collection.hybrid_search(
             query={
-                "where_document": {
-                    "$and": [{"$contains": "machine"}, {"$contains": "learning"}]
-                },
+                "where_document": {"$and": [{"$contains": "machine"}, {"$contains": "learning"}]},
                 "where": {"$or": [{"tag": {"$eq": "ml"}}, {"tag": {"$eq": "python"}}]},
                 "n_results": 10,
             },
@@ -375,17 +349,13 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_scalar_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(
-            db_client, collection_name
-        )
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
 
-        inserted_ids = self._insert_test_data(
-            db_client, collection_name, dimension=actual_dimension
-        )
+        inserted_ids = self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
 
         # Test $in operator
-        print(f"\n✅ Testing hybrid_search with $in operator")
+        print("\n✅ Testing hybrid_search with $in operator")
         results_in = collection.hybrid_search(
             query={"where": {"tag": {"$in": ["ml", "python"]}}, "n_results": 10},
             n_results=5,
@@ -395,12 +365,10 @@ class TestCollectionHybridSearch:
         for metadata in results_in["metadatas"][0]:
             if metadata:
                 assert metadata.get("tag") in ["ml", "python"]
-        print(
-            f"   Found {len(results_in['ids'][0])} results with tag in ['ml', 'python']"
-        )
+        print(f"   Found {len(results_in['ids'][0])} results with tag in ['ml', 'python']")
 
         # Test $nin operator
-        print(f"   Testing hybrid_search with $nin operator")
+        print("   Testing hybrid_search with $nin operator")
         results_nin = collection.hybrid_search(
             query={"where": {"tag": {"$nin": ["ml", "python"]}}, "n_results": 10},
             n_results=5,
@@ -410,12 +378,10 @@ class TestCollectionHybridSearch:
         for metadata in results_nin["metadatas"][0]:
             if metadata:
                 assert metadata.get("tag") not in ["ml", "python"]
-        print(
-            f"   Found {len(results_nin['ids'][0])} results with tag not in ['ml', 'python']"
-        )
+        print(f"   Found {len(results_nin['ids'][0])} results with tag not in ['ml', 'python']")
 
         # Test #id filter
-        print(f"   Testing hybrid_search with #id filter")
+        print("   Testing hybrid_search with #id filter")
         target_id = inserted_ids[0]
         results_id = collection.hybrid_search(
             query={"where": {"#id": {"$in": [target_id]}}, "n_results": 5},

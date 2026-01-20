@@ -2,8 +2,6 @@
 Database model definition
 """
 
-from typing import Optional
-
 
 class Database:
     """
@@ -17,9 +15,9 @@ class Database:
     def __init__(
         self,
         name: str,
-        tenant: Optional[str] = None,
-        charset: Optional[str] = None,
-        collation: Optional[str] = None,
+        tenant: str | None = None,
+        charset: str | None = None,
+        collation: str | None = None,
         **kwargs,
     ):
         """

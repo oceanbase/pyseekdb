@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, ClassVar
 
 from pyseekdb.client.embedding_function import (
     Documents,
@@ -31,7 +31,7 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
     """
 
     # Since we do dynamic imports we have to type this as Any
-    models: Dict[str, Any] = {}
+    models: ClassVar[dict[str, Any]] = {}
 
     # for a full list of options: https://huggingface.co/sentence-transformers,
     # https://www.sbert.net/docs/pretrained_models.html
@@ -52,36 +52,34 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         try:
             from sentence_transformers import SentenceTransformer
-        except ImportError:
+        except ImportError as exc:
             raise ValueError(
                 "The sentence-transformers python package is not installed. Please install it with `pip install sentence-transformers`"
-            )
+            ) from exc
 
         self.model_name = model_name
         self.device = device
         self.normalize_embeddings = normalize_embeddings
         for key, value in kwargs.items():
             if not isinstance(value, (str, int, float, bool, list, dict, tuple)):
-                raise ValueError(f"Keyword argument {key} is not a primitive type")
+                raise TypeError(f"Keyword argument {key} is not a primitive type")
         self.kwargs = kwargs
 
         if model_name not in self.models:
-            self.models[model_name] = SentenceTransformer(
-                model_name_or_path=model_name, device=device, **kwargs
-            )
+            self.models[model_name] = SentenceTransformer(model_name_or_path=model_name, device=device, **kwargs)
         self._model = self.models[model_name]
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """Generate embeddings for the given documents.
 
         Args:
-            input: Documents to generate embeddings for.
+            documents: Documents to generate embeddings for.
 
         Returns:
             Embeddings for the documents.
         """
         embeddings = self._model.encode(
-            list(input),
+            list(documents),
             convert_to_numpy=True,
             normalize_embeddings=self.normalize_embeddings,
         )
@@ -97,7 +95,7 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         return "sentence_transformer"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the configuration dictionary for the SentenceTransformerEmbeddingFunction.
 
         Returns:
@@ -112,7 +110,7 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
 
     @staticmethod
     def build_from_config(
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> "SentenceTransformerEmbeddingFunction":
         """Build a SentenceTransformerEmbeddingFunction from its configuration dictionary.
 
@@ -130,7 +128,7 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         normalize_embeddings = config.get("normalize_embeddings", False)
         kwargs = config.get("kwargs", {})
         if not isinstance(kwargs, dict):
-            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
 
         return SentenceTransformerEmbeddingFunction(
             model_name=model_name,

@@ -10,13 +10,15 @@ To run this test manually:
     OPENAI_API_KEY=your-key pytest tests/unit_tests/test_openai_embedding_function.py -v -s
 """
 
-import pytest
+import importlib.util
 import os
 
-from pyseekdb.utils.embedding_functions import OpenAIEmbeddingFunction
+import pytest
+
 from pyseekdb.client.embedding_function import dimension_of
+from pyseekdb.utils.embedding_functions import OpenAIEmbeddingFunction
+
 from .test_utils import env_guard
-import importlib.util
 
 
 def is_openai_available() -> bool:
@@ -39,15 +41,13 @@ class TestOpenAIEmbeddingFunction:
 
     def test_openai_env(self):
         """Test if openai package is installed and required environment variables are set."""
-        try:
-            import openai
-        except ImportError:
+        if not is_openai_available():
             print("openai package is not installed")
-            assert False, "openai package is not installed"
+            raise AssertionError("openai package is not installed")
 
         if not os.environ.get("OPENAI_API_KEY"):
             print("OPENAI_API_KEY environment variable is not set")
-            assert False, "OPENAI_API_KEY environment variable is not set"
+            raise AssertionError("OPENAI_API_KEY environment variable is not set")
 
     def test_initialization_with_defaults(self):
         """Test OpenAIEmbeddingFunction initialization with default values"""
@@ -82,9 +82,7 @@ class TestOpenAIEmbeddingFunction:
 
     def test_initialization_with_custom_api_key_env(self):
         """Test OpenAIEmbeddingFunction initialization with custom API key env"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction initialization with custom API key env"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction initialization with custom API key env")
 
         self.test_openai_env()
 
@@ -98,9 +96,7 @@ class TestOpenAIEmbeddingFunction:
 
     def test_initialization_with_custom_api_base(self):
         """Test OpenAIEmbeddingFunction initialization with custom API base"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction initialization with custom API base"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction initialization with custom API base")
 
         self.test_openai_env()
 
@@ -116,9 +112,7 @@ class TestOpenAIEmbeddingFunction:
 
         self.test_openai_env()
 
-        ef = OpenAIEmbeddingFunction(
-            model_name="text-embedding-3-small", dimensions=512
-        )
+        ef = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=512)
         assert ef._dimensions_param == 512
         print(f"   Dimensions parameter: {ef._dimensions_param}")
 
@@ -130,13 +124,11 @@ class TestOpenAIEmbeddingFunction:
 
         ef = OpenAIEmbeddingFunction(timeout=30, max_retries=3)
         assert ef is not None
-        print(f"   Initialized with timeout and max_retries")
+        print("   Initialized with timeout and max_retries")
 
     def test_initialization_missing_api_key(self):
         """Test that missing API key raises ValueError"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction initialization with missing API key"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction initialization with missing API key")
 
         # Temporarily remove API key
         original_key = os.environ.pop("OPENAI_API_KEY", None)
@@ -150,62 +142,46 @@ class TestOpenAIEmbeddingFunction:
 
     def test_dimension_property_known_models(self):
         """Test dimension property for known models"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction dimension property for known models"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction dimension property for known models")
 
         self.test_openai_env()
 
         # Test text-embedding-ada-002
         ef_ada = OpenAIEmbeddingFunction(model_name="text-embedding-ada-002")
         dim_ada = ef_ada.dimension
-        assert dim_ada == 1536, (
-            f"Expected dimension 1536 for text-embedding-ada-002, got {dim_ada}"
-        )
+        assert dim_ada == 1536, f"Expected dimension 1536 for text-embedding-ada-002, got {dim_ada}"
         print(f"   text-embedding-ada-002 dimension: {dim_ada}")
 
         # Test text-embedding-3-small
         ef_small = OpenAIEmbeddingFunction(model_name="text-embedding-3-small")
         dim_small = ef_small.dimension
-        assert dim_small == 1536, (
-            f"Expected dimension 1536 for text-embedding-3-small, got {dim_small}"
-        )
+        assert dim_small == 1536, f"Expected dimension 1536 for text-embedding-3-small, got {dim_small}"
         print(f"   text-embedding-3-small dimension: {dim_small}")
 
         # Test text-embedding-3-large
         ef_large = OpenAIEmbeddingFunction(model_name="text-embedding-3-large")
         dim_large = ef_large.dimension
-        assert dim_large == 3072, (
-            f"Expected dimension 3072 for text-embedding-3-large, got {dim_large}"
-        )
+        assert dim_large == 3072, f"Expected dimension 3072 for text-embedding-3-large, got {dim_large}"
         print(f"   text-embedding-3-large dimension: {dim_large}")
 
     def test_dimension_property_with_custom_dimensions(self):
         """Test dimension property when dimensions parameter is set"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction dimension property with custom dimensions"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction dimension property with custom dimensions")
 
         self.test_openai_env()
 
         # Test with text-embedding-3-small and custom dimensions
-        ef_512 = OpenAIEmbeddingFunction(
-            model_name="text-embedding-3-small", dimensions=512
-        )
+        ef_512 = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=512)
         assert ef_512.dimension == 512
         print(f"   text-embedding-3-small with dimensions=512: {ef_512.dimension}")
 
-        ef_256 = OpenAIEmbeddingFunction(
-            model_name="text-embedding-3-small", dimensions=256
-        )
+        ef_256 = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=256)
         assert ef_256.dimension == 256
         print(f"   text-embedding-3-small with dimensions=256: {ef_256.dimension}")
 
     def test_dimension_property_unknown_model(self):
         """Test dimension property for unknown model (should make API call)"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction dimension property for unknown model"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction dimension property for unknown model")
 
         self.test_openai_env()
 
@@ -219,9 +195,7 @@ class TestOpenAIEmbeddingFunction:
 
     def test_call_single_document(self):
         """Test __call__ with single document"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction embedding generation (single document)"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction embedding generation (single document)")
 
         self.test_openai_env()
 
@@ -237,9 +211,7 @@ class TestOpenAIEmbeddingFunction:
 
     def test_call_multiple_documents(self):
         """Test __call__ with multiple documents"""
-        print(
-            "\n✅ Testing OpenAIEmbeddingFunction embedding generation (multiple documents)"
-        )
+        print("\n✅ Testing OpenAIEmbeddingFunction embedding generation (multiple documents)")
 
         self.test_openai_env()
 
@@ -253,11 +225,9 @@ class TestOpenAIEmbeddingFunction:
 
         assert isinstance(embeddings, list)
         assert len(embeddings) == len(multiple_docs)
-        for i, emb in enumerate(embeddings):
+        for _i, emb in enumerate(embeddings):
             assert isinstance(emb, list)
-            assert len(emb) == len(embeddings[0]), (
-                f"All embeddings should have same dimension"
-            )
+            assert len(emb) == len(embeddings[0]), "All embeddings should have same dimension"
         print(f"   Multiple documents embedding dimension: {len(embeddings[0])}")
         print(f"   Number of embeddings: {len(embeddings)}")
 
@@ -279,26 +249,18 @@ class TestOpenAIEmbeddingFunction:
         self.test_openai_env()
 
         # Test with text-embedding-3-small and custom dimensions
-        ef_512 = OpenAIEmbeddingFunction(
-            model_name="text-embedding-3-small", dimensions=512
-        )
+        ef_512 = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=512)
         test_doc = "Test document for embedding"
         embeddings_512 = ef_512(test_doc)
 
         assert len(embeddings_512) == 1
-        assert len(embeddings_512[0]) == 512, (
-            f"Expected 512 dimensions, got {len(embeddings_512[0])}"
-        )
+        assert len(embeddings_512[0]) == 512, f"Expected 512 dimensions, got {len(embeddings_512[0])}"
         print(f"   Verified: embeddings have {len(embeddings_512[0])} dimensions")
 
         # Test with different dimensions
-        ef_256 = OpenAIEmbeddingFunction(
-            model_name="text-embedding-3-small", dimensions=256
-        )
+        ef_256 = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=256)
         embeddings_256 = ef_256(test_doc)
-        assert len(embeddings_256[0]) == 256, (
-            f"Expected 256 dimensions, got {len(embeddings_256[0])}"
-        )
+        assert len(embeddings_256[0]) == 256, f"Expected 256 dimensions, got {len(embeddings_256[0])}"
         print(f"   Verified: embeddings have {len(embeddings_256[0])} dimensions")
 
     def test_dimension_of_function(self):
@@ -318,9 +280,7 @@ class TestOpenAIEmbeddingFunction:
 
         self.test_openai_env()
 
-        ef = OpenAIEmbeddingFunction(
-            model_name="text-embedding-3-small", dimensions=512
-        )
+        ef = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=512)
         dim = dimension_of(ef)
         assert dim == 512
         print(f"   dimension_of result with custom dimensions: {dim}")
@@ -379,15 +339,11 @@ class TestOpenAIEmbeddingFunction:
 
         for model_name, expected_dim in test_cases:
             ef = OpenAIEmbeddingFunction(model_name=model_name)
-            assert ef.dimension == expected_dim, (
-                f"Model {model_name} should have dimension {expected_dim}"
-            )
+            assert ef.dimension == expected_dim, f"Model {model_name} should have dimension {expected_dim}"
             print(f"   {model_name}: {ef.dimension} dimensions")
 
 
-@pytest.mark.skipif(
-    not is_openai_available(), reason="openai is not available on this system"
-)
+@pytest.mark.skipif(not is_openai_available(), reason="openai is not available on this system")
 class TestOpenAIEmbeddingFunctionPersistence:
     """Test persistence for OpenAIEmbeddingFunction"""
 
@@ -433,9 +389,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
     def test_get_config_with_dimensions(self):
         """Test that get_config() correctly includes dimensions parameter"""
         with env_guard(OPENAI_API_KEY="test-key"):
-            ef = OpenAIEmbeddingFunction(
-                model_name="text-embedding-3-small", dimensions=256
-            )
+            ef = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=256)
             config = ef.get_config()
 
             assert config["dimensions"] == 256
@@ -483,9 +437,7 @@ class TestOpenAIEmbeddingFunctionPersistence:
     def test_persistence_roundtrip(self):
         """Test complete roundtrip: get_config -> build_from_config"""
         with env_guard(OPENAI_API_KEY="test-key"):
-            original_ef = OpenAIEmbeddingFunction(
-                model_name="text-embedding-3-small", dimensions=256
-            )
+            original_ef = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", dimensions=256)
 
             config = original_ef.get_config()
             restored_ef = OpenAIEmbeddingFunction.build_from_config(config)

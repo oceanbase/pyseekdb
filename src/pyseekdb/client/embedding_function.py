@@ -5,30 +5,21 @@ This module provides the EmbeddingFunction protocol and default implementations
 for converting text documents to vector embeddings.
 """
 
-import importlib
 import logging
 import os
-import sys
-import tarfile
+from abc import abstractmethod
 from functools import cached_property
 from pathlib import Path
 from typing import (
-    List,
-    Protocol,
-    Union,
-    runtime_checkable,
-    Optional,
-    TypeVar,
-    cast,
     Any,
-    Dict,
+    Protocol,
+    TypeVar,
+    runtime_checkable,
 )
-from abc import abstractmethod
 
+import httpx
 import numpy as np
 import numpy.typing as npt
-import httpx
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_random
 
 # Set Hugging Face mirror endpoint for better download speed in China
 # Users can override this by setting HF_ENDPOINT environment variable
@@ -41,9 +32,9 @@ logger = logging.getLogger(__name__)
 D = TypeVar("D")
 
 # Type aliases
-Documents = Union[str, List[str]]
-Embeddings = List[List[float]]
-Embedding = List[float]
+Documents = str | list[str]
+Embeddings = list[list[float]]
+Embedding = list[float]
 
 
 @runtime_checkable
@@ -64,7 +55,7 @@ class EmbeddingFunction(Protocol[D]):
         ...     @staticmethod
         ...     def name() -> str:
         ...         return "my_embedding_function"
-        ...     def __call__(self, input: Documents) -> Embeddings:
+        ...     def __call__(self, documents: Documents) -> Embeddings:
         ...         # Convert documents to embeddings
         ...         return [[0.1, 0.2, ...], [0.3, 0.4, ...]]
         ...     def get_config(self) -> Dict[str, Any]:
@@ -80,12 +71,12 @@ class EmbeddingFunction(Protocol[D]):
     """
 
     @abstractmethod
-    def __call__(self, input: D) -> Embeddings:
+    def __call__(self, documents: D) -> Embeddings:
         """
         Convert input documents to embeddings.
 
         Args:
-            input: Documents to embed (can be a single string or list of strings)
+            documents: Documents to embed (can be a single string or list of strings)
 
         Returns:
             List of embedding vectors (list of floats)
@@ -93,7 +84,7 @@ class EmbeddingFunction(Protocol[D]):
         ...
 
     @abstractmethod
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """
         Get the configuration dictionary for the embedding function.
 
@@ -111,9 +102,7 @@ def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
     """
     Get the dimension of the embeddings produced by the embedding function.
     """
-    if hasattr(embedding_function, "dimension") and callable(
-        getattr(embedding_function, "dimension", None)
-    ):
+    if hasattr(embedding_function, "dimension") and callable(getattr(embedding_function, "dimension", None)):
         return embedding_function.dimension()
     elif hasattr(embedding_function, "dimension"):
         return embedding_function.dimension
@@ -124,9 +113,7 @@ def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
         if test_embeddings and len(test_embeddings) > 0:
             return len(test_embeddings[0])
         else:
-            raise ValueError(
-                "Embedding function returned empty result when called with 'seekdb'"
-            )
+            raise ValueError("Embedding function returned empty result when called with 'seekdb'")
 
 
 class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -152,7 +139,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(
         self,
         model_name: str = "all-MiniLM-L6-v2",
-        preferred_providers: Optional[List[str]] = None,
+        preferred_providers: list[str] | None = None,
     ):
         """
         Initialize the default embedding function.
@@ -164,19 +151,13 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                                 Defaults to None (uses available providers).
         """
         if model_name != "all-MiniLM-L6-v2":
-            raise ValueError(
-                f"Currently only 'all-MiniLM-L6-v2' is supported, got '{model_name}'"
-            )
+            raise ValueError(f"Currently only 'all-MiniLM-L6-v2' is supported, got '{model_name}'")
         self.model_name = model_name
 
         # Validate preferred_providers
-        if preferred_providers and not all(
-            [isinstance(i, str) for i in preferred_providers]
-        ):
+        if preferred_providers and not all(isinstance(i, str) for i in preferred_providers):
             raise ValueError("Preferred providers must be a list of strings")
-        if preferred_providers and len(preferred_providers) != len(
-            set(preferred_providers)
-        ):
+        if preferred_providers and len(preferred_providers) != len(set(preferred_providers)):
             raise ValueError("Preferred providers must be unique")
 
         self._preferred_providers = preferred_providers
@@ -206,29 +187,28 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         logger.info(f"Downloading from {url}")
         # Use Client to ensure correct handling of redirects
-        with httpx.Client(timeout=600.0, follow_redirects=True) as client:
-            with client.stream("GET", url) as resp:
-                resp.raise_for_status()
-                total = int(resp.headers.get("content-length", 0))
-                with (
-                    open(fname, "wb") as file,
-                    self.tqdm(
-                        desc=os.path.basename(fname),
-                        total=total,
-                        unit="iB",
-                        unit_scale=True,
-                        unit_divisor=1024,
-                    ) as bar,
-                ):
-                    for data in resp.iter_bytes(chunk_size=chunk_size):
-                        size = file.write(data)
-                        bar.update(size)
+        with httpx.Client(timeout=600.0, follow_redirects=True) as client, client.stream("GET", url) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
+            with (
+                open(fname, "wb") as file,
+                self.tqdm(
+                    desc=os.path.basename(fname),
+                    total=total,
+                    unit="iB",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                ) as bar,
+            ):
+                for data in resp.iter_bytes(chunk_size=chunk_size):
+                    size = file.write(data)
+                    bar.update(size)
 
     def _get_hf_endpoint(self) -> str:
         """Get Hugging Face endpoint URL, using HF_ENDPOINT environment variable if set."""
         return os.environ.get("HF_ENDPOINT", "https://huggingface.co")
 
-    def _download_from_huggingface(self) -> bool:
+    def _download_from_huggingface(self) -> bool:  # noqa: C901
         """
         Download model files from Hugging Face (supports mirror acceleration).
 
@@ -251,14 +231,10 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                 "vocab.txt": "vocab.txt",
             }
 
-            extracted_folder = os.path.join(
-                self.DOWNLOAD_PATH, self.EXTRACTED_FOLDER_NAME
-            )
+            extracted_folder = os.path.join(self.DOWNLOAD_PATH, self.EXTRACTED_FOLDER_NAME)
             os.makedirs(extracted_folder, exist_ok=True)
 
-            logger.info(
-                f"Downloading model from Hugging Face (endpoint: {hf_endpoint})"
-            )
+            logger.info(f"Downloading model from Hugging Face (endpoint: {hf_endpoint})")
 
             # Download each file
             for hf_filename, local_filename in files_to_download.items():
@@ -278,32 +254,24 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                     try:
                         head_resp = httpx.head(url, timeout=10.0, follow_redirects=True)
                         if head_resp.status_code == 404:
-                            logger.warning(
-                                f"File {hf_filename} not found on Hugging Face (404), will try fallback"
-                            )
+                            logger.warning(f"File {hf_filename} not found on Hugging Face (404), will try fallback")
                             return False
-                    except Exception:
+                    except Exception as exc:
                         # If HEAD request fails, continue with GET request
-                        pass
+                        logger.debug("HEAD request failed for %s: %s", hf_filename, exc)
 
                     self._download(url, local_path, chunk_size=8192)
                     logger.info(f"Successfully downloaded {local_filename}")
                 except httpx.HTTPStatusError as e:
                     if e.response.status_code == 404:
-                        logger.warning(
-                            f"File {hf_filename} not found on Hugging Face (404), will try fallback"
-                        )
+                        logger.warning(f"File {hf_filename} not found on Hugging Face (404), will try fallback")
                         return False
-                    logger.warning(
-                        f"HTTP error downloading {hf_filename} from Hugging Face: {e}"
-                    )
+                    logger.warning(f"HTTP error downloading {hf_filename} from Hugging Face: {e}")
                     if os.path.exists(local_path):
                         os.remove(local_path)
                     return False
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to download {hf_filename} from Hugging Face: {e}"
-                    )
+                    logger.warning(f"Failed to download {hf_filename} from Hugging Face: {e}")
                     # If download fails, try to delete partially downloaded file
                     if os.path.exists(local_path):
                         os.remove(local_path)
@@ -318,15 +286,13 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                 return False
 
             logger.info("Successfully downloaded all model files from Hugging Face")
-            return True
+            return True  # noqa: TRY300
 
-        except Exception as e:
-            logger.error(f"Error downloading from Hugging Face: {e}")
+        except Exception:
+            logger.exception("Error downloading from Hugging Face")
             return False
 
-    def _forward(
-        self, documents: List[str], batch_size: int = 32
-    ) -> npt.NDArray[np.float32]:
+    def _forward(self, documents: list[str], batch_size: int = 32) -> npt.NDArray[np.float32]:
         """
         Generate embeddings for a list of documents.
 
@@ -348,16 +314,13 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
             for doc_tokens in encoded:
                 if len(doc_tokens.ids) > self.max_tokens():
                     raise ValueError(
-                        f"Document length {len(doc_tokens.ids)} is greater than "
-                        f"the max tokens {self.max_tokens()}"
+                        f"Document length {len(doc_tokens.ids)} is greater than the max tokens {self.max_tokens()}"
                     )
 
             # Create input arrays exactly like the working standalone script
             # Create input arrays, ensuring int64 type
             input_ids = np.array([e.ids for e in encoded], dtype=np.int64)
-            attention_mask = np.array(
-                [e.attention_mask for e in encoded], dtype=np.int64
-            )
+            attention_mask = np.array([e.attention_mask for e in encoded], dtype=np.int64)
 
             # Ensure 2D arrays (batch_size, seq_length)
             if input_ids.ndim == 1:
@@ -385,9 +348,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
             # Mean pooling (exactly as in the code)
             # Note: attention_mask needs to be converted to float type for floating point operations
             attention_mask_float = attention_mask.astype(np.float32)
-            input_mask_expanded = np.broadcast_to(
-                np.expand_dims(attention_mask_float, -1), last_hidden_state.shape
-            )
+            input_mask_expanded = np.broadcast_to(np.expand_dims(attention_mask_float, -1), last_hidden_state.shape)
             embeddings = np.sum(last_hidden_state * input_mask_expanded, 1) / np.clip(
                 input_mask_expanded.sum(1), a_min=1e-9, a_max=None
             )
@@ -406,14 +367,12 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
             The tokenizer for the model.
         """
         tokenizer = self.tokenizers.Tokenizer.from_file(
-            os.path.join(
-                self.DOWNLOAD_PATH, self.EXTRACTED_FOLDER_NAME, "tokenizer.json"
-            )
+            os.path.join(self.DOWNLOAD_PATH, self.EXTRACTED_FOLDER_NAME, "tokenizer.json")
         )
         # max_seq_length = 256, for some reason sentence-transformers uses 256
         # even though the HF config has a max length of 128
         tokenizer.enable_truncation(max_length=256)
-        tokenizer.enable_padding(pad_id=0, pad_token="[PAD]", length=256)
+        tokenizer.enable_padding(pad_id=0, pad_token="[PAD]", length=256)  # noqa: S106
         return tokenizer
 
     @cached_property
@@ -431,12 +390,9 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                     f"{self.ort.get_available_providers()}"
                 )
             self._preferred_providers = self.ort.get_available_providers()
-        elif not set(self._preferred_providers).issubset(
-            set(self.ort.get_available_providers())
-        ):
+        elif not set(self._preferred_providers).issubset(set(self.ort.get_available_providers())):
             raise ValueError(
-                f"Preferred providers must be subset of available providers: "
-                f"{self.ort.get_available_providers()}"
+                f"Preferred providers must be subset of available providers: {self.ort.get_available_providers()}"
             )
 
         # Create minimal session options to avoid issues
@@ -448,10 +404,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         so.inter_op_num_threads = 1
         so.intra_op_num_threads = 1
 
-        if (
-            self._preferred_providers
-            and "CoreMLExecutionProvider" in self._preferred_providers
-        ):
+        if self._preferred_providers and "CoreMLExecutionProvider" in self._preferred_providers:
             # remove CoreMLExecutionProvider from the list, it is not as well optimized as CPU.
             self._preferred_providers.remove("CoreMLExecutionProvider")
 
@@ -500,12 +453,12 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         """Get the maximum number of tokens supported by the model."""
         return 256
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """
         Generate embeddings for the given documents.
 
         Args:
-            input: Single document (str) or list of documents (List[str])
+            documents: Single document (str) or list of documents (List[str])
 
         Returns:
             List of embedding vectors
@@ -518,18 +471,18 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
             >>> embeddings = ef(["Hello", "World"])
         """
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         # Only download the model when it is actually used
         self._download_model_if_not_exists()
 
         # Generate embeddings
-        embeddings = self._forward(input)
+        embeddings = self._forward(documents)
 
         # Convert numpy arrays to lists
         return [embedding.tolist() for embedding in embeddings]
@@ -538,11 +491,11 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
     def name() -> str:
         return "default"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         return {}
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "DefaultEmbeddingFunction":
+    def build_from_config(config: dict[str, Any]) -> "DefaultEmbeddingFunction":
         return DefaultEmbeddingFunction()
 
     def __repr__(self) -> str:
@@ -550,7 +503,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
 
 
 # Global default embedding function instance
-_default_embedding_function: Optional[DefaultEmbeddingFunction] = None
+_default_embedding_function: DefaultEmbeddingFunction | None = None
 
 
 def get_default_embedding_function() -> DefaultEmbeddingFunction:

@@ -6,7 +6,6 @@ Provides helper classes and functions for testing, including environment variabl
 
 import os
 from contextlib import contextmanager
-from typing import Dict, Optional
 
 
 class EnvGuard:
@@ -37,7 +36,7 @@ class EnvGuard:
         guard.restore()
     """
 
-    def __init__(self, **env_vars: Optional[str]):
+    def __init__(self, **env_vars: str | None):
         """
         Initialize EnvGuard with optional environment variables to set.
 
@@ -45,7 +44,7 @@ class EnvGuard:
             **env_vars: Environment variables to set immediately.
                        Use None to unset a variable.
         """
-        self._saved: Dict[str, Optional[str]] = {}
+        self._saved: dict[str, str | None] = {}
         if env_vars:
             self.set(**env_vars)
 
@@ -67,7 +66,7 @@ class EnvGuard:
             self._saved[var_name] = os.environ.get(var_name)
         return self
 
-    def set(self, **env_vars: Optional[str]) -> "EnvGuard":
+    def set(self, **env_vars: str | None) -> "EnvGuard":
         """
         Set environment variables, saving their current values.
 
@@ -132,7 +131,7 @@ class EnvGuard:
 
 
 @contextmanager
-def env_guard(**env_vars: Optional[str]):
+def env_guard(**env_vars: str | None):
     """
     Context manager for temporarily setting environment variables.
 

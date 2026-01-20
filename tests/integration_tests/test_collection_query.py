@@ -3,12 +3,11 @@ Collection query tests using db_client fixture
 Demonstrates how to use the conftest.py fixtures to eliminate code duplication
 """
 
-import pytest
-import time
 import json
+import time
 import uuid
 
-import pyseekdb
+import pytest
 
 
 class TestCollectionQuery:
@@ -83,15 +82,13 @@ class TestCollectionQuery:
             # Convert vector to string format: [1.0,2.0,3.0]
             vector_str = "[" + ",".join(map(str, embedding)) + "]"
             # Convert metadata to JSON string
-            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace(
-                "'", "\\'"
-            )
+            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
             # Escape single quotes in document
             document_str = data["document"].replace("'", "\\'")
 
             # Use CAST to convert string to binary for varbinary(512) field
             sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
-                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""
+                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""  # noqa: S608
             client._server._execute(sql)
 
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
@@ -122,7 +119,7 @@ class TestCollectionQuery:
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
 
         # Test 1: Basic vector similarity query
-        print(f"\n✅ Testing basic query")
+        print("\n✅ Testing basic query")
         # Generate query vector with correct dimension
         query_vector = [1.0, 2.0, 3.0] * ((actual_dimension // 3) + 1)
         query_vector = query_vector[:actual_dimension]
@@ -134,16 +131,14 @@ class TestCollectionQuery:
         print(f"   Found {len(results['ids'][0])} results")
 
         # Test 2: Query with metadata filter
-        print(f"✅ Testing query with metadata filter")
-        results = collection.query(
-            query_embeddings=query_vector, where={"category": "AI"}, n_results=5
-        )
+        print("✅ Testing query with metadata filter")
+        results = collection.query(query_embeddings=query_vector, where={"category": "AI"}, n_results=5)
         assert results is not None
         assert "ids" in results
         print(f"   Found {len(results['ids'][0])} results with category='AI'")
 
         # Test 3: Query with document filter
-        print(f"✅ Testing query with document filter")
+        print("✅ Testing query with document filter")
         results = collection.query(
             query_embeddings=query_vector,
             where_document={"$contains": "machine learning"},
@@ -151,12 +146,10 @@ class TestCollectionQuery:
         )
         assert results is not None
         assert "ids" in results
-        print(
-            f"   Found {len(results['ids'][0])} results containing 'machine learning'"
-        )
+        print(f"   Found {len(results['ids'][0])} results containing 'machine learning'")
 
         # Test 4: Query with document filter using regex
-        print(f"✅ Testing query with document filter using regex")
+        print("✅ Testing query with document filter using regex")
         results = collection.query(
             query_embeddings=query_vector,
             where_document={"$regex": ".*machine.*"},
@@ -167,7 +160,7 @@ class TestCollectionQuery:
         print(f"   Found {len(results['ids'][0])} results matching regex '.*machine.*'")
 
         # Test 5: Query with include parameter
-        print(f"✅ Testing query with include parameter")
+        print("✅ Testing query with include parameter")
         results = collection.query(
             query_embeddings=query_vector,
             include=["documents", "metadatas"],
@@ -183,28 +176,20 @@ class TestCollectionQuery:
             assert len(results["ids"][0]) == len(results["metadatas"][0])
 
         # Test 6: Query with multiple vectors (should return dict with lists of lists)
-        print(
-            f"✅ Testing query with multiple vectors (returns dict with lists of lists)"
-        )
+        print("✅ Testing query with multiple vectors (returns dict with lists of lists)")
         query_vector2 = [2.0, 3.0, 4.0] * ((actual_dimension // 3) + 1)
         query_vector2 = query_vector2[:actual_dimension]
-        results = collection.query(
-            query_embeddings=[query_vector, query_vector2], n_results=2
-        )
+        results = collection.query(query_embeddings=[query_vector, query_vector2], n_results=2)
         assert results is not None
         assert isinstance(results, dict), "Multiple vectors should return dict"
         assert "ids" in results
-        assert len(results["ids"]) == 2, (
-            f"Expected 2 ID lists, got {len(results['ids'])}"
-        )
+        assert len(results["ids"]) == 2, f"Expected 2 ID lists, got {len(results['ids'])}"
         for i in range(len(results["ids"])):
-            assert len(results["ids"][i]) > 0, (
-                f"ID list {i} should have at least one item"
-            )
+            assert len(results["ids"][i]) > 0, f"ID list {i} should have at least one item"
             print(f"   Query {i}: {len(results['ids'][i])} items")
 
         # Test 7: Single vector returns dict with single list
-        print(f"✅ Testing single vector returns dict format")
+        print("✅ Testing single vector returns dict format")
         results = collection.query(query_embeddings=query_vector, n_results=2)
         assert results is not None
         assert isinstance(results, dict), "Single vector should return dict"
@@ -214,7 +199,7 @@ class TestCollectionQuery:
         print(f"   Single query with {len(results['ids'][0])} items")
 
         # Test 8: Query with $in operator
-        print(f"✅ Testing query with $in operator")
+        print("✅ Testing query with $in operator")
         results = collection.query(
             query_embeddings=query_vector,
             where={"tag": {"$in": ["ml", "python"]}},
@@ -225,16 +210,14 @@ class TestCollectionQuery:
         print(f"   Found {len(results['ids'][0])} results with tag in ['ml', 'python']")
 
         # Test 9: Query with comparison operators
-        print(f"✅ Testing query with comparison operators ($gte)")
-        results = collection.query(
-            query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5
-        )
+        print("✅ Testing query with comparison operators ($gte)")
+        results = collection.query(query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5)
         assert results is not None
         assert "ids" in results
         print(f"   Found {len(results['ids'][0])} results with score >= 90")
 
         # No cleanup needed - the fixture handles it automatically!
-        print(f"   ✅ All tests passed (cleanup will be automatic)")
+        print("   ✅ All tests passed (cleanup will be automatic)")
 
 
 if __name__ == "__main__":

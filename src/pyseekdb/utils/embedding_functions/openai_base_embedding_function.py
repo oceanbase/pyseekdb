@@ -1,6 +1,7 @@
-from pyseekdb.client.embedding_function import EmbeddingFunction, Embeddings, Documents
-from typing import Any, Optional, Dict
 import os
+from typing import Any
+
+from pyseekdb.client.embedding_function import Documents, EmbeddingFunction, Embeddings
 
 
 class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -32,9 +33,9 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(
         self,
         model_name: str,
-        api_key_env: Optional[str] = None,
-        api_base: Optional[str] = None,
-        dimensions: Optional[int] = None,
+        api_key_env: str | None = None,
+        api_base: str | None = None,
+        dimensions: int | None = None,
         **kwargs: Any,
     ):
         """Initialize OpenAIBaseEmbeddingFunction.
@@ -55,10 +56,10 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         try:
             from openai import OpenAI
-        except ImportError:
+        except ImportError as exc:
             raise ValueError(
                 "The openai python package is not installed. Please install it with `pip install openai`"
-            )
+            ) from exc
 
         # Set defaults
         if api_key_env is None:
@@ -105,9 +106,7 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         Returns:
             str: Default API key environment variable name
         """
-        raise NotImplementedError(
-            "Subclasses must implement _get_default_api_key_env()"
-        )
+        raise NotImplementedError("Subclasses must implement _get_default_api_key_env()")
 
     def _get_model_dimensions(self) -> dict[str, int]:
         """Get a dictionary mapping model names to their default dimensions.
@@ -148,38 +147,32 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to determine embedding dimension via API call: {e}"
-            )
-        if (
-            not embeddings
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-        ):
+            raise RuntimeError(f"Failed to determine embedding dimension via API call: {e}") from e
+        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
             raise RuntimeError("Could not get embedding dimension from API response")
         return len(embeddings[0])
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """Generate embeddings for the given documents.
 
         Args:
-            input: Documents to generate embeddings for. Can be a single string or list of strings.
+            documents: Documents to generate embeddings for. Can be a single string or list of strings.
 
         Returns:
             Embeddings for the documents as a list of lists of floats.
         """
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         # Prepare request parameters
         request_params = {
             "model": self.model_name,
-            "input": input,
+            "input": documents,
         }
 
         # Add dimensions parameter if specified
@@ -193,14 +186,12 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
         embeddings = [item.embedding for item in response.data]
 
         # Validate that we got the expected number of embeddings
-        if len(embeddings) != len(input):
-            raise ValueError(
-                f"Expected {len(input)} embeddings but got {len(embeddings)} from API"
-            )
+        if len(embeddings) != len(documents):
+            raise ValueError(f"Expected {len(documents)} embeddings but got {len(embeddings)} from API")
 
         return embeddings
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """
         Get the configuration dictionary for the OpenAIBaseEmbeddingFunction.
 

@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union, Any, Dict
-from .embedding_function import get_default_embedding_function, dimension_of
 
 # Default configuration constants
 # Note: Default embedding function (DefaultEmbeddingFunction) produces 384-dim embeddings
@@ -33,7 +31,7 @@ class FulltextParserConfig:
     """
 
     parser: str = "ik"
-    params: Optional[Dict[str, Union[str, int, float, bool]]] = None
+    params: dict[str, str | int | float | bool] | None = None
 
 
 @dataclass
@@ -54,9 +52,7 @@ class HNSWConfiguration:
             raise ValueError(f"dimension must be positive, got {self.dimension}")
         valid_distances = [e.value for e in DistanceMetric]
         if self.distance not in valid_distances:
-            raise ValueError(
-                f"distance must be one of {valid_distances}, got {self.distance}"
-            )
+            raise ValueError(f"distance must be one of {valid_distances}, got {self.distance}")
 
 
 class Configuration:
@@ -70,12 +66,12 @@ class Configuration:
 
     def __init__(
         self,
-        hnsw: Optional[HNSWConfiguration] = None,
-        fulltext_config: Optional[FulltextParserConfig] = None,
+        hnsw: HNSWConfiguration | None = None,
+        fulltext_config: FulltextParserConfig | None = None,
     ):
         self.hnsw = hnsw
         self.fulltext_config = fulltext_config
 
 
 # Type alias for configuration parameter that can be HNSWConfiguration, None, or sentinel
-ConfigurationParam = Union[Configuration, HNSWConfiguration, None]
+ConfigurationParam = Configuration | HNSWConfiguration | None
