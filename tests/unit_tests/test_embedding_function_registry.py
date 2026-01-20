@@ -323,7 +323,7 @@ class TestRegisterEmbeddingFunctionDecorator:
                 return {"model_name": self.model_name}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "TypedEmbeddingFunction":
+            def build_from_config(config: Dict[str, Any]) -> "TypedEmbeddingFunction":
                 return TypedEmbeddingFunction(
                     model_name=config.get("model_name", "test")
                 )

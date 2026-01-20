@@ -120,7 +120,10 @@ class EmbeddingFunction(Protocol[D]):
             or not hasattr(embedding_function, "get_config")
         ):
             return False
-        if embedding_function.get_config() is NotImplemented:
+        try:
+            if embedding_function.get_config() is NotImplemented:
+                return False
+        except Exception:
             return False
         return True
 

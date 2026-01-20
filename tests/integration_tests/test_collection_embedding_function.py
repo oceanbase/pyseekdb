@@ -48,6 +48,10 @@ class Simple3DEmbeddingFunction:
 class TestCollectionEmbeddingFunction:
     """Test collection creation with embedding function handling using parameterized db_client fixture"""
 
+    def setup_method(self):
+        EmbeddingFunctionRegistry._registry.clear()
+        EmbeddingFunctionRegistry._initialized = False
+
     def test_create_collection_default_embedding_function(self, db_client):
         """
         Test create_collection with default embedding function (not provided).
