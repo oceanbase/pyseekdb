@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from pyseekdb import Configuration, HNSWConfiguration, FulltextParserConfig
+from pyseekdb import Configuration, HNSWConfiguration, FulltextAnalyzerConfig
 
 
 class TestHNSWConfiguration:
@@ -41,31 +41,31 @@ class TestHNSWConfiguration:
             HNSWConfiguration(dimension=128, distance="invalid")
 
 
-class TestFulltextParserConfig:
-    """Test FulltextParserConfig class"""
+class TestFulltextAnalyzerConfig:
+    """Test FulltextAnalyzerConfig class"""
 
     def test_valid_parsers(self):
-        """Test creating FulltextParserConfig with valid parsers"""
+        """Test creating FulltextAnalyzerConfig with valid parsers"""
         valid_parsers = ["ik", "space", "ngram", "ngram2", "beng"]
         for parser in valid_parsers:
-            config = FulltextParserConfig(analyzer=parser)
+            config = FulltextAnalyzerConfig(analyzer=parser)
             assert config.analyzer == parser
             assert config.properties is None
 
     def test_default_parser(self):
         """Test default parser is 'ik'"""
-        config = FulltextParserConfig()
+        config = FulltextAnalyzerConfig()
         assert config.analyzer == "ik"
 
     def test_parser_with_params(self):
         """Test parser with parameters"""
-        config = FulltextParserConfig(analyzer="ngram", properties={"size": 2})
+        config = FulltextAnalyzerConfig(analyzer="ngram", properties={"size": 2})
         assert config.analyzer == "ngram"
         assert config.properties == {"size": 2}
 
     def test_parser_with_multiple_params(self):
         """Test parser with multiple parameters"""
-        config = FulltextParserConfig(
+        config = FulltextAnalyzerConfig(
             analyzer="ngram", properties={"size": 3, "min_size": 1, "max_size": 5}
         )
         assert config.analyzer == "ngram"
@@ -75,7 +75,7 @@ class TestFulltextParserConfig:
 
     def test_params_with_different_types(self):
         """Test params with different primitive types"""
-        config = FulltextParserConfig(
+        config = FulltextAnalyzerConfig(
             analyzer="ik",
             properties={
                 "string_param": "value",
@@ -102,7 +102,7 @@ class TestConfiguration:
 
     def test_configuration_with_fulltext_only(self):
         """Test Configuration with only fulltext config"""
-        fulltext_config = FulltextParserConfig(analyzer="ik")
+        fulltext_config = FulltextAnalyzerConfig(analyzer="ik")
         config = Configuration(fulltext_config=fulltext_config)
         assert config.hnsw is None
         assert config.fulltext_config == fulltext_config
@@ -110,7 +110,7 @@ class TestConfiguration:
     def test_configuration_with_both(self):
         """Test Configuration with both HNSW and fulltext config"""
         hnsw_config = HNSWConfiguration(dimension=128, distance="cosine")
-        fulltext_config = FulltextParserConfig(analyzer="space")
+        fulltext_config = FulltextAnalyzerConfig(analyzer="space")
         config = Configuration(hnsw=hnsw_config, fulltext_config=fulltext_config)
         assert config.hnsw == hnsw_config
         assert config.fulltext_config == fulltext_config

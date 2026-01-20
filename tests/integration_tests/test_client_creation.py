@@ -9,7 +9,7 @@ import uuid
 import random
 
 import pyseekdb
-from pyseekdb import HNSWConfiguration, Configuration, FulltextParserConfig
+from pyseekdb import HNSWConfiguration, Configuration, FulltextAnalyzerConfig
 
 
 class TestClientCreation:
@@ -47,7 +47,7 @@ class TestClientCreation:
         )
         config_with_fulltext = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
-            fulltext_config=FulltextParserConfig(analyzer="ik"),
+            fulltext_config=FulltextAnalyzerConfig(analyzer="ik"),
         )
         collection_config = db_client.create_collection(
             name=test_collection_name_config,

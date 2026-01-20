@@ -21,7 +21,7 @@ import logging
 from typing import Optional, Any
 from .base_connection import BaseConnection
 from .client_base import BaseClient, ClientAPI
-from .configuration import Configuration, HNSWConfiguration, FulltextParserConfig
+from .configuration import Configuration, HNSWConfiguration, FulltextAnalyzerConfig
 from .embedding_function import (
     EmbeddingFunction,
     DefaultEmbeddingFunction,
@@ -135,7 +135,7 @@ __all__ = [
     "ClientAPI",
     "HNSWConfiguration",
     "Configuration",
-    "FulltextParserConfig",
+    "FulltextAnalyzerConfig",
     "EmbeddingFunction",
     "DefaultEmbeddingFunction",
     "get_default_embedding_function",
