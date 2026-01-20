@@ -26,6 +26,7 @@ from .embedding_function import (
     EmbeddingFunction,
     DefaultEmbeddingFunction,
     get_default_embedding_function,
+    register_embedding_function,
 )
 from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
@@ -138,6 +139,7 @@ __all__ = [
     "EmbeddingFunction",
     "DefaultEmbeddingFunction",
     "get_default_embedding_function",
+    "register_embedding_function",
     "SeekdbEmbeddedClient",
     "RemoteServerClient",
     "Client",

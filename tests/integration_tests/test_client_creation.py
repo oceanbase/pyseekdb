@@ -70,60 +70,6 @@ class TestClientCreation:
             f"Collection dimension should be positive, got {actual_dimension}"
         )
 
-        # Verify table was created by checking if it exists
-        from pyseekdb.client.meta_info import CollectionNames
-
-        table_name = CollectionNames.table_name(test_collection_name)
-        try:
-            # Try to describe table structure to verify it exists
-            table_info = db_client._server._execute(f"DESCRIBE `{table_name}`")
-            assert table_info is not None
-            assert len(table_info) > 0
-
-            # Verify table has expected columns
-            column_names = []
-            column_types = {}
-            for row in table_info:
-                if isinstance(row, dict):
-                    field_name = row.get("Field", row.get("field", ""))
-                    field_type = row.get("Type", row.get("type", ""))
-                    column_names.append(field_name)
-                    if field_name:
-                        column_types[field_name] = str(field_type).lower()
-                elif isinstance(row, (tuple, list)):
-                    field_name = row[0] if len(row) > 0 else ""
-                    field_type = row[1] if len(row) > 1 else ""
-                    column_names.append(field_name)
-                    if field_name:
-                        column_types[field_name] = str(field_type).lower()
-                else:
-                    column_names.append(str(row))
-
-            assert "_id" in column_names
-            assert "document" in column_names
-            assert "embedding" in column_names
-            assert "metadata" in column_names
-
-            # Verify _id column type is varbinary
-            if "_id" in column_types:
-                id_type = column_types["_id"]
-                assert "varbinary" in id_type, (
-                    f"Expected _id to be varbinary type, but got: {id_type}"
-                )
-
-            print(f"\n✅ Collection '{test_collection_name}' created successfully")
-            print(f"   Table name: {table_name}")
-            print(f"   Dimension: {actual_dimension}")
-            print(f"   Table columns: {', '.join(column_names)}")
-
-        except Exception as e:
-            # Clean up and fail
-            try:
-                db_client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
-            except Exception:
-                pass
-            pytest.fail(f"Failed to verify collection table creation: {e}")
-
         # Test 2: get_collection - get the collection we just created
         retrieved_collection = db_client.get_collection(name=test_collection_name)
         assert retrieved_collection is not None

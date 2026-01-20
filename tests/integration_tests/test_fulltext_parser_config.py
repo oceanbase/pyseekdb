@@ -46,7 +46,10 @@ class TestFulltextParserConfig:
         # Verify the fulltext index was created with correct parser
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             # Get CREATE TABLE statement
             create_table_result = client._server._execute(
@@ -125,7 +128,10 @@ class TestFulltextParserConfig:
         # Verify default parser (ik) is used
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(
                 f"SHOW CREATE TABLE `{table_name}`"
@@ -171,7 +177,10 @@ class TestFulltextParserConfig:
         # Verify default parser (ik) is used for backward compatibility
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(
                 f"SHOW CREATE TABLE `{table_name}`"
