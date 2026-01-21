@@ -4,7 +4,7 @@ from typing import Any
 from pyseekdb.client.embedding_function import Documents, EmbeddingFunction, Embeddings
 
 
-class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
+class LiteLLMBaseEmbeddingFunction(EmbeddingFunction[Documents]):
     """
     A custom embedding function using LiteLLM to access various embedding models.
 
@@ -57,7 +57,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
         api_key_env: str | None = None,
         **kwargs: Any,
     ):
-        """Initialize LiteLLMEmbeddingFunction.
+        """Initialize.
 
         Args:
             model_name (str): Identifier of the embedding model.

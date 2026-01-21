@@ -5,18 +5,18 @@ This module provides the EmbeddingFunction protocol and default implementations
 for converting text documents to vector embeddings.
 """
 
-import contextlib
 import logging
 import os
-from abc import abstractmethod
 from functools import cached_property
 from pathlib import Path
+from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
     Protocol,
     TypeVar,
     runtime_checkable,
+    Self,
 )
 
 import httpx
@@ -514,7 +514,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         return {}
 
     @staticmethod
-    def build_from_config(config: dict[str, Any]) -> "DefaultEmbeddingFunction":
+    def build_from_config(_config: dict[str, Any]) -> Self:
         return DefaultEmbeddingFunction()
 
     def __repr__(self) -> str:
@@ -632,26 +632,30 @@ class EmbeddingFunctionRegistry:
                 OpenAIEmbeddingFunction,
                 QwenEmbeddingFunction,
                 SentenceTransformerEmbeddingFunction,
+                SiliconflowEmbeddingFunction,
+                TengxunHunyuanEmbeddingFunction,
+                OllamaEmbeddingFunction,
+                VoyageaiEmbeddingFunction,
+                GoogleVertexEmbeddingFunction,
+                CohereEmbeddingFunction,
+                JinaEmbeddingFunction,
+                AmazonBedrockEmbeddingFunction,
             )
 
             cls._registry["sentence_transformer"] = SentenceTransformerEmbeddingFunction
             cls._registry["openai"] = OpenAIEmbeddingFunction
             cls._registry["qwen"] = QwenEmbeddingFunction
-        except ImportError:
+            cls._registry["siliconflow"] = SiliconflowEmbeddingFunction
+            cls._registry["tengxun_hunyuan"] = TengxunHunyuanEmbeddingFunction
+            cls._registry["ollama"] = OllamaEmbeddingFunction
+            cls._registry["voyageai"] = VoyageaiEmbeddingFunction
+            cls._registry["google_vertex"] = GoogleVertexEmbeddingFunction
+            cls._registry["cohere"] = CohereEmbeddingFunction
+            cls._registry["jina"] = JinaEmbeddingFunction
+            cls._registry["amazon_bedrock"] = AmazonBedrockEmbeddingFunction
+        except ImportError as e:
             # Optional dependencies not installed, skip registration
-            pass
-
-        # Try to register LiteLLMEmbeddingFunction (may not be installed)
-        try:
-            from pyseekdb.utils.embedding_functions import LiteLLMEmbeddingFunction
-
-            # Check if it has a name() method
-            if hasattr(LiteLLMEmbeddingFunction, "name"):
-                name = LiteLLMEmbeddingFunction.name()
-                cls._registry[name] = LiteLLMEmbeddingFunction
-        except (ImportError, AttributeError):
-            # Optional dependency not installed or doesn't have name() method, skip
-            pass
+            logger.warning(f"Failed to register some embedding function classes: {e}")
 
         cls._initialized = True
 
@@ -761,7 +765,7 @@ def register_embedding_function(embedding_function_class: type[T]) -> type[T]:
         ...     def __init__(self, model_name: str = "my-model"):
         ...         self.model_name = model_name
         ...
-        ...     def __call__(self, input: Documents) -> Embeddings:
+        ...     def __call__(self, input: list[str]|str) -> list[list[float]]:
         ...         # Your embedding logic
         ...         return [[0.1, 0.2, 0.3] for _ in (input if isinstance(input, list) else [input])]
         ...
@@ -779,7 +783,7 @@ def register_embedding_function(embedding_function_class: type[T]) -> type[T]:
         >>> # The class is now automatically registered!
         >>> # You can use it immediately when creating collections
         >>> import pyseekdb
-        >>> client = pyseekdb.Client(path="./db")
+        >>> client = pyseekdb.Client(path="./seekdb.db")
         >>> ef = MyCustomEmbeddingFunction()
         >>> collection = client.create_collection("my_collection", embedding_function=ef)
     """

@@ -1,0 +1,286 @@
+from pyseekdb.client.embedding_function import (
+    Documents,
+    EmbeddingFunction,
+    Embeddings,
+)
+from typing import Any, Dict, Optional
+import json
+
+# Known Amazon Bedrock embedding model dimensions
+# Source: https://docs.aws.amazon.com/bedrock/latest/userguide/models.html
+_AMAZON_BEDROCK_MODEL_DIMENSIONS = {
+    "amazon.titan-embed-text-v1": 1536,
+    "amazon.titan-embed-text-v2": 1024,
+    "amazon.titan-embed-g1-text-02": 1024,
+    "amazon.titan-embed-text-v2:0": 1024,
+}
+
+
+class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
+    """
+    A convenient embedding function for Amazon Bedrock embedding models.
+
+    This class provides a simplified interface to Amazon Bedrock embedding models using boto3.
+
+    For more information about Amazon Bedrock models, see
+    https://docs.aws.amazon.com/bedrock/latest/userguide/models.html
+
+    Authentication:
+        This function uses AWS credentials. Set up authentication by:
+        1. Setting AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables, or
+        2. Using AWS IAM roles, or
+        3. Using AWS credentials file (~/.aws/credentials)
+        Reference https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
+
+    Example:
+        pip install pyseekdb boto3
+
+    .. code-block:: python
+        import pyseekdb
+        from pyseekdb.utils.embedding_functions import AmazonBedrockEmbeddingFunction
+
+        # Using Amazon Bedrock embedding model
+        # Set up AWS credentials first (see Authentication section above)
+        import boto3
+        session = boto3.Session()
+        ef = AmazonBedrockEmbeddingFunction(
+            session=session,
+            model_name="amazon.titan-embed-text-v2"
+        )
+
+        # Using with a custom boto3 session
+        import boto3
+        session = boto3.Session(region_name="us-east-1")
+        ef = AmazonBedrockEmbeddingFunction(
+            model_name="amazon.titan-embed-text-v2",
+            session=session
+        )
+
+        # Using with AWS profile name via session
+        import boto3
+        session = boto3.Session(profile_name="my-profile")
+        ef = AmazonBedrockEmbeddingFunction(
+            model_name="amazon.titan-embed-text-v2",
+            session=session
+        )
+
+        db = pyseekdb.Client(path="./seekdb.db")
+        collection = db.create_collection(name="my_collection", embedding_function=ef)
+        # Add documents
+        collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
+        # Query using semantic search
+        results = collection.query("How are you?", n_results=1)
+        print(results)
+
+    """
+
+    def __init__(
+        self,
+        session: Any,
+        model_name: str = "amazon.titan-embed-text-v2",
+        **kwargs: Any,
+    ):
+        """Initialize AmazonBedrockEmbeddingFunction.
+
+        Args:
+            session (boto3.Session): A boto3 Session object to use.
+                The session should be configured with appropriate credentials and region.
+                region_name and profile_name will be extracted from the session for config storage.
+            model_name (str, optional): Name of the Amazon Bedrock embedding model.
+                Defaults to "amazon.titan-embed-text-v2".
+                Available options:
+                - "amazon.titan-embed-text-v1" (1536 dimensions)
+                - "amazon.titan-embed-text-v2" (1024 dimensions)
+                - "amazon.titan-embed-g1-text-02" (1024 dimensions)
+                - "amazon.titan-embed-text-v2:0" (1024 dimensions)
+                - See Amazon Bedrock documentation for all available models
+            **kwargs: Additional arguments passed to boto3.client().
+                Common options include:
+                - endpoint_url: Custom endpoint URL (for testing or custom deployments)
+                - config: boto3 Config object for advanced configuration
+                - See boto3 documentation for more options
+        """
+        try:
+            import boto3
+        except ImportError:
+            raise ValueError(
+                "The boto3 python package is not installed. Please install it with `pip install boto3`"
+            )
+
+        for key, value in kwargs.items():
+            if not isinstance(value, (str, int, float, bool, list, dict, tuple)):
+                raise ValueError(f"Keyword argument {key} is not a primitive type")
+
+        # Extract region_name and profile_name from the session for config storage
+        self.region_name = session.region_name if hasattr(session, "region_name") else None
+        self.profile_name = session.profile_name if hasattr(session, "profile_name") else None
+
+        # Store configuration (for get_config, but NOT credentials)
+        self.model_name = model_name
+        self.kwargs = kwargs
+
+        # Initialize boto3 Bedrock Runtime client from session
+        self._client = session.client("bedrock-runtime", **kwargs)
+
+        # Store dimension for quick access (will be calculated if needed)
+        model_dims = _AMAZON_BEDROCK_MODEL_DIMENSIONS
+        if model_name in model_dims:
+            self._dimension = model_dims[model_name]
+        else:
+            # Will be calculated on first access via dimension property
+            self._dimension = None
+
+    @property
+    def dimension(self) -> int:
+        """Get the dimension of embeddings produced by this function.
+
+        Returns the known dimension for models without making an API call.
+        If the model is in the known dimensions list, that value is returned.
+
+        If the model is not in the known dimensions list, falls back to making
+        an API call to get the embedding and infer the dimension.
+
+        Returns:
+            int: The dimension of embeddings for this model.
+        """
+        # If dimension is known, return it
+        if self._dimension is not None:
+            return self._dimension
+
+        # Fallback: make an API call to get the embedding and infer the dimension
+        # This is done by actually generating an embedding for a dummy sentence
+        test_input = "dimension probing"
+        try:
+            embeddings = self([test_input])
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to determine embedding dimension via API call: {e}"
+            )
+        if (
+            not embeddings
+            or not isinstance(embeddings, list)
+            or not isinstance(embeddings[0], list)
+        ):
+            raise RuntimeError("Could not get embedding dimension from API response")
+
+        # Cache the dimension for future use
+        self._dimension = len(embeddings[0])
+        return self._dimension
+
+    def __call__(self, input: Documents) -> Embeddings:
+        """Generate embeddings for the given documents.
+
+        Args:
+            input: Documents to generate embeddings for. Can be a single string or list of strings.
+
+        Returns:
+            Embeddings for the documents as a list of lists of floats.
+        """
+        # Handle single string input
+        if isinstance(input, str):
+            input = [input]
+
+        # Handle empty input
+        if not input:
+            return []
+
+        accept = "application/json"
+        content_type = "application/json"
+
+        embeddings = []
+        for text in input:
+            # Prepare request body for Bedrock API
+            # Format depends on the model, but for Titan models it's:
+            request_body = {"inputText": text}
+
+            # Invoke the model
+            response = self._client.invoke_model(
+                modelId=self.model_name,
+                body=json.dumps(request_body),
+                accept=accept,
+                contentType=content_type
+            )
+
+            # Parse response
+            # The response body is a StreamingBody, so we need to read it
+            response_body = json.loads(response["body"].read())
+
+            # Extract embedding from response
+            # For Titan models, the embedding is in the "embedding" field
+            embedding = response_body.get("embedding")
+            if embedding is None:
+                raise ValueError(
+                    f"Unexpected response format from Bedrock API: {response_body}"
+                )
+
+            embeddings.append(embedding)
+
+        return embeddings
+
+    @staticmethod
+    def name() -> str:
+        return "amazon_bedrock"
+
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for the AmazonBedrockEmbeddingFunction.
+
+        Returns:
+            Dictionary containing configuration needed to restore this embedding function.
+            Note: AWS credentials are NOT stored in the config for security reasons.
+            Credentials should be provided via environment variables, IAM roles, or
+            passed as parameters when restoring.
+        """
+        # Never store credentials in config for security reasons
+        # Users should use environment variables, IAM roles, or pass credentials
+        # when restoring from config
+        config = {
+            "model_name": self.model_name,
+            "kwargs": self.kwargs,
+            "session_args": self._session_args,
+        }
+
+        return config
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "AmazonBedrockEmbeddingFunction":
+        """Build an AmazonBedrockEmbeddingFunction from its configuration dictionary.
+
+        Args:
+            config: Dictionary containing the embedding function's configuration.
+                Note: AWS credentials are NOT stored in config for security reasons.
+                Credentials should be provided via environment variables, IAM roles,
+                or passed as additional parameters.
+
+        Returns:
+            Restored AmazonBedrockEmbeddingFunction instance
+
+        Raises:
+            ValueError: If the configuration is invalid or missing required fields
+        """
+        model_name = config.get("model_name")
+        if model_name is None:
+            raise ValueError("Missing required field 'model_name' in configuration")
+
+        kwargs = config.get("kwargs", {})
+        if not isinstance(kwargs, dict):
+            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+
+        # Credentials are not stored in config for security reasons
+        # They should be provided via environment variables, IAM roles, or
+        # passed as additional parameters when calling build_from_config
+        # Create a session with region_name and profile_name if they were stored
+        try:
+            import boto3
+        except ImportError:
+            raise ValueError(
+                "The boto3 python package is not installed. Please install it with `pip install boto3`"
+            )
+
+        session_args = config.get("session_args")
+        session = boto3.Session(**session_args) if session_args else boto3.Session()
+
+        return AmazonBedrockEmbeddingFunction(
+            session=session,
+            model_name=model_name,
+            **kwargs,
+        )

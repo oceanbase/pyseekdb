@@ -1,0 +1,222 @@
+from pyseekdb.utils.embedding_functions.litellm_base_embedding_function import (
+    LiteLLMBaseEmbeddingFunction,
+)
+from typing import Any, Dict, Optional
+
+# Known Jina AI embedding model dimensions
+# Source: https://api.jina.ai/scalar#tag/search-foundation-models/POST/v1/embeddings
+# Note: Most Jina v2 models have 768 dimensions
+_JINA_MODEL_DIMENSIONS = {
+    "jina-embeddings-v3": 1024,
+    "jina-embeddings-v4": 2048,
+    "jina-clip-v2": 1024,
+    "jina-colbert-v2": 128,
+    "jina-embeddings-v2-base-en": 768,
+    "jina-embeddings-v2-base-zh": 768,
+    "jina-embeddings-v2-base-es": 768,
+    "jina-embeddings-v2-base-de": 768,
+    "jina-embeddings-v2-base-code": 768,
+    "jina-embeddings-v2-base-multilingual": 768,
+    "jina-embeddings-v2-small-en": 512,
+    "jina-embeddings-v2-small-zh": 512,
+    "jina-embeddings-v2-small-es": 512,
+    "jina-embeddings-v2-small-de": 512,
+    "jina-embeddings-v2-small-code": 512,
+    "jina-embeddings-v2-small-multilingual": 512,
+}
+
+
+class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
+    """
+    A convenient embedding function for Jina AI embedding models.
+
+    This class provides a simplified interface to Jina AI embedding models using LiteLLM.
+
+    For more information about Jina AI models, see https://jina.ai/embeddings
+
+    For LiteLLM documentation, see https://docs.litellm.ai/docs/embedding/supported_embedding
+
+    Example:
+        pip install pyseekdb litellm
+
+    .. code-block:: python
+        import pyseekdb
+        from pyseekdb.utils.embedding_functions import JinaEmbeddingFunction
+
+        # Using Jina AI embedding model
+        # Set JINA_API_KEY environment variable first
+        ef = JinaEmbeddingFunction(
+            model_name="jina-embeddings-v2-base-en"
+        )
+
+        # Using multilingual model
+        ef = JinaEmbeddingFunction(
+            model_name="jina-embeddings-v2-base-multilingual"
+        )
+
+        # Using with custom api_key_env
+        ef = JinaEmbeddingFunction(
+            model_name="jina-embeddings-v2-base-en",
+            api_key_env="JINA_API_KEY"
+        )
+
+        db = pyseekdb.Client(path="./seekdb.db")
+        collection = db.create_collection(name="my_collection", embedding_function=ef)
+        # Add documents
+        collection.add(ids=["1", "2"], documents=["Hello world", "How are you?"], metadatas=[{"id": 1}, {"id": 2}])
+        # Query using semantic search
+        results = collection.query("How are you?", n_results=1)
+        print(results)
+
+    """
+
+    def __init__(
+        self,
+        model_name: str = "jina-embeddings-v3",
+        api_key_env: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        """Initialize JinaEmbeddingFunction.
+
+        Args:
+            model_name (str, optional): Name of the Jina AI embedding model.
+                Defaults to "jina-embeddings-v2-base-en".
+                Available options:
+                - "jina-embeddings-v3"
+                - "jina-embeddings-v4"
+                - "jina-embeddings-v2-base-en"
+                - "jina-embeddings-v2-base-zh"
+                - "jina-embeddings-v2-base-es"
+                - "jina-embeddings-v2-base-de"
+                - "jina-embeddings-v2-base-code"
+                - "jina-embeddings-v2-base-multilingual"
+                - "jina-embeddings-v2-small-en"
+                - "jina-embeddings-v2-small-zh"
+                - "jina-embeddings-v2-small-es"
+                - "jina-embeddings-v2-small-de"
+                - "jina-embeddings-v2-small-code"
+                - "jina-embeddings-v2-small-multilingual"
+                - See Jina AI documentation for all available models: https://jina.ai/embeddings
+            api_key_env (str, optional): Name of the environment variable containing the Jina AI API key.
+                Defaults to "JINA_AI_API_KEY" if not provided.
+            **kwargs: Additional arguments to pass to LiteLLM.
+                Common options include:
+                - api_base: Base URL for the API endpoint
+                - timeout: Request timeout in seconds
+                - max_retries: Maximum number of retries
+                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
+        """
+        # Construct LiteLLM model name format: jina/<model-name>
+        litellm_model_name = f"jina/{model_name}"
+
+        # Set default API key env if not provided
+        if api_key_env is None:
+            api_key_env = "JINA_AI_API_KEY"
+
+        # Initialize the base class
+        super().__init__(
+            model_name=litellm_model_name,
+            api_key_env=api_key_env,
+            **kwargs,
+        )
+
+        # Store additional configuration for get_config
+        self._base_model_name = model_name  # Store original model name without prefix
+
+        # Store dimension for quick access (will be calculated if needed)
+        model_dims = _JINA_MODEL_DIMENSIONS
+        if model_name in model_dims:
+            self._dimension = model_dims[model_name]
+        else:
+            # Will be calculated on first access via dimension property
+            self._dimension = None
+
+    @property
+    def dimension(self) -> int:
+        """Get the dimension of embeddings produced by this function.
+
+        Returns the known dimension for models without making an API call.
+        If the model is in the known dimensions list, that value is returned.
+
+        If the model is not in the known dimensions list, falls back to making
+        an API call to get the embedding and infer the dimension.
+
+        Returns:
+            int: The dimension of embeddings for this model.
+        """
+        # If dimension is known, return it
+        if self._dimension is not None:
+            return self._dimension
+
+        # Fallback: make an API call to get the embedding and infer the dimension
+        # This is done by actually generating an embedding for a dummy sentence
+        test_input = "dimension probing"
+        try:
+            embeddings = self([test_input])
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to determine embedding dimension via API call: {e}"
+            )
+        if (
+            not embeddings
+            or not isinstance(embeddings, list)
+            or not isinstance(embeddings[0], list)
+        ):
+            raise RuntimeError("Could not get embedding dimension from API response")
+
+        # Cache the dimension for future use
+        self._dimension = len(embeddings[0])
+        return self._dimension
+
+    @staticmethod
+    def name() -> str:
+        """Get the unique name identifier for JinaEmbeddingFunction.
+
+        Returns:
+            The name identifier for this embedding function type
+        """
+        return "jina"
+
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration dictionary for the JinaEmbeddingFunction.
+
+        Returns:
+            Dictionary containing configuration needed to restore this embedding function
+        """
+        # Get base config from parent
+        base_config = super().get_config()
+
+        # Add Jina specific configuration
+        return {
+            "model_name": self._base_model_name,
+            "api_key_env": self.api_key_env,
+            "kwargs": base_config.get("kwargs", {}),
+        }
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "JinaEmbeddingFunction":
+        """Build a JinaEmbeddingFunction from its configuration dictionary.
+
+        Args:
+            config: Dictionary containing the embedding function's configuration
+
+        Returns:
+            Restored JinaEmbeddingFunction instance
+
+        Raises:
+            ValueError: If the configuration is invalid or missing required fields
+        """
+        model_name = config.get("model_name")
+        if model_name is None:
+            raise ValueError("Missing required field 'model_name' in configuration")
+
+        api_key_env = config.get("api_key_env", "JINA_AI_API_KEY")
+        kwargs = config.get("kwargs", {})
+        if not isinstance(kwargs, dict):
+            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+
+        return JinaEmbeddingFunction(
+            model_name=model_name,
+            api_key_env=api_key_env,
+            **kwargs,
+        )
