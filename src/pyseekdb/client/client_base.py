@@ -1357,6 +1357,10 @@ class BaseClient(BaseConnection, AdminAPI):
         #    - If embedding_function is provided, use it to generate embeddings from documents
         #    - If embedding_function is not provided, raise an error
         # 3. If neither embeddings nor documents are provided, raise an error
+        # NOTE: The embedding_function is passed through `get_collection` and `create_collection` parameters.
+        # If embedding_function parameter passed in `get_collection` and `create_collection` is None,
+        # then the embedding function is not provided. If developers passed through `_NOT_PROVIDED` (default value),
+        # then the embedding function is the default embedding function.
 
         if embeddings:
             # embeddings provided, use them directly without embedding

@@ -226,8 +226,8 @@ new_id = str(uuid.uuid4())
 new_document = "This is a new document from upsert"
 collection.upsert(
     ids=new_id,
-    documents="This is a new document from upsert",
-    embeddings=default_ef("This is a new document from upsert"),
+    documents=new_document,
+    embeddings=default_ef(new_document),
     metadatas={"category": "New", "upserted": True},
 )
 
