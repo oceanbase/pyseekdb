@@ -256,7 +256,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
             "input_type": self.input_type,
             "truncation": self.truncation,
             "output_dimension": self.output_dimension,
-            "kwargs": self.kwargs,
+            "client_kwargs": self.kwargs,
         }
 
     @staticmethod
@@ -280,7 +280,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         input_type = config.get("input_type")
         truncation = config.get("truncation")
         output_dimension = config.get("output_dimension")
-        kwargs = config.get("kwargs", {})
+        kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
             raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
 

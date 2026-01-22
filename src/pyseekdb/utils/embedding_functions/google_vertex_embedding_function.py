@@ -13,6 +13,8 @@ _GOOGLE_VERTEX_MODEL_DIMENSIONS = {
     "gemini-embedding-001": 768,  # supports outputDimensionality: 128, 256, 512, 768
 }
 
+_DEFAULT_MODEL_NAME = "textembedding-gecko@003"
+
 
 class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
     """
@@ -72,7 +74,7 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
     def __init__(
         self,
         project_id: str,
-        model_name: str = "textembedding-gecko@003",
+        model_name: str = _DEFAULT_MODEL_NAME,
         location: str = "us-central1",
         task_type: Optional[str] = None,
         output_dimensionality: Optional[int] = None,
@@ -114,6 +116,8 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         """
         # Construct LiteLLM model name format: vertex_ai/<model-name>
         litellm_model_name = f"vertex_ai/{model_name}"
+
+        self._client_kwargs = kwargs
 
         # Prepare kwargs for LiteLLM
         litellm_kwargs = {
@@ -206,9 +210,6 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         Returns:
             Dictionary containing configuration needed to restore this embedding function
         """
-        # Get base config from parent
-        base_config = super().get_config()
-
         # Add Google Vertex AI specific configuration
         return {
             "project_id": self.project_id,
@@ -217,7 +218,7 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
             "task_type": self.task_type,
             "output_dimensionality": self.output_dimensionality,
             "api_key_env": self.api_key_env,
-            "kwargs": base_config.get("kwargs", {}),
+            "client_kwargs": self._client_kwargs,
         }
 
     @staticmethod
@@ -237,12 +238,12 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         if project_id is None:
             raise ValueError("Missing required field 'project_id' in configuration")
 
-        model_name = config.get("model_name", "textembedding-gecko@003")
+        model_name = config.get("model_name", _DEFAULT_MODEL_NAME)
         location = config.get("location", "us-central1")
         task_type = config.get("task_type")
         output_dimensionality = config.get("output_dimensionality")
         api_key_env = config.get("api_key_env")
-        kwargs = config.get("kwargs", {})
+        kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
             raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
 

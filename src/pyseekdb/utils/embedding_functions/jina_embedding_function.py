@@ -1,3 +1,4 @@
+import os
 from pyseekdb.utils.embedding_functions.litellm_base_embedding_function import (
     LiteLLMBaseEmbeddingFunction,
 )
@@ -107,11 +108,16 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
                 - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
         """
         # Construct LiteLLM model name format: jina/<model-name>
-        litellm_model_name = f"jina/{model_name}"
+        litellm_model_name = f"jina_ai/{model_name}"
+        self._client_kwargs = kwargs
 
         # Set default API key env if not provided
         if api_key_env is None:
             api_key_env = "JINA_AI_API_KEY"
+        if not os.environ.get(api_key_env):
+            raise ValueError(
+                f"API key environment variable '{api_key_env}' is not set. Please set it before using {self.__class__.__name__}."
+            )
 
         # Initialize the base class
         super().__init__(
@@ -183,14 +189,11 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         Returns:
             Dictionary containing configuration needed to restore this embedding function
         """
-        # Get base config from parent
-        base_config = super().get_config()
-
         # Add Jina specific configuration
         return {
             "model_name": self._base_model_name,
             "api_key_env": self.api_key_env,
-            "kwargs": base_config.get("kwargs", {}),
+            "client_kwargs": self._client_kwargs,
         }
 
     @staticmethod
@@ -211,7 +214,7 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
             raise ValueError("Missing required field 'model_name' in configuration")
 
         api_key_env = config.get("api_key_env", "JINA_AI_API_KEY")
-        kwargs = config.get("kwargs", {})
+        kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
             raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
 

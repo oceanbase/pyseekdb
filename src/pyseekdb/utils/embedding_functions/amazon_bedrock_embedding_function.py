@@ -15,6 +15,8 @@ _AMAZON_BEDROCK_MODEL_DIMENSIONS = {
     "amazon.titan-embed-text-v2:0": 1024,
 }
 
+_DEFAULT_MODEL_NAME = "amazon.titan-embed-text-v2"
+
 
 class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
     """
@@ -77,7 +79,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(
         self,
         session: Any,
-        model_name: str = "amazon.titan-embed-text-v2",
+        model_name: str = _DEFAULT_MODEL_NAME,
         **kwargs: Any,
     ):
         """Initialize AmazonBedrockEmbeddingFunction.
@@ -112,12 +114,17 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
                 raise ValueError(f"Keyword argument {key} is not a primitive type")
 
         # Extract region_name and profile_name from the session for config storage
-        self.region_name = session.region_name if hasattr(session, "region_name") else None
-        self.profile_name = session.profile_name if hasattr(session, "profile_name") else None
+        self._session_args = {}
+        self._session_args["region_name"] = (
+            session.region_name if hasattr(session, "region_name") else None
+        )
+        self._session_args["profile_name"] = (
+            session.profile_name if hasattr(session, "profile_name") else None
+        )
 
         # Store configuration (for get_config, but NOT credentials)
         self.model_name = model_name
-        self.kwargs = kwargs
+        self._client_kwargs = kwargs
 
         # Initialize boto3 Bedrock Runtime client from session
         self._client = session.client("bedrock-runtime", **kwargs)
@@ -198,7 +205,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
                 modelId=self.model_name,
                 body=json.dumps(request_body),
                 accept=accept,
-                contentType=content_type
+                contentType=content_type,
             )
 
             # Parse response
@@ -235,7 +242,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
         # when restoring from config
         config = {
             "model_name": self.model_name,
-            "kwargs": self.kwargs,
+            "client_kwargs": self._client_kwargs,
             "session_args": self._session_args,
         }
 
@@ -257,11 +264,9 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
         Raises:
             ValueError: If the configuration is invalid or missing required fields
         """
-        model_name = config.get("model_name")
-        if model_name is None:
-            raise ValueError("Missing required field 'model_name' in configuration")
+        model_name = config.get("model_name", _DEFAULT_MODEL_NAME)
 
-        kwargs = config.get("kwargs", {})
+        kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
             raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
 

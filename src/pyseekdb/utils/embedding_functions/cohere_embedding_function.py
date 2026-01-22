@@ -17,6 +17,8 @@ _COHERE_MODEL_DIMENSIONS = {
     "embed-multilingual-light-v2.0": 384,
 }
 
+_DEFAULT_MODEL_NAME = "embed-english-v3.0"
+
 
 class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
     """
@@ -70,7 +72,7 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
 
     def __init__(
         self,
-        model_name: str = "embed-english-v3.0",
+        model_name: str = _DEFAULT_MODEL_NAME,
         api_key_env: Optional[str] = None,
         input_type: Optional[str] = None,
         **kwargs: Any,
@@ -105,6 +107,8 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         """
         # Construct LiteLLM model name format: cohere/<model-name>
         litellm_model_name = f"cohere/{model_name}"
+
+        self._client_kwargs = kwargs
 
         # Set default API key env if not provided
         if api_key_env is None:
@@ -188,22 +192,12 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         Returns:
             Dictionary containing configuration needed to restore this embedding function
         """
-        # Get base config from parent
-        base_config = super().get_config()
-
-        # Add Cohere specific configuration
-        # Extract input_type from kwargs if it exists, otherwise use stored value
-        kwargs = base_config.get("kwargs", {})
-        if "input_type" in kwargs:
-            input_type = kwargs.pop("input_type")
-        else:
-            input_type = self.input_type
 
         return {
             "model_name": self._base_model_name,
             "api_key_env": self.api_key_env,
-            "input_type": input_type,
-            "kwargs": kwargs,
+            "input_type": self.input_type,
+            "client_kwargs": self._client_kwargs,
         }
 
     @staticmethod
@@ -219,13 +213,11 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         Raises:
             ValueError: If the configuration is invalid or missing required fields
         """
-        model_name = config.get("model_name")
-        if model_name is None:
-            raise ValueError("Missing required field 'model_name' in configuration")
+        model_name = config.get("model_name", _DEFAULT_MODEL_NAME)
 
         api_key_env = config.get("api_key_env", "COHERE_API_KEY")
         input_type = config.get("input_type")
-        kwargs = config.get("kwargs", {})
+        kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
             raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
 
