@@ -51,7 +51,13 @@ jobs:
 
       - name: Run unit tests
         run: |
-          uv run pytest tests/unit_tests/ -v --log-cli-level=INFO
+          if [ "${{ env.RUNNER_DEBUG }}" = "true" ]; then
+            log_level=DEBUG
+          else
+            log_level=INFO
+          fi
+          uv run pytest tests/unit_tests/ -v --log-cli-level=${log_level} | tee pytest.log
+          cat pytest.log | awk '/^collected/{s=$8} /passed/{p=$2} END{if(s==p) print "✅ all passed "p"/"s; else print "❌ failed"; exit s!=p}'
 
   integration-test:
     runs-on: ubuntu-latest
@@ -107,4 +113,10 @@ jobs:
           SERVER_PORT: 2881
         run: |
           # Run integration tests filtered by test mode
-          uv run pytest tests/integration_tests/ -v --log-cli-level=INFO -k "${{ matrix.test_mode }}"
+          if [ "${{ env.RUNNER_DEBUG }}" = "true" ]; then
+            log_level=DEBUG
+          else
+            log_level=INFO
+          fi
+          uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} -k "${{ matrix.test_mode }}" | tee pytest.log
+          cat pytest.log | awk '/^collected/{s=$8} /passed/{p=$2} END{if(s==p) print "✅ all passed "p"/"s; else print "❌ failed"; exit s!=p}'
