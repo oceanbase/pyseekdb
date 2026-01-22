@@ -56,8 +56,7 @@ jobs:
           else
             log_level=INFO
           fi
-          uv run pytest tests/unit_tests/ -v --log-cli-level=${log_level} | tee pytest.log
-          cat pytest.log | awk '/^collected/{s=$8} /passed/{p=$2} /failed/{f=$2} /skipped/{sk=$2} END{f=f+0; sk=sk+0; total=p+sk; if(total!=s) {print "❌ failed: "p" passed, "f" failed, "sk" skipped out of "s; exit 1} else {print "✅ all passed: "p" passed, "sk" skipped out of "s; exit 0}
+          uv run pytest tests/unit_tests/ -v --log-cli-level=${log_level}
 
   integration-test:
     runs-on: ubuntu-latest
@@ -118,5 +117,4 @@ jobs:
           else
             log_level=INFO
           fi
-          uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} -k "${{ matrix.test_mode }}" | tee pytest.log
-          cat pytest.log | awk '/^collected/{s=$8} /passed/{p=$2} /failed/{f=$2} /skipped/{sk=$2} END{f=f+0; sk=sk+0; total=p+sk; if(total!=s) {print "❌ failed: "p" passed, "f" failed, "sk" skipped out of "s; exit 1} else {print "✅ all passed: "p" passed, "sk" skipped out of "s; exit 0}
+          uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} -k "${{ matrix.test_mode }}"
