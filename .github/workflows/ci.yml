@@ -47,7 +47,7 @@ jobs:
 
       - name: Install depencies for unit tests
         run: |
-          uv run pip install openai sentence-transformers torch torchvision torchaudio
+          uv run pip install openai sentence-transformers torch torchvision torchaudio boto3 litellm voyageai
 
       - name: Run unit tests
         run: |
