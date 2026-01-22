@@ -42,6 +42,7 @@ class TestDetectDbTypeAndVersion:
         print(f"   version1={version1}, version2={version2}")
         print(f"   version1 > version2: {version1 > version2}")
 
+    @pytest.mark.parametrize("db_client", ["server"], indirect=True)
     def test_seekdb_type_detection(self, db_client):
         """Test: detect seekdb Server type and version"""
         # Verify client type
@@ -65,6 +66,7 @@ class TestDetectDbTypeAndVersion:
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
+    @pytest.mark.parametrize("db_client", ["oceanbase"], indirect=True)
     def test_ob_type_detection(self, db_client):
         """Test: detect OceanBase Server type and version"""
         # Verify client type
