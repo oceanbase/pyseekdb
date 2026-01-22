@@ -7,10 +7,10 @@ import time
 
 import pytest
 
-from pyseekdb import Configuration, FulltextParserConfig, HNSWConfiguration
+from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
 
 
-class TestFulltextParserConfig:
+class TestFulltextAnalyzerConfig:
     """Test fulltext parser configuration using parameterized db_client fixture"""
 
     def _test_fulltext_parser_config(self, client, parser_name: str, params: dict | None = None):
@@ -26,7 +26,7 @@ class TestFulltextParserConfig:
         test_dimension = 128
 
         # Create configuration with fulltext parser
-        fulltext_config = FulltextParserConfig(parser=parser_name, params=params)
+        fulltext_config = FulltextAnalyzerConfig(analyzer=parser_name, properties=params)
         config = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
             fulltext_config=fulltext_config,
@@ -43,7 +43,10 @@ class TestFulltextParserConfig:
         # Verify the fulltext index was created with correct parser
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             # Get CREATE TABLE statement
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
@@ -104,7 +107,10 @@ class TestFulltextParserConfig:
         # Verify default parser (ik) is used
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             create_stmt = (
@@ -140,7 +146,10 @@ class TestFulltextParserConfig:
         # Verify default parser (ik) is used for backward compatibility
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             create_stmt = (

@@ -17,11 +17,17 @@ class CollectionFieldNames:
 class CollectionNames:
     # Version prefix for collection tables
     _PREFIX = "c$v1$"
+    _PREFIX_V2 = "c$v2$"
 
     @staticmethod
     def table_name(collection_name: str) -> str:
         """Convert collection name to table name."""
         return f"{CollectionNames._PREFIX}{collection_name}"
+
+    @staticmethod
+    def table_name_v2(collection_id: str) -> str:
+        """Convert collection id to table name."""
+        return f"{CollectionNames._PREFIX_V2}{collection_id}"
 
     @staticmethod
     def collection_name(table_name: str) -> str:
@@ -44,3 +50,7 @@ class CollectionNames:
     def prefix() -> str:
         """Get the collection table prefix."""
         return CollectionNames._PREFIX
+
+    @staticmethod
+    def sdk_collections_table_name() -> str:
+        return "sdk_collections"

@@ -3,7 +3,6 @@ Collection query tests using db_client fixture
 Demonstrates how to use the conftest.py fixtures to eliminate code duplication
 """
 
-import json
 import time
 import uuid
 
@@ -21,9 +20,7 @@ class TestCollectionQuery:
             collection_name: Collection name
             dimension: Actual dimension of the collection (used to generate vectors)
         """
-        from pyseekdb.client.meta_info import CollectionNames
-
-        table_name = CollectionNames.table_name(collection_name)
+        collection = client.get_collection(collection_name)
 
         # Base vectors (3D) - will be extended or truncated to match actual dimension
         base_vectors = [
@@ -63,33 +60,13 @@ class TestCollectionQuery:
             },
         ]
 
-        for data in test_data:
-            # Generate UUID for _id (use string format directly)
-            id_str = str(uuid.uuid4())
-            # Escape single quotes in ID
-            id_str_escaped = id_str.replace("'", "''")
-
-            # Generate vector with correct dimension
-            base_vec = data["base_vector"]
-            if dimension <= len(base_vec):
-                # Truncate if dimension is smaller
-                embedding = base_vec[:dimension]
-            else:
-                # Extend if dimension is larger (repeat pattern)
-                embedding = base_vec * ((dimension // len(base_vec)) + 1)
-                embedding = embedding[:dimension]
-
-            # Convert vector to string format: [1.0,2.0,3.0]
-            vector_str = "[" + ",".join(map(str, embedding)) + "]"
-            # Convert metadata to JSON string
-            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
-            # Escape single quotes in document
-            document_str = data["document"].replace("'", "\\'")
-
-            # Use CAST to convert string to binary for varbinary(512) field
-            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
-                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""  # noqa: S608
-            client._server._execute(sql)
+        insert_ids = [str(uuid.uuid4()) for _ in test_data]
+        collection.add(
+            ids=insert_ids,
+            embeddings=[data["base_vector"] for data in test_data],
+            documents=[data["document"] for data in test_data],
+            metadatas=[data["metadata"] for data in test_data],
+        )
 
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
 

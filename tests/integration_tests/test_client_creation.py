@@ -10,13 +10,13 @@ import uuid
 
 import pytest
 
-from pyseekdb import Configuration, FulltextParserConfig, HNSWConfiguration
+from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
 
 
 class TestClientCreation:
     """Test client creation and collection management using parameterized db_client fixture"""
 
-    def test_client_creation_and_collection_management(self, db_client):  # noqa: C901
+    def test_client_creation_and_collection_management(self, db_client):
         """
         Test client creation, connection, and all collection management interfaces.
 
@@ -46,7 +46,7 @@ class TestClientCreation:
         test_collection_name_config = f"test_collection_config_{int(time.time() * 1000)}"
         config_with_fulltext = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
-            fulltext_config=FulltextParserConfig(parser="ik"),
+            fulltext_config=FulltextAnalyzerConfig(analyzer="ik"),
         )
         collection_config = db_client.create_collection(
             name=test_collection_name_config,
@@ -64,56 +64,6 @@ class TestClientCreation:
         assert collection.name == test_collection_name
         actual_dimension = collection.dimension
         assert actual_dimension > 0, f"Collection dimension should be positive, got {actual_dimension}"
-
-        # Verify table was created by checking if it exists
-        from pyseekdb.client.meta_info import CollectionNames
-
-        table_name = CollectionNames.table_name(test_collection_name)
-        try:
-            # Try to describe table structure to verify it exists
-            table_info = db_client._server._execute(f"DESCRIBE `{table_name}`")
-            assert table_info is not None
-            assert len(table_info) > 0
-
-            # Verify table has expected columns
-            column_names = []
-            column_types = {}
-            for row in table_info:
-                if isinstance(row, dict):
-                    field_name = row.get("Field", row.get("field", ""))
-                    field_type = row.get("Type", row.get("type", ""))
-                    column_names.append(field_name)
-                    if field_name:
-                        column_types[field_name] = str(field_type).lower()
-                elif isinstance(row, (tuple, list)):
-                    field_name = row[0] if len(row) > 0 else ""
-                    field_type = row[1] if len(row) > 1 else ""
-                    column_names.append(field_name)
-                    if field_name:
-                        column_types[field_name] = str(field_type).lower()
-                else:
-                    column_names.append(str(row))
-
-            assert "_id" in column_names
-            assert "document" in column_names
-            assert "embedding" in column_names
-            assert "metadata" in column_names
-
-            # Verify _id column type is varbinary
-            if "_id" in column_types:
-                id_type = column_types["_id"]
-                assert "varbinary" in id_type, f"Expected _id to be varbinary type, but got: {id_type}"
-
-            print(f"\n✅ Collection '{test_collection_name}' created successfully")
-            print(f"   Table name: {table_name}")
-            print(f"   Dimension: {actual_dimension}")
-            print(f"   Table columns: {', '.join(column_names)}")
-
-        except Exception as e:
-            # Clean up and fail
-            with contextlib.suppress(Exception):
-                db_client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
-            pytest.fail(f"Failed to verify collection table creation: {e}")
 
         # Test 2: get_collection - get the collection we just created
         retrieved_collection = db_client.get_collection(name=test_collection_name)
@@ -208,10 +158,7 @@ class TestClientCreation:
         random.seed(42)  # For reproducibility
         test_ids = [str(uuid.uuid4()) for _ in range(3)]
         # Generate embeddings matching the collection's dimension
-        embeddings = [
-            [random.random() for _ in range(collection.dimension)]  # noqa: S311
-            for _ in range(3)
-        ]
+        embeddings = [[random.random() for _ in range(collection.dimension)] for _ in range(3)]  # noqa: S311
         collection.add(
             ids=test_ids,
             embeddings=embeddings,

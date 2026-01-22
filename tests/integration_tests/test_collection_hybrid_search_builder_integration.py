@@ -3,7 +3,6 @@ Collection hybrid search tests using HybridSearch builder with db_client fixture
 Mirrors test_collection_hybrid_search.py but passes HybridSearch instances to collection.hybrid_search().
 """
 
-import json
 import time
 import uuid
 
@@ -49,9 +48,7 @@ class TestCollectionHybridSearchWithBuilder:
         return extended[:dimension]
 
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
-        from pyseekdb.client.meta_info import CollectionNames
-
-        table_name = CollectionNames.table_name(collection_name)
+        collection = client.get_collection(collection_name)
         base_vectors = [
             [1.0, 2.0, 3.0],
             [2.0, 3.0, 4.0],
@@ -121,26 +118,13 @@ class TestCollectionHybridSearchWithBuilder:
             },
         ]
 
-        inserted_ids = []
-        for data in test_data:
-            id_str = str(uuid.uuid4())
-            inserted_ids.append(id_str)
-            id_str_escaped = id_str.replace("'", "''")
-
-            base_vec = data["base_vector"]
-            if dimension <= len(base_vec):
-                embedding = base_vec[:dimension]
-            else:
-                embedding = base_vec * ((dimension // len(base_vec)) + 1)
-                embedding = embedding[:dimension]
-
-            vector_str = "[" + ",".join(map(str, embedding)) + "]"
-            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
-            document_str = data["document"].replace("'", "\\'")
-
-            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
-                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""  # noqa: S608
-            client._server._execute(sql)
+        inserted_ids = [str(uuid.uuid4()) for _ in test_data]
+        collection.add(
+            ids=inserted_ids,
+            embeddings=[data["base_vector"] for data in test_data],
+            documents=[data["document"] for data in test_data],
+            metadatas=[data["metadata"] for data in test_data],
+        )
 
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
         return inserted_ids
@@ -152,7 +136,7 @@ class TestCollectionHybridSearchWithBuilder:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_ft_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -192,7 +176,7 @@ class TestCollectionHybridSearchWithBuilder:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_vec_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -228,7 +212,7 @@ class TestCollectionHybridSearchWithBuilder:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_comb_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -263,7 +247,7 @@ class TestCollectionHybridSearchWithBuilder:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_meta_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -306,7 +290,7 @@ class TestCollectionHybridSearchWithBuilder:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_logic_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -347,7 +331,7 @@ class TestCollectionHybridSearchWithBuilder:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_builder_scalar_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         inserted_ids = self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)

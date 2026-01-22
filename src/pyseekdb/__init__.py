@@ -76,12 +76,13 @@ from .client import (
     Database,
     DefaultEmbeddingFunction,
     EmbeddingFunction,
-    FulltextParserConfig,
+    FulltextAnalyzerConfig,
     HNSWConfiguration,
     RemoteServerClient,
     SeekdbEmbeddedClient,
     Version,
     get_default_embedding_function,
+    register_embedding_function,
 )
 from .client.collection import Collection
 from .client.hybrid_search import (
@@ -124,7 +125,7 @@ __all__ = [
     "Database",
     "DefaultEmbeddingFunction",
     "EmbeddingFunction",
-    "FulltextParserConfig",
+    "FulltextAnalyzerConfig",
     "HNSWConfiguration",
     "HybridSearch",
     "K",
@@ -132,4 +133,5 @@ __all__ = [
     "SeekdbEmbeddedClient",
     "Version",
     "get_default_embedding_function",
+    "register_embedding_function",
 ]

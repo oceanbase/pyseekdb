@@ -3,7 +3,6 @@ Collection hybrid search tests using db_client fixture
 Demonstrates how to eliminate code duplication using parameterized fixtures
 """
 
-import json
 import time
 import uuid
 
@@ -37,9 +36,8 @@ class TestCollectionHybridSearch:
 
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
         """Helper method to insert test data via SQL and return inserted IDs"""
-        from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(collection_name)
+        collection = client.get_collection(collection_name)
 
         base_vectors = [
             [1.0, 2.0, 3.0],
@@ -110,29 +108,16 @@ class TestCollectionHybridSearch:
             },
         ]
 
-        inserted_ids = []
-        for data in test_data:
-            id_str = str(uuid.uuid4())
-            inserted_ids.append(id_str)
-            id_str_escaped = id_str.replace("'", "''")
-
-            base_vec = data["base_vector"]
-            if dimension <= len(base_vec):
-                embedding = base_vec[:dimension]
-            else:
-                embedding = base_vec * ((dimension // len(base_vec)) + 1)
-                embedding = embedding[:dimension]
-
-            vector_str = "[" + ",".join(map(str, embedding)) + "]"
-            metadata_str = json.dumps(data["metadata"], ensure_ascii=False).replace("'", "\\'")
-            document_str = data["document"].replace("'", "\\'")
-
-            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
-                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""  # noqa: S608
-            client._server._execute(sql)
+        ids = [str(uuid.uuid4()) for _ in test_data]
+        collection.add(
+            ids=ids,
+            embeddings=[data["base_vector"] for data in test_data],
+            documents=[data["document"] for data in test_data],
+            metadatas=[data["metadata"] for data in test_data],
+        )
 
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
-        return inserted_ids
+        return ids
 
     def test_hybrid_search_full_text_only(self, db_client):
         """
@@ -141,7 +126,7 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_ft_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -190,7 +175,7 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_vec_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -228,7 +213,7 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_comb_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -264,7 +249,7 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_meta_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -309,7 +294,7 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_logic_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)
@@ -349,7 +334,7 @@ class TestCollectionHybridSearch:
         Automatically runs for: embedded, server, oceanbase
         """
         collection_name = f"test_hybrid_search_scalar_{int(time.time() * 1000)}"
-        collection, actual_dimension = self._create_test_collection(db_client, collection_name)
+        collection, actual_dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         inserted_ids = self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
         time.sleep(1)

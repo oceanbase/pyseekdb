@@ -3,7 +3,6 @@ Collection get tests - testing collection.get() interface for all three modes us
 """
 
 import contextlib
-import json
 import time
 import uuid
 
@@ -43,9 +42,8 @@ class TestCollectionGet:
 
     def _insert_test_data(self, client, collection_name: str):
         """Helper method to insert test data and return inserted IDs"""
-        from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(collection_name)
+        collection = client.get_collection(collection_name)
 
         # Insert test data with vectors, documents, and metadata
         test_data = [
@@ -82,30 +80,13 @@ class TestCollectionGet:
         ]
 
         # Store inserted IDs for return (using generated UUIDs)
-        inserted_ids = []
-
-        # Insert all data with generated UUIDs
-        for data in test_data:
-            # Use string ID directly (support any string format)
-            id_str = data["_id"]
-            inserted_ids.append(id_str)  # Store original ID string for return
-
-            # Escape single quotes in ID
-            id_str_escaped = id_str.replace("'", "''")
-
-            # Convert vector to string format: [1.0,2.0,3.0]
-            vector_str = "[" + ",".join(map(str, data["embedding"])) + "]"
-            # Convert metadata to JSON string
-            metadata_str = json.dumps(data["metadata"]).replace("'", "\\'")
-            # Escape single quotes in document
-            document_str = data["document"].replace("'", "\\'")
-
-            # Use CAST to convert string to binary for varbinary(512) field
-            sql = f"""INSERT INTO `{table_name}` (_id, document, embedding, metadata)
-                     VALUES (CAST('{id_str_escaped}' AS BINARY), '{document_str}', '{vector_str}', '{metadata_str}')"""  # noqa: S608
-            client._server._execute(sql)
-
-        return inserted_ids
+        collection.add(
+            ids=[data["_id"] for data in test_data],
+            embeddings=[data["embedding"] for data in test_data],
+            documents=[data["document"] for data in test_data],
+            metadatas=[data["metadata"] for data in test_data],
+        )
+        return [data["_id"] for data in test_data]
 
     def test_metadata_array_in_nin_overlap(self, db_client):
         """
