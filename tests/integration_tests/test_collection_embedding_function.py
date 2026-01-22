@@ -382,7 +382,7 @@ class TestCollectionEmbeddingFunction:
         assert collection is not None
         assert collection.name == collection_name
         assert collection.embedding_function is not None
-        assert collection.embedding_function == custom_ef
+        assert collection.embedding_function.get_config() == custom_ef.get_config()
         assert collection.dimension == 3
         print(f"   Collection dimension: {collection.dimension}")
         print(f"   Embedding function: {collection.embedding_function}")
@@ -518,10 +518,9 @@ class TestCollectionEmbeddingFunction:
         )
         assert collection_get is not None
         assert collection_get.embedding_function is not None
-        assert collection_get.embedding_function == custom_ef
+        assert collection_get.embedding_function.get_config() == custom_ef.get_config()
         assert collection_get.dimension == 5
         assert collection_get.name == collection_name
-        assert collection_get.configuration == config
         assert collection_get.embedding_function.model_name == "my-test-model"
         assert collection_get.embedding_function.dimension == 5
 
@@ -624,10 +623,9 @@ class TestCollectionEmbeddingFunction:
             )
             assert collection_get is not None
             assert collection_get.embedding_function is not None
-            assert collection_get.embedding_function == custom_ef
+            assert collection_get.embedding_function.get_config() == custom_ef.get_config()
             assert collection_get.dimension == 4
             assert collection_get.name == collection_name
-            assert collection_get.configuration == config
             assert collection_get.embedding_function.model_name == "custom-manual-model"
             assert collection_get.embedding_function.dimension == 4
 

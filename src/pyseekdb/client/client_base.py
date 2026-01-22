@@ -712,6 +712,7 @@ class BaseClient(BaseConnection, AdminAPI):
         ) ORGANIZATION = HEAP;"""
 
         # Execute SQL to create table
+        logger.debug(f"Creating table: {table_name} with SQL: {sql}")
         self._execute(sql)
 
         # Create and return Collection object
@@ -934,8 +935,8 @@ class BaseClient(BaseConnection, AdminAPI):
             and not embedding_function is _NOT_PROVIDED
         ):
             if (
-                embedding_function
-                and embedding_function_persistence.name() != embedding_function.name()
+                embedding_function is None
+                or embedding_function_persistence.name() != embedding_function.name()
             ):
                 raise ValueError(
                     f"Both embedding function from parameter (not _NOT_PROVIDED, default value) and embedding function from persistence provided."

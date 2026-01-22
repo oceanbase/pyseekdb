@@ -47,7 +47,7 @@ class HNSWConfiguration:
     """
 
     dimension: int
-    distance: str = DistanceMetric.L2
+    distance: str = DistanceMetric.L2.value
 
     def __post_init__(self):
         if self.dimension <= 0:
