@@ -5,19 +5,17 @@ Also includes ClientProxy for strict separation of Collection vs Database operat
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Sequence, TYPE_CHECKING, Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 from .database import Database
 
 if TYPE_CHECKING:
     from .client_base import (
         BaseClient,
-        ClientAPI,
-        HNSWConfiguration,
         ConfigurationParam,
         EmbeddingFunctionParam,
     )
-    from .embedding_function import EmbeddingFunction, Documents as EmbeddingDocuments
     from .collection import Collection
 
 # Delay import to avoid circular import
@@ -86,8 +84,8 @@ class AdminAPI(ABC):
     @abstractmethod
     def list_databases(
         self,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        limit: int | None = None,
+        offset: int | None = None,
         tenant: str = DEFAULT_TENANT,
     ) -> Sequence[Database]:
         """
@@ -137,8 +135,8 @@ class _AdminClientProxy(AdminAPI):
 
     def list_databases(
         self,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        limit: int | None = None,
+        offset: int | None = None,
         tenant: str = DEFAULT_TENANT,
     ) -> Sequence[Database]:
         """Proxy to server implementation"""
@@ -197,23 +195,19 @@ class _ClientProxy:
             **kwargs,
         )
 
-    def get_collection(
-        self, name: str, embedding_function: EmbeddingFunctionParam = _PLACEHOLDER
-    ) -> "Collection":
+    def get_collection(self, name: str, embedding_function: EmbeddingFunctionParam = _PLACEHOLDER) -> "Collection":
         """Proxy to server implementation - collection operations only"""
         # Replace placeholder with real _NOT_PROVIDED if needed
         real_not_provided = _get_not_provided()
         if embedding_function is _PLACEHOLDER:
             embedding_function = real_not_provided
-        return self._server.get_collection(
-            name=name, embedding_function=embedding_function
-        )
+        return self._server.get_collection(name=name, embedding_function=embedding_function)
 
     def delete_collection(self, name: str) -> None:
         """Proxy to server implementation - collection operations only"""
         return self._server.delete_collection(name=name)
 
-    def list_collections(self) -> List["Collection"]:
+    def list_collections(self) -> list["Collection"]:
         """Proxy to server implementation - collection operations only"""
         return self._server.list_collections()
 

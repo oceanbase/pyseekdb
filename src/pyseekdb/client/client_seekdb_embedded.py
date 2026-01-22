@@ -3,24 +3,23 @@ Embedded mode client - based on seekdb
 Note: Only available when pylibseekdb is installed (Linux only)
 """
 
-import os
 import logging
-from typing import Any, List, Optional, Sequence, Dict, Union
-from pymysql.converters import escape_string
+import os
+from collections.abc import Sequence
+from typing import Any
 
 # Try to import pylibseekdb - it may not be available on all platforms
 try:
-    import pylibseekdb as seekdb  # type: ignore
+    import pylibseekdb as seekdb  # type: ignore[import-not-found]
 
     _PYLIBSEEKDB_AVAILABLE = True
 except ImportError:
-    seekdb = None  # type: ignore
+    seekdb = None  # type: ignore[assignment]
     _PYLIBSEEKDB_AVAILABLE = False
 
-from .client_base import BaseClient
-from .collection import Collection
-from .database import Database
 from .admin_client import DEFAULT_TENANT
+from .client_base import BaseClient
+from .database import Database
 from .sql_utils import render_sql_with_params
 
 logger = logging.getLogger(__name__)
@@ -62,9 +61,7 @@ class SeekdbEmbeddedClient(BaseClient):
         self._connection = None
         self._initialized = False
 
-        logger.info(
-            f"Initialize SeekdbEmbeddedClient: path={self.path}, database={self.database}"
-        )
+        logger.info(f"Initialize SeekdbEmbeddedClient: path={self.path}, database={self.database}")
 
     # ==================== Connection Management ====================
 
@@ -73,7 +70,7 @@ class SeekdbEmbeddedClient(BaseClient):
         if not self._initialized:
             # 1. open seekdb
             try:
-                seekdb.open(db_dir=self.path)  # type: ignore
+                seekdb.open(db_dir=self.path)  # type: ignore[attr-defined]
                 logger.info(f"✅ seekdb opened: {self.path}")
             except Exception as e:
                 if "initialized twice" not in str(e):
@@ -84,7 +81,7 @@ class SeekdbEmbeddedClient(BaseClient):
 
         # 3. Create connection
         if self._connection is None:
-            self._connection = seekdb.connect(  # type: ignore
+            self._connection = seekdb.connect(  # type: ignore[attr-defined]
                 database=self.database, autocommit=True
             )
             logger.info(f"✅ Connected to database: {self.database}")
@@ -117,9 +114,9 @@ class SeekdbEmbeddedClient(BaseClient):
         """
         return False
 
-    def _execute_query_with_cursor(
-        self, conn: Any, sql: str, params: List[Any], use_context_manager: bool = True
-    ) -> List[Dict[str, Any]]:
+    def _execute_query_with_cursor(  # noqa: C901
+        self, conn: Any, sql: str, params: list[Any], use_context_manager: bool = True
+    ) -> list[dict[str, Any]]:
         """
         Execute SQL query and return normalized rows
         Override base class to handle pyseekdb cursor which doesn't support parameterized queries
@@ -158,9 +155,7 @@ class SeekdbEmbeddedClient(BaseClient):
                 import re
 
                 # Extract column names from SELECT clause using simple regex
-                select_match = re.search(
-                    r"SELECT\s+(.+?)\s+FROM", embedded_sql, re.IGNORECASE | re.DOTALL
-                )
+                select_match = re.search(r"SELECT\s+(.+?)\s+FROM", embedded_sql, re.IGNORECASE | re.DOTALL)
                 if select_match:
                     select_clause = select_match.group(1).strip()
                     # Split by comma, but skip commas inside parentheses (for function calls)
@@ -261,8 +256,8 @@ class SeekdbEmbeddedClient(BaseClient):
 
     def list_databases(
         self,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        limit: int | None = None,
+        offset: int | None = None,
         tenant: str = DEFAULT_TENANT,
     ) -> Sequence[Database]:
         """

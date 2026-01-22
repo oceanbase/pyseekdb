@@ -10,16 +10,15 @@ Tests the escape_string fixes across all database operations to ensure:
 This test covers ADD, UPDATE, UPSERT, QUERY, and GET operations using db_client fixture.
 """
 
-from typing import Dict, Any, List
-import pytest
+from typing import Any
 
-import pyseekdb
+import pytest
 
 
 class TestSecuritySQLInjection:
     """Security test class for SQL injection prevention"""
 
-    def get_security_test_cases(self) -> List[Dict[str, Any]]:
+    def get_security_test_cases(self) -> list[dict[str, Any]]:
         """Get test cases with various security attack vectors"""
         return [
             {
@@ -60,12 +59,10 @@ class TestSecuritySQLInjection:
             },
         ]
 
-    def verify_data_integrity(self, collection, test_case: Dict[str, Any]) -> bool:
+    def verify_data_integrity(self, collection, test_case: dict[str, Any]) -> bool:
         """Verify that data was stored and retrieved correctly"""
         try:
-            result = collection.get(
-                ids=[test_case["id"]], include=["documents", "metadatas"]
-            )
+            result = collection.get(ids=[test_case["id"]], include=["documents", "metadatas"])
 
             if not result or len(result["ids"]) == 0:
                 return False
@@ -75,11 +72,10 @@ class TestSecuritySQLInjection:
 
             doc_match = retrieved_doc == test_case["document"]
             meta_match = retrieved_meta == test_case["metadata"]
-
-            return doc_match and meta_match
-
         except Exception:
             return False
+        else:
+            return doc_match and meta_match
 
     def test_security_sql_injection(self, db_client):
         """
@@ -94,7 +90,7 @@ class TestSecuritySQLInjection:
 
         Automatically runs for: embedded, server, oceanbase
         """
-        print(f"\n🔒 Running security SQL injection tests")
+        print("\n🔒 Running security SQL injection tests")
 
         # Test each operation separately with its own collection to avoid ID conflicts
 
@@ -102,29 +98,21 @@ class TestSecuritySQLInjection:
         self._run_single_test(db_client, "add_test", self._test_add_operation_security)
 
         # Test 2: UPDATE operation
-        self._run_single_test(
-            db_client, "update_test", self._test_update_operation_security
-        )
+        self._run_single_test(db_client, "update_test", self._test_update_operation_security)
 
         # Test 3: UPSERT operation
-        self._run_single_test(
-            db_client, "upsert_test", self._test_upsert_operation_security
-        )
+        self._run_single_test(db_client, "upsert_test", self._test_upsert_operation_security)
 
         # Test 4: QUERY operation
-        self._run_single_test(
-            db_client, "query_test", self._test_query_operation_security
-        )
+        self._run_single_test(db_client, "query_test", self._test_query_operation_security)
 
         # Test 5: GET operation
         self._run_single_test(db_client, "get_test", self._test_get_operation_security)
 
         # Test 6: Comprehensive workflow
-        self._run_single_test(
-            db_client, "comprehensive_test", self._test_comprehensive_security_workflow
-        )
+        self._run_single_test(db_client, "comprehensive_test", self._test_comprehensive_security_workflow)
 
-        print(f"✅ All security SQL injection tests passed")
+        print("✅ All security SQL injection tests passed")
 
     def _run_single_test(self, client, test_name, test_method):
         """Run a single test with its own collection"""
@@ -141,13 +129,11 @@ class TestSecuritySQLInjection:
             try:
                 client.delete_collection(name=collection_name)
             except Exception as cleanup_error:
-                print(
-                    f"Warning: failed to cleanup collection '{collection_name}': {cleanup_error}"
-                )
+                print(f"Warning: failed to cleanup collection '{collection_name}': {cleanup_error}")
 
     def _test_add_operation_security(self, collection):
         """Test ADD operation with security attack vectors"""
-        print(f"\n  🧪 Testing ADD operation security")
+        print("\n  🧪 Testing ADD operation security")
         test_cases = self.get_security_test_cases()
 
         for test_case in test_cases:
@@ -167,7 +153,7 @@ class TestSecuritySQLInjection:
 
     def _test_update_operation_security(self, collection):
         """Test UPDATE operation with security attack vectors"""
-        print(f"\n  🧪 Testing UPDATE operation security")
+        print("\n  🧪 Testing UPDATE operation security")
         test_cases = self.get_security_test_cases()
 
         # First add the data
@@ -188,9 +174,7 @@ class TestSecuritySQLInjection:
             }
 
             # Test UPDATE operation
-            collection.update(
-                ids=[test_case["id"]], documents=[updated_doc], metadatas=[updated_meta]
-            )
+            collection.update(ids=[test_case["id"]], documents=[updated_doc], metadatas=[updated_meta])
 
             # Verify updated data integrity
             updated_test_case = {
@@ -206,7 +190,7 @@ class TestSecuritySQLInjection:
 
     def _test_upsert_operation_security(self, collection):
         """Test UPSERT operation with security attack vectors"""
-        print(f"\n  🧪 Testing UPSERT operation security")
+        print("\n  🧪 Testing UPSERT operation security")
         test_cases = self.get_security_test_cases()
 
         # Test UPSERT for new records
@@ -251,7 +235,7 @@ class TestSecuritySQLInjection:
 
     def _test_query_operation_security(self, collection):
         """Test QUERY operation with security attack vectors"""
-        print(f"\n  🧪 Testing QUERY operation security")
+        print("\n  🧪 Testing QUERY operation security")
         test_cases = self.get_security_test_cases()
 
         # First add test data
@@ -280,23 +264,17 @@ class TestSecuritySQLInjection:
                 )
 
                 # Results can be empty, but query should execute successfully
-                assert isinstance(results, dict), (
-                    f"Query failed for: {query_test['name']}"
-                )
-                assert "ids" in results, (
-                    f"Query result missing 'ids' for: {query_test['name']}"
-                )
+                assert isinstance(results, dict), f"Query failed for: {query_test['name']}"
+                assert "ids" in results, f"Query result missing 'ids' for: {query_test['name']}"
 
             except Exception as e:
-                pytest.fail(
-                    f"Query operation failed with security payload '{query_test['text']}': {e}"
-                )
+                pytest.fail(f"Query operation failed with security payload '{query_test['text']}': {e}")
 
         print(f"     ✓ QUERY operation passed ({len(query_tests)} test cases)")
 
     def _test_get_operation_security(self, collection):
         """Test GET operation with security attack vectors in IDs"""
-        print(f"\n  🧪 Testing GET operation security")
+        print("\n  🧪 Testing GET operation security")
 
         # Test with special character IDs
         special_ids = [
@@ -317,15 +295,11 @@ class TestSecuritySQLInjection:
         # Test GET operations with special IDs
         for special_id in special_ids:
             try:
-                result = collection.get(
-                    ids=[special_id], include=["documents", "metadatas"]
-                )
+                result = collection.get(ids=[special_id], include=["documents", "metadatas"])
 
                 # Should successfully retrieve the data
                 assert result is not None, f"GET failed for special ID: {special_id}"
-                assert len(result["ids"]) > 0, (
-                    f"No data retrieved for special ID: {special_id}"
-                )
+                assert len(result["ids"]) > 0, f"No data retrieved for special ID: {special_id}"
 
             except Exception as e:
                 pytest.fail(f"GET operation failed with special ID '{special_id}': {e}")
@@ -334,7 +308,7 @@ class TestSecuritySQLInjection:
 
     def _test_comprehensive_security_workflow(self, collection):
         """Test a comprehensive workflow with all operations and security payloads"""
-        print(f"\n  🧪 Testing comprehensive security workflow")
+        print("\n  🧪 Testing comprehensive security workflow")
 
         # This is a comprehensive test that combines all operations
         test_case = {
@@ -364,9 +338,7 @@ class TestSecuritySQLInjection:
             "new_attack": "1' UNION SELECT * FROM users --",
         }
 
-        collection.update(
-            ids=[test_case["id"]], documents=[updated_doc], metadatas=[updated_meta]
-        )
+        collection.update(ids=[test_case["id"]], documents=[updated_doc], metadatas=[updated_meta])
 
         updated_test_case = {
             "id": test_case["id"],
@@ -384,13 +356,11 @@ class TestSecuritySQLInjection:
         assert isinstance(results, dict)
 
         # 4. GET with security payload ID
-        result = collection.get(
-            ids=[test_case["id"]], include=["documents", "metadatas"]
-        )
+        result = collection.get(ids=[test_case["id"]], include=["documents", "metadatas"])
         assert result is not None
         assert len(result["ids"]) > 0
 
-        print(f"     ✓ Comprehensive workflow passed")
+        print("     ✓ Comprehensive workflow passed")
 
 
 if __name__ == "__main__":

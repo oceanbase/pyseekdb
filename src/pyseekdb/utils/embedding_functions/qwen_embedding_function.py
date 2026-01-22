@@ -1,7 +1,8 @@
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
     OpenAIBaseEmbeddingFunction,
 )
-from typing import Any, Optional
 
 # Known Qwen embedding model dimensions
 # Source: Qwen/DashScope documentation
@@ -59,9 +60,9 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     def __init__(
         self,
         model_name: str,
-        api_key_env: Optional[str] = None,
-        api_base: Optional[str] = None,
-        dimensions: Optional[int] = None,
+        api_key_env: str | None = None,
+        api_base: str | None = None,
+        dimensions: int | None = None,
         **kwargs: Any,
     ):
         """Initialize QwenEmbeddingFunction.
@@ -157,9 +158,7 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         dimensions = config.get("dimensions")
         client_kwargs = config.get("client_kwargs", {})
         if not isinstance(client_kwargs, dict):
-            raise ValueError(
-                f"client_kwargs must be a dictionary, but got {client_kwargs}"
-            )
+            raise TypeError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
 
         return QwenEmbeddingFunction(
             model_name=model_name,

@@ -3,6 +3,8 @@ AdminClient database management tests using admin_client fixture
 Testing all database CRUD operations for all three modes
 """
 
+import contextlib
+
 import pytest
 
 import pyseekdb
@@ -41,7 +43,7 @@ class TestAdminDatabaseManagement:
 
         try:
             # Step 1: List all databases before test
-            print(f"\n📋 Step 1: List all databases")
+            print("\n📋 Step 1: List all databases")
             databases_before = admin_client.list_databases()
             assert databases_before is not None
             assert isinstance(databases_before, (list, tuple))
@@ -59,9 +61,7 @@ class TestAdminDatabaseManagement:
             db = admin_client.get_database(test_db_name)
             assert db is not None
             assert db.name == test_db_name
-            assert db.tenant == expected_tenant, (
-                f"Expected tenant {expected_tenant}, got {db.tenant}"
-            )
+            assert db.tenant == expected_tenant, f"Expected tenant {expected_tenant}, got {db.tenant}"
             print(f"   ✅ Database retrieved: {db.name}")
             print(f"      - Name: {db.name}")
             print(f"      - Tenant: {db.tenant}")
@@ -74,25 +74,21 @@ class TestAdminDatabaseManagement:
             print(f"   ✅ Database '{test_db_name}' deleted")
 
             # Step 5: List databases again to verify deletion
-            print(f"\n📋 Step 5: List all databases to verify deletion")
+            print("\n📋 Step 5: List all databases to verify deletion")
             databases_after = admin_client.list_databases()
             assert databases_after is not None
             print(f"   Found {len(databases_after)} databases after deletion")
             # Verify the test database is not in the list
             db_names = [db.name for db in databases_after]
-            assert test_db_name not in db_names, (
-                f"Database '{test_db_name}' should be deleted"
-            )
+            assert test_db_name not in db_names, f"Database '{test_db_name}' should be deleted"
             print(f"   ✅ Verified: '{test_db_name}' is not in the database list")
 
-            print(f"\n🎉 All database management operations completed successfully!")
+            print("\n🎉 All database management operations completed successfully!")
 
         except Exception as e:
             # Cleanup: try to delete test database if it exists
-            try:
+            with contextlib.suppress(Exception):
                 admin_client.delete_database(test_db_name)
-            except:
-                pass
             pytest.fail(f"Admin client test failed: {e}")
 
 

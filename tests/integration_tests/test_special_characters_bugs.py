@@ -7,11 +7,10 @@ Bug reports:
 3. If there's '"' character in the metadata parameter, it failed to insert data into database.
 """
 
-import pytest
 import time
-import uuid
 
-import pyseekdb
+import pytest
+
 from pyseekdb import HNSWConfiguration
 
 
@@ -29,9 +28,7 @@ class TestSpecialCharactersBugs:
 
         # Create collection using proper API
         config = HNSWConfiguration(dimension=dimension, distance="cosine")
-        collection = db_client.create_collection(
-            name=collection_name, configuration=config, embedding_function=None
-        )
+        collection = db_client.create_collection(name=collection_name, configuration=config, embedding_function=None)
 
         # Test cases with backslashes in documents
         test_cases = [
@@ -89,10 +86,10 @@ class TestSpecialCharactersBugs:
             "Command: cd C:\\Users\\Documents && dir",
         ]
 
-        print(f"\n🔍 Testing backslash in documents parameter")
+        print("\n🔍 Testing backslash in documents parameter")
         for i, doc_with_backslash in enumerate(test_cases):
             test_id = f"test_backslash_{i}_{int(time.time() * 1000)}"
-            print(f"  Testing: {repr(doc_with_backslash)}")
+            print(f"  Testing: {doc_with_backslash!r}")
 
             try:
                 # Attempt to add document with backslash
@@ -105,19 +102,13 @@ class TestSpecialCharactersBugs:
 
                 # Verify insertion succeeded
                 results = collection.get(ids=test_id)
-                assert len(results["ids"]) == 1, (
-                    f"Failed to insert document with backslash: {doc_with_backslash}"
-                )
+                assert len(results["ids"]) == 1, f"Failed to insert document with backslash: {doc_with_backslash}"
                 assert results["documents"][0] == doc_with_backslash, (
-                    f"Document content mismatch: expected {repr(doc_with_backslash)}, got {repr(results['documents'][0])}"
+                    f"Document content mismatch: expected {doc_with_backslash!r}, got {results['documents'][0]!r}"
                 )
-                print(
-                    f"    ✅ Successfully inserted and verified: {repr(doc_with_backslash)}"
-                )
+                print(f"    ✅ Successfully inserted and verified: {doc_with_backslash!r}")
             except Exception as e:
-                print(
-                    f"    ❌ FAILED to insert document with backslash: {repr(doc_with_backslash)}"
-                )
+                print(f"    ❌ FAILED to insert document with backslash: {doc_with_backslash!r}")
                 print(f"       Error: {e}")
                 raise
 
@@ -131,9 +122,7 @@ class TestSpecialCharactersBugs:
 
         # Create collection using proper API
         config = HNSWConfiguration(dimension=dimension, distance="cosine")
-        collection = db_client.create_collection(
-            name=collection_name, configuration=config, embedding_function=None
-        )
+        collection = db_client.create_collection(name=collection_name, configuration=config, embedding_function=None)
 
         # Test cases with percent signs in IDs
         test_cases = [
@@ -148,9 +137,9 @@ class TestSpecialCharactersBugs:
             "%%%",
         ]
 
-        print(f"\n🔍 Testing percent sign in id parameter")
-        for i, id_with_percent in enumerate(test_cases):
-            print(f"  Testing ID: {repr(id_with_percent)}")
+        print("\n🔍 Testing percent sign in id parameter")
+        for id_with_percent in test_cases:
+            print(f"  Testing ID: {id_with_percent!r}")
 
             try:
                 # Attempt to add with ID containing percent
@@ -163,35 +152,25 @@ class TestSpecialCharactersBugs:
 
                 # Verify insertion succeeded
                 results = collection.get(ids=id_with_percent)
-                assert len(results["ids"]) == 1, (
-                    f"Failed to insert with ID containing percent: {id_with_percent}"
-                )
+                assert len(results["ids"]) == 1, f"Failed to insert with ID containing percent: {id_with_percent}"
                 assert results["ids"][0] == id_with_percent, (
-                    f"ID mismatch: expected {repr(id_with_percent)}, got {repr(results['ids'][0])}"
+                    f"ID mismatch: expected {id_with_percent!r}, got {results['ids'][0]!r}"
                 )
-                print(
-                    f"    ✅ Successfully inserted and verified ID: {repr(id_with_percent)}"
-                )
+                print(f"    ✅ Successfully inserted and verified ID: {id_with_percent!r}")
             except ValueError as e:
                 # This is the expected bug - ValueError about unsupported format character
                 error_msg = str(e)
                 if "unsupported format character" in error_msg or "%" in error_msg:
-                    print(
-                        f"    ❌ BUG REPRODUCED: Failed to insert with ID containing percent: {repr(id_with_percent)}"
-                    )
+                    print(f"    ❌ BUG REPRODUCED: Failed to insert with ID containing percent: {id_with_percent!r}")
                     print(f"       Error type: {type(e).__name__}")
                     print(f"       Error message: {error_msg}")
-                    print(
-                        f"       This confirms the bug - percent signs in IDs cause formatting errors"
-                    )
+                    print("       This confirms the bug - percent signs in IDs cause formatting errors")
                     raise
                 else:
                     # Different ValueError, re-raise
                     raise
             except Exception as e:
-                print(
-                    f"    ❌ FAILED to insert with ID containing percent: {repr(id_with_percent)}"
-                )
+                print(f"    ❌ FAILED to insert with ID containing percent: {id_with_percent!r}")
                 print(f"       Error type: {type(e).__name__}")
                 print(f"       Error message: {e}")
                 raise
@@ -207,9 +186,7 @@ class TestSpecialCharactersBugs:
 
         # Create collection using proper API
         config = HNSWConfiguration(dimension=dimension, distance="cosine")
-        collection = db_client.create_collection(
-            name=collection_name, configuration=config, embedding_function=None
-        )
+        collection = db_client.create_collection(name=collection_name, configuration=config, embedding_function=None)
 
         # Test cases with double quotes in metadata
         test_cases = [
@@ -223,10 +200,10 @@ class TestSpecialCharactersBugs:
             {"json_like": '{"key": "value"}'},
         ]
 
-        print(f"\n🔍 Testing double quote in metadata parameter")
+        print("\n🔍 Testing double quote in metadata parameter")
         for i, metadata_with_quote in enumerate(test_cases):
             test_id = f"test_quote_{i}_{int(time.time() * 1000)}"
-            print(f"  Testing metadata: {repr(metadata_with_quote)}")
+            print(f"  Testing metadata: {metadata_with_quote!r}")
 
             try:
                 # Attempt to add with metadata containing double quotes
@@ -243,15 +220,11 @@ class TestSpecialCharactersBugs:
                     f"Failed to insert with metadata containing double quote: {metadata_with_quote}"
                 )
                 assert results["metadatas"][0] == metadata_with_quote, (
-                    f"Metadata mismatch: expected {repr(metadata_with_quote)}, got {repr(results['metadatas'][0])}"
+                    f"Metadata mismatch: expected {metadata_with_quote!r}, got {results['metadatas'][0]!r}"
                 )
-                print(
-                    f"    ✅ Successfully inserted and verified metadata: {repr(metadata_with_quote)}"
-                )
+                print(f"    ✅ Successfully inserted and verified metadata: {metadata_with_quote!r}")
             except Exception as e:
-                print(
-                    f"    ❌ FAILED to insert with metadata containing double quote: {repr(metadata_with_quote)}"
-                )
+                print(f"    ❌ FAILED to insert with metadata containing double quote: {metadata_with_quote!r}")
                 print(f"       Error: {e}")
                 raise
 
@@ -265,11 +238,9 @@ class TestSpecialCharactersBugs:
 
         # Create collection using proper API
         config = HNSWConfiguration(dimension=dimension, distance="cosine")
-        collection = db_client.create_collection(
-            name=collection_name, configuration=config, embedding_function=None
-        )
+        collection = db_client.create_collection(name=collection_name, configuration=config, embedding_function=None)
 
-        print(f"\n🔍 Testing all special characters combined")
+        print("\n🔍 Testing all special characters combined")
         test_id = "id_with_%_percent"
         test_document = "Path: C:\\Users\\Documents\\file.txt"
         test_metadata = {
@@ -287,17 +258,13 @@ class TestSpecialCharactersBugs:
 
             # Verify insertion succeeded
             results = collection.get(ids=test_id)
-            assert len(results["ids"]) == 1, (
-                "Failed to insert with all special characters"
-            )
-            assert results["ids"][0] == test_id, f"ID mismatch"
-            assert results["documents"][0] == test_document, f"Document mismatch"
-            assert results["metadatas"][0] == test_metadata, f"Metadata mismatch"
-            print(
-                f"    ✅ Successfully inserted and verified all special characters combined"
-            )
+            assert len(results["ids"]) == 1, "Failed to insert with all special characters"
+            assert results["ids"][0] == test_id, "ID mismatch"
+            assert results["documents"][0] == test_document, "Document mismatch"
+            assert results["metadatas"][0] == test_metadata, "Metadata mismatch"
+            print("    ✅ Successfully inserted and verified all special characters combined")
         except Exception as e:
-            print(f"    ❌ FAILED to insert with all special characters combined")
+            print("    ❌ FAILED to insert with all special characters combined")
             print(f"       Error: {e}")
             raise
 

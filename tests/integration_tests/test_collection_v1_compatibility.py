@@ -5,9 +5,10 @@ Tests that all collection operations work correctly with v1 collections
 created using _collection_version=1 parameter.
 """
 
-import pytest
 import time
 import uuid
+
+import pytest
 
 import pyseekdb
 from pyseekdb.client.meta_info import CollectionNames
@@ -425,7 +426,7 @@ class TestCollectionV1Compatibility:
         collection_name = f"test_v1_table_{int(time.time() * 1000)}"
 
         # Create v1 collection
-        collection = db_client.create_collection(
+        db_client.create_collection(
             name=collection_name,
             _collection_version=1,
         )
@@ -475,9 +476,7 @@ class TestCollectionV1Compatibility:
         assert v1_collection.id is None
 
         # Create v2 collection (default)
-        v2_collection = db_client.create_collection(
-            name=v2_name, configuration=hnsw_config, embedding_function=None
-        )
+        v2_collection = db_client.create_collection(name=v2_name, configuration=hnsw_config, embedding_function=None)
         assert v2_collection.id is not None
 
         # Both should be in list

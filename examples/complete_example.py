@@ -12,10 +12,11 @@ This example demonstrates all available operations:
 This is a complete reference for all client capabilities.
 """
 
-import uuid
-import pyseekdb
-
 import logging
+import uuid
+
+import pyseekdb
+from pyseekdb import HNSWConfiguration
 
 logging.basicConfig(level=logging.DEBUG)
 # ============================================================================
@@ -51,8 +52,6 @@ collection_name = "comprehensive_example"
 dimension = 384
 
 # 2.1 Create a collection
-from pyseekdb import HNSWConfiguration
-
 # create a collection with default configuration and default embedding function
 collection = client.get_or_create_collection(
     name="demo_default_collection",
@@ -86,12 +85,10 @@ collection2 = client.get_or_create_collection(
 @pyseekdb.register_embedding_function
 class CustomEmbeddingFunction(pyseekdb.EmbeddingFunction):
     def __init__(self):
-        self._ef = (
-            pyseekdb.DefaultEmbeddingFunction()
-        )  # use the default embedding function
+        self._ef = pyseekdb.DefaultEmbeddingFunction()  # use the default embedding function
 
-    def __call__(self, input):
-        return self._ef(input)
+    def __call__(self, documents):
+        return self._ef(documents)
 
     def get_config(self) -> dict:
         return self._ef.get_config()
@@ -255,14 +252,10 @@ results = collection.query(query_embeddings=query_vector, n_results=3)
 print(f"Query results: {len(results['ids'][0])} items")
 
 # 6.2 Query with metadata filter (simplified equality)
-results = collection.query(
-    query_embeddings=query_vector, where={"category": "AI"}, n_results=5
-)
+results = collection.query(query_embeddings=query_vector, where={"category": "AI"}, n_results=5)
 
 # 6.3 Query with comparison operators
-results = collection.query(
-    query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5
-)
+results = collection.query(query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5)
 
 # 6.4 Query with $in operator
 results = collection.query(
@@ -337,9 +330,7 @@ results = collection.get(where={"score": {"$gte": 90}}, limit=5)
 results = collection.get(where={"tag": {"$in": ["ml", "python"]}}, limit=5)
 
 # 7.6 Get with logical operators (simplified equality)
-results = collection.get(
-    where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5
-)
+results = collection.get(where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5)
 
 # 7.7 Get by document filter
 results = collection.get(where_document={"$contains": "Python"}, limit=5)
@@ -395,9 +386,7 @@ collection.delete(where={"type": {"$eq": "vector_only"}})
 collection.delete(where_document={"$contains": "Updated document"})
 
 # 9.4 Delete with combined filters
-collection.delete(
-    where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"}
-)
+collection.delete(where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"})
 
 # ============================================================================
 # PART 10: COLLECTION INFORMATION

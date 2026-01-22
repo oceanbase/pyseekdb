@@ -3,13 +3,14 @@ Client creation and connection tests using db_client fixture
 Testing client creation, connection, and collection management for all three modes
 """
 
-import pytest
+import contextlib
+import random
 import time
 import uuid
-import random
 
-import pyseekdb
-from pyseekdb import HNSWConfiguration, Configuration, FulltextAnalyzerConfig
+import pytest
+
+from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
 
 
 class TestClientCreation:
@@ -42,9 +43,7 @@ class TestClientCreation:
         )
 
         # Test: Verify Configuration class with fulltext parser works
-        test_collection_name_config = (
-            f"test_collection_config_{int(time.time() * 1000)}"
-        )
+        test_collection_name_config = f"test_collection_config_{int(time.time() * 1000)}"
         config_with_fulltext = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
             fulltext_config=FulltextAnalyzerConfig(analyzer="ik"),
@@ -57,18 +56,14 @@ class TestClientCreation:
         assert collection_config is not None
         assert collection_config.name == test_collection_name_config
         # Clean up
-        try:
+        with contextlib.suppress(Exception):
             db_client.delete_collection(test_collection_name_config)
-        except Exception:
-            pass
 
         # Verify collection object
         assert collection is not None
         assert collection.name == test_collection_name
         actual_dimension = collection.dimension
-        assert actual_dimension > 0, (
-            f"Collection dimension should be positive, got {actual_dimension}"
-        )
+        assert actual_dimension > 0, f"Collection dimension should be positive, got {actual_dimension}"
 
         # Test 2: get_collection - get the collection we just created
         retrieved_collection = db_client.get_collection(name=test_collection_name)
@@ -82,13 +77,11 @@ class TestClientCreation:
         # Test 3: has_collection - should return False for non-existent collection
         non_existent_name = f"test_collection_nonexistent_{int(time.time() * 1000)}"
         assert not db_client.has_collection(non_existent_name)
-        print(
-            f"\n✅ has_collection correctly returns False for non-existent collection"
-        )
+        print("\n✅ has_collection correctly returns False for non-existent collection")
 
         # Test 4: has_collection - should return True for existing collection
         assert db_client.has_collection(test_collection_name)
-        print(f"\n✅ has_collection correctly returns True for existing collection")
+        print("\n✅ has_collection correctly returns True for existing collection")
 
         # Test 5: get_or_create_collection - should get existing collection
         existing_collection = db_client.get_or_create_collection(
@@ -97,9 +90,7 @@ class TestClientCreation:
         assert existing_collection is not None
         assert existing_collection.name == test_collection_name
         assert existing_collection.dimension == actual_dimension
-        print(
-            f"\n✅ get_or_create_collection successfully retrieved existing collection"
-        )
+        print("\n✅ get_or_create_collection successfully retrieved existing collection")
 
         # Test 6: get_or_create_collection - should create new collection
         test_collection_name_mgmt = f"test_collection_mgmt_{int(time.time() * 1000)}"
@@ -111,9 +102,7 @@ class TestClientCreation:
         assert new_collection is not None
         assert new_collection.name == test_collection_name_mgmt
         assert new_collection.dimension == actual_dimension
-        print(
-            f"\n✅ get_or_create_collection successfully created collection '{test_collection_name_mgmt}'"
-        )
+        print(f"\n✅ get_or_create_collection successfully created collection '{test_collection_name_mgmt}'")
 
         # Test 7: list_collections - should include our collections
         collections = db_client.list_collections()
@@ -121,44 +110,30 @@ class TestClientCreation:
         collection_names = [c.name for c in collections]
         assert test_collection_name in collection_names
         assert test_collection_name_mgmt in collection_names
-        print(
-            f"\n✅ list_collections successfully listed collections: {len(collections)} found"
-        )
+        print(f"\n✅ list_collections successfully listed collections: {len(collections)} found")
         print(f"   Collection names: {collection_names}")
 
         # Test 8: delete_collection - should delete the collection
         db_client.delete_collection(test_collection_name_mgmt)
         assert not db_client.has_collection(test_collection_name_mgmt)
-        print(
-            f"\n✅ delete_collection successfully deleted collection '{test_collection_name_mgmt}'"
-        )
+        print(f"\n✅ delete_collection successfully deleted collection '{test_collection_name_mgmt}'")
 
         # Test 9: delete_collection - should raise error for non-existent collection
         try:
             db_client.delete_collection(test_collection_name_mgmt)
-            pytest.fail(
-                "delete_collection should raise ValueError for non-existent collection"
-            )
+            pytest.fail("delete_collection should raise ValueError for non-existent collection")
         except ValueError as e:
             assert "does not exist" in str(e)
-            print(
-                f"\n✅ delete_collection correctly raises ValueError for non-existent collection"
-            )
+            print("\n✅ delete_collection correctly raises ValueError for non-existent collection")
 
         # Test 10: get_or_create_collection without configuration - should use default configuration
-        test_collection_name_default = (
-            f"test_collection_default_{int(time.time() * 1000)}"
-        )
-        default_collection = db_client.get_or_create_collection(
-            name=test_collection_name_default
-        )
+        test_collection_name_default = f"test_collection_default_{int(time.time() * 1000)}"
+        default_collection = db_client.get_or_create_collection(name=test_collection_name_default)
         assert default_collection is not None
         assert default_collection.name == test_collection_name_default
         # Default dimension is 384 (matches default embedding function)
         assert default_collection.dimension == 384
-        print(
-            f"\n✅ get_or_create_collection successfully created collection with default configuration"
-        )
+        print("\n✅ get_or_create_collection successfully created collection with default configuration")
 
         # Test 11: count_collection - count the number of collections
         collection_count = db_client.count_collection()
@@ -177,17 +152,13 @@ class TestClientCreation:
         assert preview is not None
         assert "ids" in preview
         assert len(preview["ids"]) == 0  # Empty collection
-        print(
-            f"\n✅ collection.peek() successfully returned preview: {len(preview['ids'])} items"
-        )
+        print(f"\n✅ collection.peek() successfully returned preview: {len(preview['ids'])} items")
 
         # Add some test data to test count and peek with data
         random.seed(42)  # For reproducibility
         test_ids = [str(uuid.uuid4()) for _ in range(3)]
         # Generate embeddings matching the collection's dimension
-        embeddings = [
-            [random.random() for _ in range(collection.dimension)] for _ in range(3)
-        ]
+        embeddings = [[random.random() for _ in range(collection.dimension)] for _ in range(3)]  # noqa: S311
         collection.add(
             ids=test_ids,
             embeddings=embeddings,
@@ -212,33 +183,25 @@ class TestClientCreation:
         assert len(preview_with_data["ids"]) == len(preview_with_data["documents"])
         assert len(preview_with_data["ids"]) == len(preview_with_data["metadatas"])
         assert len(preview_with_data["ids"]) == len(preview_with_data["embeddings"])
-        print(
-            f"\n✅ collection.peek() with data returned {len(preview_with_data['ids'])} items"
-        )
+        print(f"\n✅ collection.peek() with data returned {len(preview_with_data['ids'])} items")
 
         # Test 16: collection.peek() with different limit
         preview_all = collection.peek(limit=10)
         assert len(preview_all["ids"]) == 3  # All 3 items
-        print(
-            f"\n✅ collection.peek(limit=10) returned {len(preview_all['ids'])} items"
-        )
+        print(f"\n✅ collection.peek(limit=10) returned {len(preview_all['ids'])} items")
 
         # Clean up: delete all test collections
         try:
             db_client.delete_collection(test_collection_name)
             print(f"   Cleaned up collection: {test_collection_name}")
         except Exception as cleanup_error:
-            print(
-                f"   Warning: Failed to cleanup {test_collection_name}: {cleanup_error}"
-            )
+            print(f"   Warning: Failed to cleanup {test_collection_name}: {cleanup_error}")
 
         try:
             db_client.delete_collection(test_collection_name_default)
             print(f"   Cleaned up collection: {test_collection_name_default}")
         except Exception as cleanup_error:
-            print(
-                f"   Warning: Failed to cleanup {test_collection_name_default}: {cleanup_error}"
-            )
+            print(f"   Warning: Failed to cleanup {test_collection_name_default}: {cleanup_error}")
 
 
 if __name__ == "__main__":

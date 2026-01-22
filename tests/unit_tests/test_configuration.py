@@ -2,15 +2,16 @@
 Unit tests for configuration classes
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from pyseekdb import Configuration, HNSWConfiguration, FulltextAnalyzerConfig
+from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration  # noqa: E402
 
 
 class TestHNSWConfiguration:
@@ -65,9 +66,7 @@ class TestFulltextAnalyzerConfig:
 
     def test_parser_with_multiple_params(self):
         """Test parser with multiple parameters"""
-        config = FulltextAnalyzerConfig(
-            analyzer="ngram", properties={"size": 3, "min_size": 1, "max_size": 5}
-        )
+        config = FulltextAnalyzerConfig(analyzer="ngram", properties={"size": 3, "min_size": 1, "max_size": 5})
         assert config.analyzer == "ngram"
         assert config.properties["size"] == 3
         assert config.properties["min_size"] == 1

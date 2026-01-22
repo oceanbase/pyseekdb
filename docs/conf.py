@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Project information
 project = "pyseekdb"
-copyright = "2025, OceanBase"
+copyright = "2025, OceanBase"  # noqa: A001
 author = "OceanBase <open_oceanbase@oceanbase.com>"
 
 try:

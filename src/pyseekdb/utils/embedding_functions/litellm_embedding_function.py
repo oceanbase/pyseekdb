@@ -1,6 +1,7 @@
-from pyseekdb.client.embedding_function import EmbeddingFunction, Embeddings, Documents
-from typing import Any, Optional
 import os
+from typing import Any
+
+from pyseekdb.client.embedding_function import Documents, EmbeddingFunction, Embeddings
 
 
 class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -53,7 +54,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(
         self,
         model_name: str,
-        api_key_env: Optional[str] = None,
+        api_key_env: str | None = None,
         **kwargs: Any,
     ):
         """Initialize LiteLLMEmbeddingFunction.
@@ -81,40 +82,38 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         try:
             from litellm import embedding
-        except ImportError:
+        except ImportError as exc:
             raise ValueError(
                 "The litellm python package is not installed. Please install it with `pip install litellm`"
-            )
+            ) from exc
 
         self.model_name = model_name
         self.api_key_env = api_key_env
         for key, value in kwargs.items():
-            if not isinstance(
-                value, (str, int, float, bool, list, dict, tuple, type(None))
-            ):
-                raise ValueError(f"Keyword argument {key} is not a primitive type")
+            if not isinstance(value, (str, int, float, bool, list, dict, tuple, type(None))):
+                raise TypeError(f"Keyword argument {key} is not a primitive type")
         self.kwargs = kwargs
         self._embedding_func = embedding
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:  # noqa: C901
         """Generate embeddings for the given documents.
 
         Args:
-            input: Documents to generate embeddings for. Can be a single string or list of strings.
+            documents: Documents to generate embeddings for. Can be a single string or list of strings.
 
         Returns:
             Embeddings for the documents as a list of lists of floats.
         """
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         # Prepare arguments for LiteLLM embedding function
-        embedding_kwargs = {"model": self.model_name, "input": input, **self.kwargs}
+        embedding_kwargs = {"model": self.model_name, "input": documents, **self.kwargs}
 
         # Read API key from environment variable if specified
         if self.api_key_env is not None:
@@ -145,9 +144,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                     # Some providers might return the embedding vector directly
                     embeddings.append(item)
                 else:
-                    raise ValueError(
-                        f"Unexpected item format in LiteLLM response: {type(item)}"
-                    )
+                    raise ValueError(f"Unexpected item format in LiteLLM response: {type(item)}")
         # Handle dict response (backward compatibility)
         elif isinstance(response, dict) and "data" in response:
             for item in response["data"]:
@@ -157,9 +154,7 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                     # Some providers might return the embedding vector directly
                     embeddings.append(item)
                 else:
-                    raise ValueError(
-                        f"Unexpected item format in LiteLLM response: {type(item)}"
-                    )
+                    raise ValueError(f"Unexpected item format in LiteLLM response: {type(item)}")
         # Handle list response (backward compatibility)
         elif isinstance(response, list):
             for item in response:
@@ -168,18 +163,12 @@ class LiteLLMEmbeddingFunction(EmbeddingFunction[Documents]):
                 elif isinstance(item, list):
                     embeddings.append(item)
                 else:
-                    raise ValueError(
-                        f"Unexpected item format in LiteLLM response: {type(item)}"
-                    )
+                    raise ValueError(f"Unexpected item format in LiteLLM response: {type(item)}")
         else:
-            raise ValueError(
-                f"Unexpected response format from LiteLLM: {type(response)}"
-            )
+            raise ValueError(f"Unexpected response format from LiteLLM: {type(response)}")
 
         # Validate that we got the expected number of embeddings
         if len(embeddings) != len(input):
-            raise ValueError(
-                f"Expected {len(input)} embeddings but got {len(embeddings)} from LiteLLM"
-            )
+            raise ValueError(f"Expected {len(input)} embeddings but got {len(embeddings)} from LiteLLM")
 
         return embeddings

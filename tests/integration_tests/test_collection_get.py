@@ -2,11 +2,11 @@
 Collection get tests - testing collection.get() interface for all three modes using db_client fixture
 """
 
-import pytest
+import contextlib
 import time
-import json
 import uuid
-from typing import List, Union
+
+import pytest
 
 import pyseekdb
 
@@ -18,13 +18,13 @@ class Simple3DEmbeddingFunction:
     def __init__(self):
         self.dimension = 3
 
-    def __call__(self, input: Union[str, List[str]]) -> List[List[float]]:
+    def __call__(self, documents: str | list[str]) -> list[list[float]]:
         """Convert documents to 3D embeddings (simple hash-based)"""
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         embeddings = []
-        for doc in input:
+        for doc in documents:
             # Simple hash-based 3D embedding for testing
             hash_val = hash(doc) % 1000
             embedding = [
@@ -191,10 +191,8 @@ class TestCollectionGet:
                 assert "id1" not in result["ids"]
                 assert result["metadatas"][0].get("tags") == ["java", "cpp"]
             finally:
-                try:
+                with contextlib.suppress(Exception):
                     db_client.delete_collection(name=collection_name_2)
-                except Exception:
-                    pass
 
         finally:
             try:
@@ -261,9 +259,7 @@ class TestCollectionGet:
             assert set(result["ids"]) == {"id1", "id3", "id8"}, (
                 f"Expected id1, id3, id8 (array+scalar+single), got {result['ids']}"
             )
-            print(
-                f"   Matched: {sorted(result['ids'])} (array with ml, scalar ml, single-element array)"
-            )
+            print(f"   Matched: {sorted(result['ids'])} (array with ml, scalar ml, single-element array)")
 
             # Test 2: $eq with non-matching value
             print("\n✅ Test 2: $eq with non-matching value")
@@ -273,7 +269,7 @@ class TestCollectionGet:
             )
             assert result and "ids" in result
             assert len(result["ids"]) == 0, f"Expected no matches, got {result['ids']}"
-            print(f"   Correctly returned 0 results")
+            print("   Correctly returned 0 results")
 
             # Test 3: $ne with array field (exclusion)
             print("\n✅ Test 3: $ne with array field")
@@ -285,11 +281,11 @@ class TestCollectionGet:
             # Should match id2 (java), id4 (python) - excludes id1, id3, id8 which contain/equal ml
             # id5 (missing), id6 (empty), id7 (null) behavior depends on JSON_OVERLAPS NULL handling
             matched_ids = set(result["ids"])
-            assert "id2" in matched_ids, f"Expected id2 in results"
-            assert "id4" in matched_ids, f"Expected id4 in results"
-            assert "id1" not in matched_ids, f"id1 should be excluded (has ml)"
-            assert "id3" not in matched_ids, f"id3 should be excluded (is ml)"
-            assert "id8" not in matched_ids, f"id8 should be excluded (has ml)"
+            assert "id2" in matched_ids, "Expected id2 in results"
+            assert "id4" in matched_ids, "Expected id4 in results"
+            assert "id1" not in matched_ids, "id1 should be excluded (has ml)"
+            assert "id3" not in matched_ids, "id3 should be excluded (is ml)"
+            assert "id8" not in matched_ids, "id8 should be excluded (has ml)"
             print(f"   Correctly excluded ids with ml: {sorted(result['ids'])}")
 
             # Test 4: Direct equality (no operator) - should behave like $eq
@@ -340,7 +336,7 @@ class TestCollectionGet:
             assert set(result_scalar_direct["ids"]) == {"id1"}, (
                 f"Scalar direct equality should still work, got {result_scalar_direct['ids']}"
             )
-            print(f"   Scalar fields work correctly")
+            print("   Scalar fields work correctly")
 
             # Test 7: Edge case - $eq with java (single-element array vs scalar)
             print("\n✅ Test 7: $eq with single-element array")
@@ -355,21 +351,15 @@ class TestCollectionGet:
             # Test 8: Multiple conditions with $eq and $ne
             print("\n✅ Test 8: Combined $eq and $ne")
             result = collection.get(
-                where={
-                    "$and": [{"tags": {"$ne": "ml"}}, {"category": {"$ne": "Empty"}}]
-                },
+                where={"$and": [{"tags": {"$ne": "ml"}}, {"category": {"$ne": "Empty"}}]},
                 include=["ids"],
             )
             assert result and "ids" in result
             # Should exclude: id1/id3/id8 (have ml), id6 (category=Empty)
             matched_ids = set(result["ids"])
-            assert "id2" in matched_ids or "id4" in matched_ids, (
-                f"Should match id2 or id4, got {result['ids']}"
-            )
+            assert "id2" in matched_ids or "id4" in matched_ids, f"Should match id2 or id4, got {result['ids']}"
             for excluded_id in ["id1", "id3", "id8", "id6"]:
-                assert excluded_id not in matched_ids, (
-                    f"{excluded_id} should be excluded, got {result['ids']}"
-                )
+                assert excluded_id not in matched_ids, f"{excluded_id} should be excluded, got {result['ids']}"
             print(f"   Combined filters work: {sorted(result['ids'])}")
 
             print("\n✅ All $eq/$ne operator tests passed!")
@@ -407,13 +397,9 @@ class TestCollectionGet:
 
         try:
             inserted_ids = self._insert_test_data(db_client, collection_name)
-            assert len(inserted_ids) > 0, (
-                f"Failed to get inserted IDs. Expected at least 1, got {len(inserted_ids)}"
-            )
+            assert len(inserted_ids) > 0, f"Failed to get inserted IDs. Expected at least 1, got {len(inserted_ids)}"
             if len(inserted_ids) < 5:
-                print(
-                    f"   Warning: Expected 5 inserted IDs, but got {len(inserted_ids)}"
-                )
+                print(f"   Warning: Expected 5 inserted IDs, but got {len(inserted_ids)}")
 
             # Test 1: Get by single ID
             print("\n✅ Testing get by single ID")
@@ -430,9 +416,7 @@ class TestCollectionGet:
                 assert results is not None
                 assert "ids" in results
                 assert len(results["ids"]) <= 3
-                print(
-                    f"   Found {len(results['ids'])} results for IDs={inserted_ids[:3]}"
-                )
+                print(f"   Found {len(results['ids'])} results for IDs={inserted_ids[:3]}")
 
             # Test 3: Get by metadata filter
             print("✅ Testing get with metadata filter (category=AI)")
@@ -457,13 +441,9 @@ class TestCollectionGet:
 
             # Test 5: Get by document filter
             print("✅ Testing get with document filter")
-            results = collection.get(
-                where_document={"$contains": "machine learning"}, limit=10
-            )
+            results = collection.get(where_document={"$contains": "machine learning"}, limit=10)
             assert results is not None
-            print(
-                f"   Found {len(results['ids'])} results containing 'machine learning'"
-            )
+            print(f"   Found {len(results['ids'])} results containing 'machine learning'")
 
             # Test 6: Get with combined filters
             print("✅ Testing get with combined filters")
@@ -502,9 +482,7 @@ class TestCollectionGet:
             assert "documents" in results
             assert "metadatas" in results
             assert len(results["ids"]) == 2
-            print(
-                f"   Found {len(results['ids'])} results with documents and metadatas"
-            )
+            print(f"   Found {len(results['ids'])} results with documents and metadatas")
 
             # Test 10: Get by multiple IDs (should return dict)
             print("✅ Testing get by multiple IDs (returns dict)")
@@ -514,9 +492,7 @@ class TestCollectionGet:
                 assert isinstance(results, dict), "Should return dict"
                 assert "ids" in results
                 assert len(results["ids"]) <= 3
-                print(
-                    f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs"
-                )
+                print(f"   Found {len(results['ids'])} results for {len(inserted_ids[:3])} IDs")
 
             # Test 11: Single ID returns dict format
             print("✅ Testing single ID returns dict format")
@@ -541,21 +517,15 @@ class TestCollectionGet:
             assert results is not None
             assert "ids" in results
             assert len(results["ids"]) > 0
-            print(
-                f"   Found {len(results['ids'])} results with tag in ['ml', 'python']"
-            )
+            print(f"   Found {len(results['ids'])} results with tag in ['ml', 'python']")
 
             # Test 14: Get with scalar $nin operator
             print("✅ Testing get with scalar $nin operator")
-            results = collection.get(
-                where={"tag": {"$nin": ["ml", "python"]}}, limit=10
-            )
+            results = collection.get(where={"tag": {"$nin": ["ml", "python"]}}, limit=10)
             assert results is not None
             assert "ids" in results
             # Should return rows with tag='neural' (excluded 'ml' and 'python')
-            print(
-                f"   Found {len(results['ids'])} results with tag not in ['ml', 'python']"
-            )
+            print(f"   Found {len(results['ids'])} results with tag not in ['ml', 'python']")
 
         finally:
             # Cleanup

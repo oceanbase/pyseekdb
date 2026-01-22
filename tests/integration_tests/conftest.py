@@ -3,17 +3,18 @@ Pytest configuration and shared fixtures for pyseekdb tests.
 Provides parameterized client fixtures for testing across embedded, server, and oceanbase modes.
 """
 
-import pytest
+import contextlib
 import os
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-import pyseekdb
-
+import pyseekdb  # noqa: E402
 
 # ==================== Environment Variable Configuration ====================
 # Embedded mode
@@ -63,9 +64,7 @@ def create_server_client():
         result = client._server._execute("SELECT 1 as test")
         assert result and result[0].get("test") == 1
     except Exception as exc:
-        pytest.fail(
-            f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}"
-        )
+        pytest.fail(f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}")
 
     return client
 
@@ -117,18 +116,14 @@ def create_server_admin_client():
         result = admin._server._execute("SELECT 1 as test")
         assert result and result[0].get("test") == 1
     except Exception as exc:
-        pytest.fail(
-            f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}"
-        )
+        pytest.fail(f"seekdb server connection failed ({SERVER_HOST}:{SERVER_PORT}): {exc}")
 
     return admin
 
 
 def create_oceanbase_admin_client():
     """Create an OceanBase admin client instance."""
-    admin = pyseekdb.AdminClient(
-        host=OB_HOST, port=OB_PORT, tenant=OB_TENANT, user=OB_USER, password=OB_PASSWORD
-    )
+    admin = pyseekdb.AdminClient(host=OB_HOST, port=OB_PORT, tenant=OB_TENANT, user=OB_USER, password=OB_PASSWORD)
 
     # Test connection
     try:
@@ -172,11 +167,9 @@ def db_client(request):
 
     yield client
 
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 @pytest.fixture
@@ -184,11 +177,9 @@ def embedded_client():
     """Fixture for embedded client only."""
     client = create_embedded_client()
     yield client
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 @pytest.fixture
@@ -196,11 +187,9 @@ def server_client():
     """Fixture for server client only."""
     client = create_server_client()
     yield client
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 @pytest.fixture
@@ -208,11 +197,9 @@ def oceanbase_client():
     """Fixture for OceanBase client only."""
     client = create_oceanbase_client()
     yield client
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 # ==================== Parameterized AdminClient Fixtures ====================
@@ -247,11 +234,9 @@ def admin_client(request):
 
     yield client
 
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 @pytest.fixture
@@ -259,11 +244,9 @@ def embedded_admin_client():
     """Fixture for embedded admin client only."""
     client = create_embedded_admin_client()
     yield client
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 @pytest.fixture
@@ -271,11 +254,9 @@ def server_admin_client():
     """Fixture for server admin client only."""
     client = create_server_admin_client()
     yield client
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass
 
 
 @pytest.fixture
@@ -283,8 +264,6 @@ def oceanbase_admin_client():
     """Fixture for OceanBase admin client only."""
     client = create_oceanbase_admin_client()
     yield client
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(client, "close"):
             client.close()
-    except:
-        pass

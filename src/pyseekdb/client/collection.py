@@ -8,12 +8,13 @@ Design Pattern:
 4. User-facing interface is completely consistent
 """
 
-from typing import Any, List, Dict, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 from .hybrid_search import HybridSearch
 
 if TYPE_CHECKING:
-    from .embedding_function import EmbeddingFunction, Documents as EmbeddingDocuments
+    from .embedding_function import Documents as EmbeddingDocuments
+    from .embedding_function import EmbeddingFunction
 
 
 class Collection:
@@ -31,10 +32,10 @@ class Collection:
         self,
         client: Any,  # BaseClient instance
         name: str,
-        collection_id: Optional[str] = None,
-        dimension: Optional[int] = None,
+        collection_id: str | None = None,
+        dimension: int | None = None,
         embedding_function: Optional["EmbeddingFunction[EmbeddingDocuments]"] = None,
-        distance: Optional[str] = None,
+        distance: str | None = None,
         **metadata,
     ):
         """
@@ -65,12 +66,12 @@ class Collection:
         return self._name
 
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """Collection ID"""
         return self._id
 
     @property
-    def dimension(self) -> Optional[int]:
+    def dimension(self) -> int | None:
         """Vector dimension"""
         return self._dimension
 
@@ -80,7 +81,7 @@ class Collection:
         return self._client
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         """Collection metadata"""
         return self._metadata
 
@@ -90,7 +91,7 @@ class Collection:
         return self._embedding_function
 
     @property
-    def distance(self) -> Optional[str]:
+    def distance(self) -> str | None:
         """Distance metric used by the index (e.g., 'l2', 'cosine', 'inner_product')"""
         return self._distance
 
@@ -102,10 +103,10 @@ class Collection:
 
     def add(
         self,
-        ids: Union[str, List[str]],
-        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        metadatas: Optional[Union[Dict, List[Dict]]] = None,
-        documents: Optional[Union[str, List[str]]] = None,
+        ids: str | list[str],
+        embeddings: list[float] | list[list[float]] | None = None,
+        metadatas: dict | list[dict] | None = None,
+        documents: str | list[str] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -150,10 +151,10 @@ class Collection:
 
     def update(
         self,
-        ids: Union[str, List[str]],
-        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        metadatas: Optional[Union[Dict, List[Dict]]] = None,
-        documents: Optional[Union[str, List[str]]] = None,
+        ids: str | list[str],
+        embeddings: list[float] | list[list[float]] | None = None,
+        metadatas: dict | list[dict] | None = None,
+        documents: str | list[str] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -193,10 +194,10 @@ class Collection:
     # 修改为upsert语法
     def upsert(
         self,
-        ids: Union[str, List[str]],
-        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        metadatas: Optional[Union[Dict, List[Dict]]] = None,
-        documents: Optional[Union[str, List[str]]] = None,
+        ids: str | list[str],
+        embeddings: list[float] | list[list[float]] | None = None,
+        metadatas: dict | list[dict] | None = None,
+        documents: str | list[str] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -235,9 +236,9 @@ class Collection:
 
     def delete(
         self,
-        ids: Optional[Union[str, List[str]]] = None,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
+        ids: str | list[str] | None = None,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -275,14 +276,14 @@ class Collection:
 
     def query(
         self,
-        query_embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        query_texts: Optional[Union[str, List[str]]] = None,
+        query_embeddings: list[float] | list[list[float]] | None = None,
+        query_texts: str | list[str] | None = None,
         n_results: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
-        include: Optional[List[str]] = None,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+        include: list[str] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Query collection by vector similarity
 
@@ -363,14 +364,14 @@ class Collection:
 
     def get(
         self,
-        ids: Optional[Union[str, List[str]]] = None,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-        include: Optional[List[str]] = None,
+        ids: str | list[str] | None = None,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        include: list[str] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get data from collection by IDs or filters
 
@@ -429,14 +430,14 @@ class Collection:
 
     def hybrid_search(
         self,
-        query: Optional[Union[Dict[str, Any], HybridSearch]] = None,
-        knn: Optional[Dict[str, Any]] = None,
-        rank: Optional[Dict[str, Any]] = None,
+        query: dict[str, Any] | HybridSearch | None = None,
+        knn: dict[str, Any] | None = None,
+        rank: dict[str, Any] | None = None,
         n_results: int = 10,
-        include: Optional[List[str]] = None,
-        search: Optional[HybridSearch] = None,
+        include: list[str] | None = None,
+        search: HybridSearch | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Hybrid search combining full-text search and vector similarity search
 
@@ -535,11 +536,9 @@ class Collection:
             count = collection.count()
             print(f"Collection has {count} items")
         """
-        return self._client._collection_count(
-            collection_id=self._id, collection_name=self._name
-        )
+        return self._client._collection_count(collection_id=self._id, collection_name=self._name)
 
-    def peek(self, limit: int = 10) -> Dict[str, Any]:
+    def peek(self, limit: int = 10) -> dict[str, Any]:
         """
         Quickly preview the first few items in the collection
 

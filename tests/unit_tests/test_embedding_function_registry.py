@@ -2,16 +2,17 @@
 Unit tests for EmbeddingFunctionRegistry and register_embedding_function decorator.
 """
 
+from typing import Any
+
 import pytest
-from typing import Dict, Any
 
 from pyseekdb.client.embedding_function import (
+    DefaultEmbeddingFunction,
+    Documents,
     EmbeddingFunction,
     EmbeddingFunctionRegistry,
-    register_embedding_function,
-    Documents,
     Embeddings,
-    DefaultEmbeddingFunction,
+    register_embedding_function,
 )
 
 
@@ -30,9 +31,7 @@ class TestEmbeddingFunctionRegistry:
         EmbeddingFunctionRegistry._initialize()
 
         assert "default" in EmbeddingFunctionRegistry._registry
-        assert (
-            EmbeddingFunctionRegistry._registry["default"] == DefaultEmbeddingFunction
-        )
+        assert EmbeddingFunctionRegistry._registry["default"] == DefaultEmbeddingFunction
         assert EmbeddingFunctionRegistry._initialized is True
 
     def test_initialization_idempotent(self):
@@ -67,23 +66,21 @@ class TestEmbeddingFunctionRegistry:
             def __init__(self, model_name: str = "test-model"):
                 self.model_name = model_name
 
-            def __call__(self, input: Documents) -> Embeddings:
-                if isinstance(input, str):
-                    input = [input]
-                return [[0.1, 0.2, 0.3] for _ in input]
+            def __call__(self, documents: Documents) -> Embeddings:
+                if isinstance(documents, str):
+                    documents = [documents]
+                return [[0.1, 0.2, 0.3] for _ in documents]
 
             @staticmethod
             def name() -> str:
                 return "test_embedding"
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {"model_name": self.model_name}
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "TestEmbeddingFunction":
-                return TestEmbeddingFunction(
-                    model_name=config.get("model_name", "test-model")
-                )
+            def build_from_config(config: dict[str, Any]) -> "TestEmbeddingFunction":
+                return TestEmbeddingFunction(model_name=config.get("model_name", "test-model"))
 
         # Register the class
         EmbeddingFunctionRegistry.register(TestEmbeddingFunction)
@@ -97,14 +94,14 @@ class TestEmbeddingFunctionRegistry:
         """Test that registering a class without name() method raises ValueError"""
 
         class InvalidEmbeddingFunction(EmbeddingFunction[Documents]):
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "InvalidEmbeddingFunction":
+            def build_from_config(config: dict[str, Any]) -> "InvalidEmbeddingFunction":
                 return InvalidEmbeddingFunction()
 
         with pytest.raises(ValueError, match="must have a static name\\(\\) method"):
@@ -118,15 +115,13 @@ class TestEmbeddingFunctionRegistry:
             def name() -> str:
                 return "invalid_embedding"
 
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
-        with pytest.raises(
-            ValueError, match="must have.*build_from_config\\(\\) method"
-        ):
+        with pytest.raises(ValueError, match=r"must have.*build_from_config\(\) method"):
             EmbeddingFunctionRegistry.register(InvalidEmbeddingFunction)
 
     def test_register_duplicate_name_raises_error(self):
@@ -140,11 +135,11 @@ class TestEmbeddingFunctionRegistry:
             def __call__(self, _input: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "FirstEmbeddingFunction":
+            def build_from_config(_config: dict[str, Any]) -> "FirstEmbeddingFunction":
                 return FirstEmbeddingFunction()
 
         class SecondEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -152,14 +147,14 @@ class TestEmbeddingFunctionRegistry:
             def name() -> str:
                 return "duplicate_name"  # Same name!
 
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.4, 0.5, 0.6]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "SecondEmbeddingFunction":
+            def build_from_config(_config: dict[str, Any]) -> "SecondEmbeddingFunction":
                 return SecondEmbeddingFunction()
 
         # Register first one
@@ -177,14 +172,14 @@ class TestEmbeddingFunctionRegistry:
             def name() -> str:
                 return "test_embedding"
 
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "TestEmbeddingFunction":
+            def build_from_config(_config: dict[str, Any]) -> "TestEmbeddingFunction":
                 return TestEmbeddingFunction()
 
         # Register first time
@@ -197,10 +192,7 @@ class TestEmbeddingFunctionRegistry:
 
         # Should still be registered once
         assert first_count == second_count
-        assert (
-            EmbeddingFunctionRegistry.get_class("test_embedding")
-            == TestEmbeddingFunction
-        )
+        assert EmbeddingFunctionRegistry.get_class("test_embedding") == TestEmbeddingFunction
 
     def test_list_registered_returns_all_names(self):
         """Test that list_registered returns all registered names"""
@@ -210,14 +202,14 @@ class TestEmbeddingFunctionRegistry:
             def name() -> str:
                 return "test1"
 
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.1]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "TestEmbeddingFunction1":
+            def build_from_config(_config: dict[str, Any]) -> "TestEmbeddingFunction1":
                 return TestEmbeddingFunction1()
 
         class TestEmbeddingFunction2(EmbeddingFunction[Documents]):
@@ -225,14 +217,14 @@ class TestEmbeddingFunctionRegistry:
             def name() -> str:
                 return "test2"
 
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.2]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "TestEmbeddingFunction2":
+            def build_from_config(_config: dict[str, Any]) -> "TestEmbeddingFunction2":
                 return TestEmbeddingFunction2()
 
         EmbeddingFunctionRegistry.register(TestEmbeddingFunction1)
@@ -265,12 +257,12 @@ class TestRegisterEmbeddingFunctionDecorator:
             def __call__(self, _input: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
             def build_from_config(
-                _config: Dict[str, Any],
+                _config: dict[str, Any],
             ) -> type["DecoratedEmbeddingFunction"]:
                 return DecoratedEmbeddingFunction()
 
@@ -291,12 +283,12 @@ class TestRegisterEmbeddingFunctionDecorator:
             def __call__(self, _input: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
             def build_from_config(
-                _config: Dict[str, Any],
+                _config: dict[str, Any],
             ) -> type["DecoratedEmbeddingFunction"]:
                 return DecoratedEmbeddingFunction()
 
@@ -319,14 +311,12 @@ class TestRegisterEmbeddingFunctionDecorator:
             def __call__(self, _input: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {"model_name": self.model_name}
 
             @staticmethod
-            def build_from_config(config: Dict[str, Any]) -> "TypedEmbeddingFunction":
-                return TypedEmbeddingFunction(
-                    model_name=config.get("model_name", "test")
-                )
+            def build_from_config(config: dict[str, Any]) -> "TypedEmbeddingFunction":
+                return TypedEmbeddingFunction(model_name=config.get("model_name", "test"))
 
         # Type should be preserved - can instantiate and access attributes
         instance = TypedEmbeddingFunction(model_name="custom")
@@ -344,12 +334,12 @@ class TestRegisterEmbeddingFunctionDecorator:
                 def __call__(self, _input: Documents) -> Embeddings:
                     return [[0.1, 0.2, 0.3]]
 
-                def get_config(self) -> Dict[str, Any]:
+                def get_config(self) -> dict[str, Any]:
                     return {}
 
                 @staticmethod
                 def build_from_config(
-                    _config: Dict[str, Any],
+                    _config: dict[str, Any],
                 ) -> "InvalidEmbeddingFunction":
                     return InvalidEmbeddingFunction()
 
@@ -365,11 +355,11 @@ class TestRegisterEmbeddingFunctionDecorator:
             def __call__(self, _input: Documents) -> Embeddings:
                 return [[0.1, 0.2, 0.3]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "CustomEmbeddingFunction":
+            def build_from_config(_config: dict[str, Any]) -> "CustomEmbeddingFunction":
                 return CustomEmbeddingFunction()
 
         # Registry should be initialized
@@ -392,11 +382,11 @@ class TestRegisterEmbeddingFunctionDecorator:
             def __call__(self, _input: Documents) -> Embeddings:
                 return [[0.1]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "FirstEmbeddingFunction":
+            def build_from_config(_config: dict[str, Any]) -> "FirstEmbeddingFunction":
                 return FirstEmbeddingFunction()
 
         @register_embedding_function
@@ -405,14 +395,14 @@ class TestRegisterEmbeddingFunctionDecorator:
             def name() -> str:
                 return "second_embedding"
 
-            def __call__(self, input: Documents) -> Embeddings:
+            def __call__(self, documents: Documents) -> Embeddings:
                 return [[0.2]]
 
-            def get_config(self) -> Dict[str, Any]:
+            def get_config(self) -> dict[str, Any]:
                 return {}
 
             @staticmethod
-            def build_from_config(_config: Dict[str, Any]) -> "SecondEmbeddingFunction":
+            def build_from_config(_config: dict[str, Any]) -> "SecondEmbeddingFunction":
                 return SecondEmbeddingFunction()
 
         # Both should be registered
