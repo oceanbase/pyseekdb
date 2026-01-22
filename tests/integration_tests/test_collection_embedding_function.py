@@ -543,9 +543,7 @@ class TestCollectionEmbeddingFunction:
             collection_get = db_client.get_collection(name=collection_name, embedding_function=custom_ef)
             assert collection_get is not None
             assert collection_get.embedding_function is not None
-            assert (
-                collection_get.embedding_function.get_config() == custom_ef.get_config()
-            )
+            assert collection_get.embedding_function.get_config() == custom_ef.get_config()
             assert collection_get.dimension == 4
             assert collection_get.name == collection_name
             assert collection_get.embedding_function.model_name == "custom-manual-model"
