@@ -1,8 +1,9 @@
+import warnings
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
     OpenAIBaseEmbeddingFunction,
 )
-from typing import Any, Optional
-import warnings
 
 # Known Tencent Hunyuan embedding model dimensions
 # Source: https://cloud.tencent.com/document/product/1729/111007
@@ -55,9 +56,9 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     def __init__(
         self,
         model_name: str = "hunyuan-embedding",
-        api_key_env: Optional[str] = None,
-        api_base: Optional[str] = None,
-        dimensions: Optional[int] = None,
+        api_key_env: str | None = None,
+        api_base: str | None = None,
+        dimensions: int | None = None,
         **kwargs: Any,
     ):
         """Initialize TengxunHunyuanEmbeddingFunction.
@@ -178,9 +179,7 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         # dimensions is ignored since API doesn't support it
         client_kwargs = config.get("client_kwargs", {})
         if not isinstance(client_kwargs, dict):
-            raise ValueError(
-                f"client_kwargs must be a dictionary, but got {client_kwargs}"
-            )
+            raise TypeError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
 
         return TengxunHunyuanEmbeddingFunction(
             model_name=model_name,

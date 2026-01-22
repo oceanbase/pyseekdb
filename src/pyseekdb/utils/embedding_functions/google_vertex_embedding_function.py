@@ -1,7 +1,8 @@
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.litellm_base_embedding_function import (
     LiteLLMBaseEmbeddingFunction,
 )
-from typing import Any, Dict, Optional
 
 # Known Google Vertex AI embedding model dimensions
 # Source: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/text-embeddings-api
@@ -76,9 +77,9 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         project_id: str,
         model_name: str = _DEFAULT_MODEL_NAME,
         location: str = "us-central1",
-        task_type: Optional[str] = None,
-        output_dimensionality: Optional[int] = None,
-        api_key_env: Optional[str] = None,
+        task_type: str | None = None,
+        output_dimensionality: int | None = None,
+        api_key_env: str | None = None,
         **kwargs: Any,
     ):
         """Initialize GoogleVertexEmbeddingFunction.
@@ -181,14 +182,8 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to determine embedding dimension via API call: {e}"
-            )
-        if (
-            not embeddings
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-        ):
+            raise RuntimeError("Failed to determine embedding dimension via API call") from e
+        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
             raise RuntimeError("Could not get embedding dimension from API response")
 
         # Cache the dimension for future use
@@ -204,7 +199,7 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         """
         return "google_vertex"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the configuration dictionary for the GoogleVertexEmbeddingFunction.
 
         Returns:
@@ -222,7 +217,7 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         }
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "GoogleVertexEmbeddingFunction":
+    def build_from_config(config: dict[str, Any]) -> "GoogleVertexEmbeddingFunction":
         """Build a GoogleVertexEmbeddingFunction from its configuration dictionary.
 
         Args:
@@ -245,7 +240,7 @@ class GoogleVertexEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         api_key_env = config.get("api_key_env")
         kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
-            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
 
         return GoogleVertexEmbeddingFunction(
             project_id=project_id,

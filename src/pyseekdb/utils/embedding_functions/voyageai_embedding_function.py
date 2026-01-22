@@ -1,10 +1,11 @@
+import os
+from typing import Any
+
 from pyseekdb.client.embedding_function import (
     Documents,
     EmbeddingFunction,
     Embeddings,
 )
-from typing import Any, Dict, Optional
-import os
 
 # Known Voyage AI embedding model dimensions
 # Source: https://docs.voyageai.com/docs/embeddings
@@ -77,10 +78,10 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
     def __init__(
         self,
         model_name: str = "voyage-4-large",
-        api_key_env: Optional[str] = None,
-        input_type: Optional[str] = None,
-        truncation: Optional[bool] = None,
-        output_dimension: Optional[int] = None,
+        api_key_env: str | None = None,
+        input_type: str | None = None,
+        truncation: bool | None = None,
+        output_dimension: int | None = None,
         **kwargs: Any,
     ):
         """Initialize VoyageaiEmbeddingFunction.
@@ -112,19 +113,17 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         try:
             import voyageai
-        except ImportError:
+        except ImportError as error:
             raise ValueError(
                 "The voyageai python package is not installed. Please install it with `pip install voyageai`"
-            )
+            ) from error
 
         # Get API key from environment variable
         if api_key_env is None:
             api_key_env = "VOYAGE_API_KEY"
         api_key = os.environ.get(api_key_env)
         if api_key is None:
-            raise ValueError(
-                f"Voyage AI API key not found. Please set the '{api_key_env}' environment variable."
-            )
+            raise ValueError(f"Voyage AI API key not found. Please set the '{api_key_env}' environment variable.")
 
         # Store configuration
         self.model_name = model_name
@@ -172,40 +171,34 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to determine embedding dimension via API call: {e}"
-            )
-        if (
-            not embeddings
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-        ):
+            raise RuntimeError("Failed to determine embedding dimension via API call") from e
+        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
             raise RuntimeError("Could not get embedding dimension from API response")
 
         # Cache the dimension for future use
         self._dimension = len(embeddings[0])
         return self._dimension
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """Generate embeddings for the given documents.
 
         Args:
-            input: Documents to generate embeddings for. Can be a single string or list of strings.
+            documents: Documents to generate embeddings for. Can be a single string or list of strings.
 
         Returns:
             Embeddings for the documents as a list of lists of floats.
         """
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         # Prepare parameters for voyageai.Client.embed()
         embed_params = {
-            "texts": input,
+            "texts": documents,
             "model": self.model_name,
             "output_dtype": "float",  # Always use float
         }
@@ -225,10 +218,8 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         embeddings = result.embeddings
 
         # Validate that we got the expected number of embeddings
-        if len(embeddings) != len(input):
-            raise ValueError(
-                f"Expected {len(input)} embeddings but got {len(embeddings)} from API"
-            )
+        if len(embeddings) != len(documents):
+            raise ValueError(f"Expected {len(documents)} embeddings but got {len(embeddings)} from API")
 
         # Convert to list of lists (in case voyageai returns numpy arrays or other formats)
         return [list(emb) if not isinstance(emb, list) else emb for emb in embeddings]
@@ -242,7 +233,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         return "voyageai"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the configuration dictionary for the VoyageaiEmbeddingFunction.
 
         Returns:
@@ -260,7 +251,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         }
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "VoyageaiEmbeddingFunction":
+    def build_from_config(config: dict[str, Any]) -> "VoyageaiEmbeddingFunction":
         """Build a VoyageaiEmbeddingFunction from its configuration dictionary.
 
         Args:
@@ -282,7 +273,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         output_dimension = config.get("output_dimension")
         kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
-            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
 
         return VoyageaiEmbeddingFunction(
             model_name=model_name,

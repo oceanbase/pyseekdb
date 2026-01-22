@@ -1,10 +1,12 @@
+import importlib
+import json
+from typing import Any
+
 from pyseekdb.client.embedding_function import (
     Documents,
     EmbeddingFunction,
     Embeddings,
 )
-from typing import Any, Dict, Optional
-import json
 
 # Known Amazon Bedrock embedding model dimensions
 # Source: https://docs.aws.amazon.com/bedrock/latest/userguide/models.html
@@ -102,25 +104,17 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
                 - config: boto3 Config object for advanced configuration
                 - See boto3 documentation for more options
         """
-        try:
-            import boto3
-        except ImportError:
-            raise ValueError(
-                "The boto3 python package is not installed. Please install it with `pip install boto3`"
-            )
+        if not importlib.util.find_spec("boto3"):
+            raise ValueError("The boto3 python package is not installed. Please install it with `pip install boto3`")
 
         for key, value in kwargs.items():
             if not isinstance(value, (str, int, float, bool, list, dict, tuple)):
-                raise ValueError(f"Keyword argument {key} is not a primitive type")
+                raise TypeError(f"Keyword argument {key} is not a primitive type: {type(value)!s}")
 
         # Extract region_name and profile_name from the session for config storage
         self._session_args = {}
-        self._session_args["region_name"] = (
-            session.region_name if hasattr(session, "region_name") else None
-        )
-        self._session_args["profile_name"] = (
-            session.profile_name if hasattr(session, "profile_name") else None
-        )
+        self._session_args["region_name"] = session.region_name if hasattr(session, "region_name") else None
+        self._session_args["profile_name"] = session.profile_name if hasattr(session, "profile_name") else None
 
         # Store configuration (for get_config, but NOT credentials)
         self.model_name = model_name
@@ -160,42 +154,36 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to determine embedding dimension via API call: {e}"
-            )
-        if (
-            not embeddings
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-        ):
+            raise RuntimeError("Failed to determine embedding dimension via API call") from e
+        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
             raise RuntimeError("Could not get embedding dimension from API response")
 
         # Cache the dimension for future use
         self._dimension = len(embeddings[0])
         return self._dimension
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """Generate embeddings for the given documents.
 
         Args:
-            input: Documents to generate embeddings for. Can be a single string or list of strings.
+            documents: Documents to generate embeddings for. Can be a single string or list of strings.
 
         Returns:
             Embeddings for the documents as a list of lists of floats.
         """
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         accept = "application/json"
         content_type = "application/json"
 
         embeddings = []
-        for text in input:
+        for text in documents:
             # Prepare request body for Bedrock API
             # Format depends on the model, but for Titan models it's:
             request_body = {"inputText": text}
@@ -216,9 +204,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
             # For Titan models, the embedding is in the "embedding" field
             embedding = response_body.get("embedding")
             if embedding is None:
-                raise ValueError(
-                    f"Unexpected response format from Bedrock API: {response_body}"
-                )
+                raise ValueError(f"Unexpected response format from Bedrock API: {response_body}")
 
             embeddings.append(embedding)
 
@@ -228,7 +214,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
     def name() -> str:
         return "amazon_bedrock"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the configuration dictionary for the AmazonBedrockEmbeddingFunction.
 
         Returns:
@@ -249,7 +235,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
         return config
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "AmazonBedrockEmbeddingFunction":
+    def build_from_config(config: dict[str, Any]) -> "AmazonBedrockEmbeddingFunction":
         """Build an AmazonBedrockEmbeddingFunction from its configuration dictionary.
 
         Args:
@@ -268,7 +254,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
 
         kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
-            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
 
         # Credentials are not stored in config for security reasons
         # They should be provided via environment variables, IAM roles, or
@@ -276,10 +262,10 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
         # Create a session with region_name and profile_name if they were stored
         try:
             import boto3
-        except ImportError:
+        except ImportError as error:
             raise ValueError(
                 "The boto3 python package is not installed. Please install it with `pip install boto3`"
-            )
+            ) from error
 
         session_args = config.get("session_args")
         session = boto3.Session(**session_args) if session_args else boto3.Session()

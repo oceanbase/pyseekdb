@@ -1,8 +1,9 @@
 import os
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.litellm_base_embedding_function import (
     LiteLLMBaseEmbeddingFunction,
 )
-from typing import Any, Dict, Optional
 
 # Known Jina AI embedding model dimensions
 # Source: https://api.jina.ai/scalar#tag/search-foundation-models/POST/v1/embeddings
@@ -74,7 +75,7 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
     def __init__(
         self,
         model_name: str = "jina-embeddings-v3",
-        api_key_env: Optional[str] = None,
+        api_key_env: str | None = None,
         **kwargs: Any,
     ):
         """Initialize JinaEmbeddingFunction.
@@ -160,14 +161,8 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to determine embedding dimension via API call: {e}"
-            )
-        if (
-            not embeddings
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-        ):
+            raise RuntimeError("Failed to determine embedding dimension via API call") from e
+        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
             raise RuntimeError("Could not get embedding dimension from API response")
 
         # Cache the dimension for future use
@@ -183,7 +178,7 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         """
         return "jina"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the configuration dictionary for the JinaEmbeddingFunction.
 
         Returns:
@@ -197,7 +192,7 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         }
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "JinaEmbeddingFunction":
+    def build_from_config(config: dict[str, Any]) -> "JinaEmbeddingFunction":
         """Build a JinaEmbeddingFunction from its configuration dictionary.
 
         Args:
@@ -216,7 +211,7 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         api_key_env = config.get("api_key_env", "JINA_AI_API_KEY")
         kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
-            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
 
         return JinaEmbeddingFunction(
             model_name=model_name,

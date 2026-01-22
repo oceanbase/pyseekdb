@@ -1,8 +1,9 @@
+import os
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
     OpenAIBaseEmbeddingFunction,
 )
-from typing import Any, Optional
-import os
 
 # Known Ollama embedding model dimensions
 # Source: https://docs.ollama.com/api/openai-compatibility
@@ -68,9 +69,9 @@ class OllamaEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     def __init__(
         self,
         model_name: str = "nomic-embed-text",
-        api_key_env: Optional[str] = None,
-        api_base: Optional[str] = None,
-        dimensions: Optional[int] = None,
+        api_key_env: str | None = None,
+        api_base: str | None = None,
+        dimensions: int | None = None,
         **kwargs: Any,
     ):
         """Initialize OllamaEmbeddingFunction.
@@ -180,9 +181,7 @@ class OllamaEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         dimensions = config.get("dimensions")
         client_kwargs = config.get("client_kwargs", {})
         if not isinstance(client_kwargs, dict):
-            raise ValueError(
-                f"client_kwargs must be a dictionary, but got {client_kwargs}"
-            )
+            raise TypeError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
 
         return OllamaEmbeddingFunction(
             model_name=model_name,

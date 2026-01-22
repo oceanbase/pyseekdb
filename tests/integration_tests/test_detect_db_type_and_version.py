@@ -42,15 +42,15 @@ class TestDetectDbTypeAndVersion:
         print(f"   version1={version1}, version2={version2}")
         print(f"   version1 > version2: {version1 > version2}")
 
-    def test_seekdb_type_detection(self, server_client):
+    def test_seekdb_type_detection(self, db_client):
         """Test: detect seekdb Server type and version"""
         # Verify client type
-        assert server_client is not None
-        assert hasattr(server_client, "_server")
-        assert isinstance(server_client._server, pyseekdb.RemoteServerClient)
+        assert db_client is not None
+        assert hasattr(db_client, "_server")
+        assert isinstance(db_client._server, pyseekdb.RemoteServerClient)
 
         # Test detect_db_type_and_version
-        db_type, version = server_client._server.detect_db_type_and_version()
+        db_type, version = db_client._server.detect_db_type_and_version()
 
         # Verify results
         assert db_type == "seekdb"
@@ -65,15 +65,15 @@ class TestDetectDbTypeAndVersion:
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
-    def test_ob_type_detection(self, oceanbase_client):
+    def test_ob_type_detection(self, db_client):
         """Test: detect OceanBase Server type and version"""
         # Verify client type
-        assert oceanbase_client is not None
-        assert hasattr(oceanbase_client, "_server")
-        assert isinstance(oceanbase_client._server, pyseekdb.RemoteServerClient)
+        assert db_client is not None
+        assert hasattr(db_client, "_server")
+        assert isinstance(db_client._server, pyseekdb.RemoteServerClient)
 
         # Test detect_db_type_and_version
-        db_type, version = oceanbase_client._server.detect_db_type_and_version()
+        db_type, version = db_client._server.detect_db_type_and_version()
 
         # Verify results
         assert db_type == "oceanbase"
@@ -88,16 +88,16 @@ class TestDetectDbTypeAndVersion:
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
-    def test_connection_establishment(self, server_client):
+    def test_connection_establishment(self, db_client):
         """Test: verify detect_db_type_and_version establishes connection automatically"""
-        # Note: server_client from fixture may already be connected due to connection test
+        # Note: db_client from fixture may already be connected due to connection test
         # We test that the method works correctly
 
         # Call detect_db_type_and_version
-        db_type, version = server_client._server.detect_db_type_and_version()
+        db_type, version = db_client._server.detect_db_type_and_version()
 
         # Verify connection is established
-        assert server_client._server.is_connected()
+        assert db_client._server.is_connected()
 
         # Verify results
         assert db_type in ["seekdb", "oceanbase"]
@@ -107,10 +107,10 @@ class TestDetectDbTypeAndVersion:
         print(f"   Database type: {db_type}")
         print(f"   Version: {version}")
 
-    def test_return_format(self, server_client):
+    def test_return_format(self, db_client):
         """Test: verify detect_db_type_and_version returns correct tuple format"""
         # Test detect_db_type_and_version
-        result = server_client._server.detect_db_type_and_version()
+        result = db_client._server.detect_db_type_and_version()
 
         # Verify return type is tuple
         assert isinstance(result, tuple)

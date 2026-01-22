@@ -1,7 +1,8 @@
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.litellm_base_embedding_function import (
     LiteLLMBaseEmbeddingFunction,
 )
-from typing import Any, Dict, Optional
 
 # Known Cohere embedding model dimensions
 # Source: https://docs.cohere.com/docs/cohere-embed
@@ -73,8 +74,8 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
     def __init__(
         self,
         model_name: str = _DEFAULT_MODEL_NAME,
-        api_key_env: Optional[str] = None,
-        input_type: Optional[str] = None,
+        api_key_env: str | None = None,
+        input_type: str | None = None,
         **kwargs: Any,
     ):
         """Initialize CohereEmbeddingFunction.
@@ -163,14 +164,8 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         try:
             embeddings = self([test_input])
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to determine embedding dimension via API call: {e}"
-            )
-        if (
-            not embeddings
-            or not isinstance(embeddings, list)
-            or not isinstance(embeddings[0], list)
-        ):
+            raise RuntimeError("Failed to determine embedding dimension via API call") from e
+        if not embeddings or not isinstance(embeddings, list) or not isinstance(embeddings[0], list):
             raise RuntimeError("Could not get embedding dimension from API response")
 
         # Cache the dimension for future use
@@ -186,7 +181,7 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         """
         return "cohere"
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the configuration dictionary for the CohereEmbeddingFunction.
 
         Returns:
@@ -201,7 +196,7 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         }
 
     @staticmethod
-    def build_from_config(config: Dict[str, Any]) -> "CohereEmbeddingFunction":
+    def build_from_config(config: dict[str, Any]) -> "CohereEmbeddingFunction":
         """Build a CohereEmbeddingFunction from its configuration dictionary.
 
         Args:
@@ -219,7 +214,7 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         input_type = config.get("input_type")
         kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
-            raise ValueError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
 
         return CohereEmbeddingFunction(
             model_name=model_name,

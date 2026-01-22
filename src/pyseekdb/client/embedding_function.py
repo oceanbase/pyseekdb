@@ -5,18 +5,19 @@ This module provides the EmbeddingFunction protocol and default implementations
 for converting text documents to vector embeddings.
 """
 
+import contextlib
 import logging
 import os
+from abc import abstractmethod
 from functools import cached_property
 from pathlib import Path
-from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
     Protocol,
+    Self,
     TypeVar,
     runtime_checkable,
-    Self,
 )
 
 import httpx
@@ -629,17 +630,17 @@ class EmbeddingFunctionRegistry:
         # Try to register optional embedding functions (may not be installed)
         try:
             from pyseekdb.utils.embedding_functions import (
+                AmazonBedrockEmbeddingFunction,
+                CohereEmbeddingFunction,
+                GoogleVertexEmbeddingFunction,
+                JinaEmbeddingFunction,
+                OllamaEmbeddingFunction,
                 OpenAIEmbeddingFunction,
                 QwenEmbeddingFunction,
                 SentenceTransformerEmbeddingFunction,
                 SiliconflowEmbeddingFunction,
                 TengxunHunyuanEmbeddingFunction,
-                OllamaEmbeddingFunction,
                 VoyageaiEmbeddingFunction,
-                GoogleVertexEmbeddingFunction,
-                CohereEmbeddingFunction,
-                JinaEmbeddingFunction,
-                AmazonBedrockEmbeddingFunction,
             )
 
             cls._registry["sentence_transformer"] = SentenceTransformerEmbeddingFunction

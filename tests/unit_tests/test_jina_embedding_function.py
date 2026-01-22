@@ -10,13 +10,15 @@ To run this test manually:
     JINA_AI_API_KEY=your-key pytest tests/unit_tests/test_jina_embedding_function.py -v -s
 """
 
-import pytest
+import importlib.util
 import os
 
-from pyseekdb.utils.embedding_functions import JinaEmbeddingFunction
+import pytest
+
 from pyseekdb.client.embedding_function import dimension_of
+from pyseekdb.utils.embedding_functions import JinaEmbeddingFunction
+
 from .test_utils import env_guard
-import importlib.util
 
 
 def is_litellm_available() -> bool:
@@ -39,15 +41,9 @@ class TestJinaEmbeddingFunction:
 
     def test_jina_env(self):
         """Test if litellm package is installed and required environment variables are set."""
-        try:
-            import litellm
-        except ImportError:
-            print("litellm package is not installed")
-            assert False, "litellm package is not installed"
+        assert is_litellm_available(), "litellm package is not installed"
 
-        if not os.environ.get("JINA_AI_API_KEY"):
-            print("JINA_AI_API_KEY environment variable is not set")
-            assert False, "JINA_AI_API_KEY environment variable is not set"
+        assert os.environ.get("JINA_AI_API_KEY"), "JINA_AI_API_KEY environment variable is not set"
 
     def test_initialization_with_defaults(self):
         """Test JinaEmbeddingFunction initialization with default values"""
@@ -86,9 +82,7 @@ class TestJinaEmbeddingFunction:
 
     def test_initialization_with_custom_api_key_env(self):
         """Test JinaEmbeddingFunction initialization with custom API key env"""
-        print(
-            "\n✅ Testing JinaEmbeddingFunction initialization with custom API key env"
-        )
+        print("\n✅ Testing JinaEmbeddingFunction initialization with custom API key env")
 
         self.test_jina_env()
 
@@ -96,9 +90,7 @@ class TestJinaEmbeddingFunction:
         if not os.environ.get(custom_key_env):
             os.environ[custom_key_env] = "your-custom-key"
 
-        ef = JinaEmbeddingFunction(
-            model_name="jina-embeddings-v3", api_key_env=custom_key_env
-        )
+        ef = JinaEmbeddingFunction(model_name="jina-embeddings-v3", api_key_env=custom_key_env)
         assert ef.api_key_env == custom_key_env
         print(f"   Custom API key env: {ef.api_key_env}")
 
@@ -108,11 +100,9 @@ class TestJinaEmbeddingFunction:
 
         self.test_jina_env()
 
-        ef = JinaEmbeddingFunction(
-            model_name="jina-embeddings-v3", timeout=30, max_retries=3
-        )
+        ef = JinaEmbeddingFunction(model_name="jina-embeddings-v3", timeout=30, max_retries=3)
         assert ef is not None
-        print(f"   Initialized with timeout and max_retries")
+        print("   Initialized with timeout and max_retries")
 
     def test_initialization_missing_api_key(self):
         """Test that missing API key raises ValueError"""
@@ -137,33 +127,25 @@ class TestJinaEmbeddingFunction:
         # Test v3 (1024 dimensions)
         ef_v3 = JinaEmbeddingFunction(model_name="jina-embeddings-v3")
         dim_v3 = ef_v3.dimension
-        assert dim_v3 == 1024, (
-            f"Expected dimension 1024 for jina-embeddings-v3, got {dim_v3}"
-        )
+        assert dim_v3 == 1024, f"Expected dimension 1024 for jina-embeddings-v3, got {dim_v3}"
         print(f"   jina-embeddings-v3 dimension: {dim_v3}")
 
         # Test v4 (2048 dimensions)
         ef_v4 = JinaEmbeddingFunction(model_name="jina-embeddings-v4")
         dim_v4 = ef_v4.dimension
-        assert dim_v4 == 2048, (
-            f"Expected dimension 2048 for jina-embeddings-v4, got {dim_v4}"
-        )
+        assert dim_v4 == 2048, f"Expected dimension 2048 for jina-embeddings-v4, got {dim_v4}"
         print(f"   jina-embeddings-v4 dimension: {dim_v4}")
 
         # Test v2-base-en (768 dimensions)
         ef_v2_base = JinaEmbeddingFunction(model_name="jina-embeddings-v2-base-en")
         dim_v2_base = ef_v2_base.dimension
-        assert dim_v2_base == 768, (
-            f"Expected dimension 768 for jina-embeddings-v2-base-en, got {dim_v2_base}"
-        )
+        assert dim_v2_base == 768, f"Expected dimension 768 for jina-embeddings-v2-base-en, got {dim_v2_base}"
         print(f"   jina-embeddings-v2-base-en dimension: {dim_v2_base}")
 
         # Test v2-small-en (512 dimensions)
         ef_v2_small = JinaEmbeddingFunction(model_name="jina-embeddings-v2-small-en")
         dim_v2_small = ef_v2_small.dimension
-        assert dim_v2_small == 512, (
-            f"Expected dimension 512 for jina-embeddings-v2-small-en, got {dim_v2_small}"
-        )
+        assert dim_v2_small == 512, f"Expected dimension 512 for jina-embeddings-v2-small-en, got {dim_v2_small}"
         print(f"   jina-embeddings-v2-small-en dimension: {dim_v2_small}")
 
     def test_dimension_property_unknown_model(self):
@@ -182,9 +164,7 @@ class TestJinaEmbeddingFunction:
 
     def test_call_single_document(self):
         """Test __call__ with single document"""
-        print(
-            "\n✅ Testing JinaEmbeddingFunction embedding generation (single document)"
-        )
+        print("\n✅ Testing JinaEmbeddingFunction embedding generation (single document)")
 
         self.test_jina_env()
 
@@ -200,9 +180,7 @@ class TestJinaEmbeddingFunction:
 
     def test_call_multiple_documents(self):
         """Test __call__ with multiple documents"""
-        print(
-            "\n✅ Testing JinaEmbeddingFunction embedding generation (multiple documents)"
-        )
+        print("\n✅ Testing JinaEmbeddingFunction embedding generation (multiple documents)")
 
         self.test_jina_env()
 
@@ -216,11 +194,9 @@ class TestJinaEmbeddingFunction:
 
         assert isinstance(embeddings, list)
         assert len(embeddings) == len(multiple_docs)
-        for i, emb in enumerate(embeddings):
+        for emb in embeddings:
             assert isinstance(emb, list)
-            assert len(emb) == len(embeddings[0]), (
-                f"All embeddings should have same dimension"
-            )
+            assert len(emb) == len(embeddings[0]), "All embeddings should have same dimension"
         print(f"   Multiple documents embedding dimension: {len(embeddings[0])}")
         print(f"   Number of embeddings: {len(embeddings)}")
 
@@ -252,9 +228,7 @@ class TestJinaEmbeddingFunction:
         print(f"   dimension_of result for v4: {dim_v4}")
 
 
-@pytest.mark.skipif(
-    not is_litellm_available(), reason="litellm is not available on this system"
-)
+@pytest.mark.skipif(not is_litellm_available(), reason="litellm is not available on this system")
 class TestJinaEmbeddingFunctionPersistence:
     """Test persistence for JinaEmbeddingFunction"""
 
@@ -343,9 +317,7 @@ class TestJinaEmbeddingFunctionPersistence:
     def test_persistence_roundtrip(self):
         """Test complete roundtrip: get_config -> build_from_config"""
         with env_guard(JINA_AI_API_KEY="test-key"):
-            original_ef = JinaEmbeddingFunction(
-                model_name="jina-embeddings-v4", api_key_env="JINA_AI_API_KEY"
-            )
+            original_ef = JinaEmbeddingFunction(model_name="jina-embeddings-v4", api_key_env="JINA_AI_API_KEY")
 
             config = original_ef.get_config()
             restored_ef = JinaEmbeddingFunction.build_from_config(config)

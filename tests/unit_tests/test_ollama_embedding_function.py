@@ -10,13 +10,15 @@ To run this test manually:
     # Pull required models: ollama pull nomic-embed-text
 """
 
-import pytest
+import importlib.util
 import os
 
-from pyseekdb.utils.embedding_functions import OllamaEmbeddingFunction
+import pytest
+
 from pyseekdb.client.embedding_function import dimension_of
+from pyseekdb.utils.embedding_functions import OllamaEmbeddingFunction
+
 from .test_utils import env_guard
-import importlib.util
 
 
 def is_openai_available() -> bool:
@@ -41,16 +43,17 @@ def is_ollama_available() -> bool:
 
     try:
         import openai
+
         # Try to connect to Ollama's default endpoint
         client = openai.OpenAI(
             base_url="http://localhost:11434/v1",
-            api_key="ollama"  # Ollama ignores the key but requires it
+            api_key="ollama",  # Ollama ignores the key but requires it
         )
         # Try to list models (this will fail if Ollama is not running)
         client.models.list()
-        return True
     except Exception:
         return False
+    return True
 
 
 # Skip this test by default - it requires Ollama to be running locally
@@ -63,15 +66,8 @@ class TestOllamaEmbeddingFunction:
 
     def test_ollama_env(self):
         """Test if openai package is installed and Ollama is accessible."""
-        try:
-            import openai
-        except ImportError:
-            print("openai package is not installed")
-            assert False, "openai package is not installed"
-
-        if not is_ollama_available():
-            print("Ollama is not running or not accessible")
-            assert False, "Ollama is not running or not accessible"
+        assert is_openai_available(), "openai package is not installed"
+        assert is_ollama_available(), "Ollama is not running or not accessible"
 
     def test_initialization_with_defaults(self):
         """Test OllamaEmbeddingFunction initialization with default values"""
@@ -111,9 +107,7 @@ class TestOllamaEmbeddingFunction:
 
     def test_initialization_with_custom_api_key_env(self):
         """Test OllamaEmbeddingFunction initialization with custom API key env"""
-        print(
-            "\n✅ Testing OllamaEmbeddingFunction initialization with custom API key env"
-        )
+        print("\n✅ Testing OllamaEmbeddingFunction initialization with custom API key env")
 
         self.test_ollama_env()
 
@@ -122,9 +116,7 @@ class TestOllamaEmbeddingFunction:
         if not os.environ.get(custom_key_env):
             os.environ[custom_key_env] = "ollama"
 
-        ef = OllamaEmbeddingFunction(
-            model_name="nomic-embed-text", api_key_env=custom_key_env
-        )
+        ef = OllamaEmbeddingFunction(model_name="nomic-embed-text", api_key_env=custom_key_env)
         assert ef.api_key_env == custom_key_env
         print(f"   Custom API key env: {ef.api_key_env}")
 
@@ -156,11 +148,9 @@ class TestOllamaEmbeddingFunction:
 
         self.test_ollama_env()
 
-        ef = OllamaEmbeddingFunction(
-            model_name="nomic-embed-text", timeout=30, max_retries=3
-        )
+        ef = OllamaEmbeddingFunction(model_name="nomic-embed-text", timeout=30, max_retries=3)
         assert ef is not None
-        print(f"   Initialized with timeout and max_retries")
+        print("   Initialized with timeout and max_retries")
 
     def test_initialization_without_api_key(self):
         """Test that initialization works even without API key (Ollama ignores it)"""
@@ -193,17 +183,13 @@ class TestOllamaEmbeddingFunction:
         # Test nomic-embed-text (768 dimensions)
         ef_nomic = OllamaEmbeddingFunction(model_name="nomic-embed-text")
         dim_nomic = ef_nomic.dimension
-        assert dim_nomic == 768, (
-            f"Expected dimension 768 for nomic-embed-text, got {dim_nomic}"
-        )
+        assert dim_nomic == 768, f"Expected dimension 768 for nomic-embed-text, got {dim_nomic}"
         print(f"   nomic-embed-text dimension: {dim_nomic}")
 
         # Test all-minilm (384 dimensions)
         ef_minilm = OllamaEmbeddingFunction(model_name="all-minilm")
         dim_minilm = ef_minilm.dimension
-        assert dim_minilm == 384, (
-            f"Expected dimension 384 for all-minilm, got {dim_minilm}"
-        )
+        assert dim_minilm == 384, f"Expected dimension 384 for all-minilm, got {dim_minilm}"
         print(f"   all-minilm dimension: {dim_minilm}")
 
     def test_dimension_property_unknown_model(self):
@@ -222,9 +208,7 @@ class TestOllamaEmbeddingFunction:
 
     def test_call_single_document(self):
         """Test __call__ with single document"""
-        print(
-            "\n✅ Testing OllamaEmbeddingFunction embedding generation (single document)"
-        )
+        print("\n✅ Testing OllamaEmbeddingFunction embedding generation (single document)")
 
         self.test_ollama_env()
 
@@ -240,9 +224,7 @@ class TestOllamaEmbeddingFunction:
 
     def test_call_multiple_documents(self):
         """Test __call__ with multiple documents"""
-        print(
-            "\n✅ Testing OllamaEmbeddingFunction embedding generation (multiple documents)"
-        )
+        print("\n✅ Testing OllamaEmbeddingFunction embedding generation (multiple documents)")
 
         self.test_ollama_env()
 
@@ -256,11 +238,9 @@ class TestOllamaEmbeddingFunction:
 
         assert isinstance(embeddings, list)
         assert len(embeddings) == len(multiple_docs)
-        for i, emb in enumerate(embeddings):
+        for emb in embeddings:
             assert isinstance(emb, list)
-            assert len(emb) == len(embeddings[0]), (
-                f"All embeddings should have same dimension"
-            )
+            assert len(emb) == len(embeddings[0]), "All embeddings should have same dimension"
         print(f"   Multiple documents embedding dimension: {len(embeddings[0])}")
         print(f"   Number of embeddings: {len(embeddings)}")
 
@@ -346,9 +326,7 @@ class TestOllamaEmbeddingFunction:
         print(f"   Model dimensions: {dimensions}")
 
 
-@pytest.mark.skipif(
-    not is_openai_available(), reason="openai is not available on this system"
-)
+@pytest.mark.skipif(not is_openai_available(), reason="openai is not available on this system")
 class TestOllamaEmbeddingFunctionPersistence:
     """Test persistence for OllamaEmbeddingFunction"""
 
@@ -464,9 +442,7 @@ class TestOllamaEmbeddingFunctionPersistence:
     def test_persistence_roundtrip(self):
         """Test complete roundtrip: get_config -> build_from_config"""
         with env_guard(OLLAMA_API_KEY="ollama"):
-            original_ef = OllamaEmbeddingFunction(
-                model_name="nomic-embed-text", dimensions=256
-            )
+            original_ef = OllamaEmbeddingFunction(model_name="nomic-embed-text", dimensions=256)
 
             config = original_ef.get_config()
             restored_ef = OllamaEmbeddingFunction.build_from_config(config)
