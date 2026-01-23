@@ -496,6 +496,20 @@ class Collection:
         """
         if "_source" in kwargs:
             raise TypeError("Use return_fields= instead of _source=.")
+        if return_fields is not None:
+            if not isinstance(return_fields, list) or not all(
+                isinstance(item, str) for item in return_fields
+            ):
+                raise TypeError("return_fields must be a List[str] or None")
+            normalized = []
+            for item in return_fields:
+                if item == "":
+                    raise ValueError("return_fields items must not be empty strings")
+                if item not in normalized:
+                    normalized.append(item)
+            if not normalized:
+                normalized = ["_id"]
+            return_fields = normalized
 
         # Allow passing builder as first positional argument
         if isinstance(query, HybridSearch):

@@ -262,9 +262,22 @@ class HybridSearch:
         if kwargs:
             unexpected = ", ".join(sorted(kwargs))
             raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
-        self._return_fields = (
-            copy.deepcopy(return_fields) if return_fields is not None else None
-        )
+        if return_fields is not None:
+            if not isinstance(return_fields, list) or not all(
+                isinstance(item, str) for item in return_fields
+            ):
+                raise TypeError("return_fields must be a List[str] or None")
+            normalized = []
+            for item in return_fields:
+                if item == "":
+                    raise ValueError("return_fields items must not be empty strings")
+                if item not in normalized:
+                    normalized.append(item)
+            if not normalized:
+                normalized = ["_id"]
+            self._return_fields = copy.deepcopy(normalized)
+        else:
+            self._return_fields = None
 
         if query:
             self._append_query_payload(query)
@@ -451,7 +464,22 @@ class HybridSearch:
         - This maps to OceanBase GET_SQL search_params `_source`.
         - The SDK does not auto-complete any fields.
         """
-        self._return_fields = copy.deepcopy(fields) if fields is not None else None
+        if fields is None:
+            self._return_fields = None
+            return self
+        if not isinstance(fields, list) or not all(isinstance(item, str) for item in fields):
+            raise TypeError("return_fields must be a List[str] or None")
+
+        normalized = []
+        for item in fields:
+            if item == "":
+                raise ValueError("return_fields items must not be empty strings")
+            if item not in normalized:
+                normalized.append(item)
+        if not normalized:
+            normalized = ["_id"]
+
+        self._return_fields = copy.deepcopy(normalized)
         return self
 
     def select(self, *fields: Any) -> "HybridSearch":
