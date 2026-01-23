@@ -90,7 +90,7 @@ class TestHybridSearchReturnFieldsUnit:
 class TestBuildSearchParmReturnFieldsUnit:
     def test_build_search_parm_does_not_add_source_by_default(self) -> None:
         dummy = _DummyClient()
-        result = BaseClient._build_search_parm(  # type: ignore[misc]
+        result = BaseClient._build_search_parm(
             dummy,
             query=None,
             knn=None,
@@ -101,7 +101,7 @@ class TestBuildSearchParmReturnFieldsUnit:
 
     def test_build_search_parm_maps_return_fields_to_source(self) -> None:
         dummy = _DummyClient()
-        result = BaseClient._build_search_parm(  # type: ignore[misc]
+        result = BaseClient._build_search_parm(
             dummy,
             query=None,
             knn=None,
@@ -115,21 +115,15 @@ class TestBuildSearchParmReturnFieldsUnit:
 class TestBuildSourceFieldsUnit:
     def test_build_source_fields_defaults_to_documents_and_metadatas(self) -> None:
         dummy = _DummyClient()
-        assert BaseClient._build_source_fields(  # type: ignore[misc]
-            dummy, include=None
-        ) == ["_id", "document", "metadata"]
+        assert BaseClient._build_source_fields(dummy, include=None) == ["_id", "document", "metadata"]
 
     def test_build_source_fields_empty_include_is_id_only(self) -> None:
         dummy = _DummyClient()
-        assert BaseClient._build_source_fields(  # type: ignore[misc]
-            dummy, include=[]
-        ) == ["_id"]
+        assert BaseClient._build_source_fields(dummy, include=[]) == ["_id"]
 
     def test_build_source_fields_includes_embedding_only_when_requested(self) -> None:
         dummy = _DummyClient()
-        assert BaseClient._build_source_fields(  # type: ignore[misc]
-            dummy, include=["embeddings"]
-        ) == ["_id", "embedding"]
+        assert BaseClient._build_source_fields(dummy, include=["embeddings"]) == ["_id", "embedding"]
 
 
 class _HybridSearchInferenceClient:
@@ -145,7 +139,7 @@ class _HybridSearchInferenceClient:
         return False
 
     def _build_source_fields(self, include: list[str] | None) -> list[str]:
-        return BaseClient._build_source_fields(self, include)  # type: ignore[misc]
+        return BaseClient._build_source_fields(self, include)
 
     def _build_search_parm(
         self,
@@ -183,7 +177,7 @@ class _HybridSearchInferenceClient:
 class TestHybridSearchReturnFieldsInferenceUnit:
     def test_hybrid_search_infers_return_fields_when_omitted(self) -> None:
         client = _HybridSearchInferenceClient()
-        result = BaseClient._collection_hybrid_search(  # type: ignore[misc]
+        result = BaseClient._collection_hybrid_search(
             client,
             collection_id=None,
             collection_name="test",
@@ -199,7 +193,7 @@ class TestHybridSearchReturnFieldsInferenceUnit:
 
     def test_hybrid_search_does_not_override_explicit_return_fields(self) -> None:
         client = _HybridSearchInferenceClient()
-        result = BaseClient._collection_hybrid_search(  # type: ignore[misc]
+        result = BaseClient._collection_hybrid_search(
             client,
             collection_id=None,
             collection_name="test",
