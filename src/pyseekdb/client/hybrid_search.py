@@ -256,9 +256,7 @@ class HybridSearch:
             unexpected = ", ".join(sorted(kwargs))
             raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
         if return_fields is not None:
-            if not isinstance(return_fields, list) or not all(
-                isinstance(item, str) for item in return_fields
-            ):
+            if not isinstance(return_fields, list) or not all(isinstance(item, str) for item in return_fields):
                 raise TypeError("return_fields must be a List[str] or None")
             normalized = []
             for item in return_fields:
@@ -432,7 +430,7 @@ class HybridSearch:
         self._n_results = n_results
         return self
 
-    def return_fields(self, fields: list[str] | None) -> "HybridSearch":
+    def return_fields(self, fields: list[str] | None) -> HybridSearch:
         """
         Configure OceanBase GET_SQL return fields allowlist.
 
