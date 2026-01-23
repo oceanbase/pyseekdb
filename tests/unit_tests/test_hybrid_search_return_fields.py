@@ -4,18 +4,19 @@ Unit tests for HybridSearch/Collection return_fields API surface and internal ma
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+from pyseekdb.client.client_base import BaseClient
+from pyseekdb.client.collection import Collection
+from pyseekdb.client.hybrid_search import HybridSearch
 
 # Ensure local src/ is on sys.path so we import the in-repo pyseekdb,
 # not an already-installed version in the virtualenv.
 project_root = Path(__file__).parent.parent.parent
 src_root = project_root / "src"
 sys.path.insert(0, str(src_root))
-
-from pyseekdb.client.client_base import BaseClient  # noqa: E402
-from pyseekdb.client.collection import Collection  # noqa: E402
-from pyseekdb.client.hybrid_search import HybridSearch  # noqa: E402
 
 
 class _CapturingClient:
@@ -24,7 +25,7 @@ class _CapturingClient:
     def __init__(self) -> None:
         self.captured = None
 
-    def _collection_hybrid_search(self, **kwargs):  # type: ignore[no-untyped-def]
+    def _collection_hybrid_search(self, **kwargs: Any) -> dict[str, Any]:
         self.captured = kwargs
         return {"captured": kwargs}
 
@@ -137,45 +138,45 @@ class _HybridSearchInferenceClient:
     def __init__(self) -> None:
         self.captured_return_fields = None
 
-    def _ensure_connection(self):  # type: ignore[no-untyped-def]
+    def _ensure_connection(self) -> None:
         return None
 
     def _use_context_manager_for_cursor(self) -> bool:
         return False
 
-    def _build_source_fields(self, _include):  # type: ignore[no-untyped-def]
-        return BaseClient._build_source_fields(self, _include)  # type: ignore[misc]
+    def _build_source_fields(self, include: list[str] | None) -> list[str]:
+        return BaseClient._build_source_fields(self, include)  # type: ignore[misc]
 
-    def _build_search_parm(  # type: ignore[no-untyped-def]
+    def _build_search_parm(
         self,
-        _query,
-        _knn,
-        _rank,
-        _n_results,
-        _return_fields=None,
-        _dimension=None,
-        **kwargs,
-    ):
-        self.captured_return_fields = _return_fields
-        return BaseClient._build_search_parm(  # type: ignore[misc]
+        query: dict[str, Any] | None,
+        knn: dict[str, Any] | list[dict[str, Any]] | None,
+        rank: dict[str, Any] | None,
+        n_results: int,
+        return_fields: list[str] | None = None,
+        dimension: int | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        self.captured_return_fields = return_fields
+        return BaseClient._build_search_parm(
             self,
-            query=_query,
-            knn=_knn,
-            rank=_rank,
-            n_results=_n_results,
-            return_fields=_return_fields,
-            dimension=_dimension,
+            query=query,
+            knn=knn,
+            rank=rank,
+            n_results=n_results,
+            return_fields=return_fields,
+            dimension=dimension,
             **kwargs,
         )
 
-    def _execute_query_with_cursor(  # type: ignore[no-untyped-def]
-        self, _conn, sql, _params, _use_context_manager=True
-    ):
+    def _execute_query_with_cursor(
+        self, _conn: Any, sql: str, _params: Any, _use_context_manager: bool = True
+    ) -> list[dict[str, Any]]:
         if isinstance(sql, str) and sql.strip().upper().startswith("SELECT DBMS_HYBRID_SEARCH.GET_SQL"):
             return [{"query_sql": "SELECT 1"}]
         return []
 
-    def _transform_sql_result(self, _result_rows, _include):  # type: ignore[no-untyped-def]
+    def _transform_sql_result(self, _result_rows: list[dict[str, Any]], _include: list[str] | None) -> dict[str, Any]:
         return {"captured_return_fields": self.captured_return_fields}
 
 
