@@ -143,30 +143,39 @@ class _HybridSearchInferenceClient:
     def _use_context_manager_for_cursor(self) -> bool:
         return False
 
-    def _build_source_fields(self, include):  # type: ignore[no-untyped-def]
-        return BaseClient._build_source_fields(self, include)  # type: ignore[misc]
+    def _build_source_fields(self, _include):  # type: ignore[no-untyped-def]
+        return BaseClient._build_source_fields(self, _include)  # type: ignore[misc]
 
     def _build_search_parm(  # type: ignore[no-untyped-def]
-        self, query, knn, rank, n_results, return_fields=None, dimension=None, **kwargs
+        self,
+        _query,
+        _knn,
+        _rank,
+        _n_results,
+        _return_fields=None,
+        _dimension=None,
+        **kwargs,
     ):
-        self.captured_return_fields = return_fields
+        self.captured_return_fields = _return_fields
         return BaseClient._build_search_parm(  # type: ignore[misc]
             self,
-            query=query,
-            knn=knn,
-            rank=rank,
-            n_results=n_results,
-            return_fields=return_fields,
-            dimension=dimension,
+            query=_query,
+            knn=_knn,
+            rank=_rank,
+            n_results=_n_results,
+            return_fields=_return_fields,
+            dimension=_dimension,
             **kwargs,
         )
 
-    def _execute_query_with_cursor(self, conn, sql, params, use_context_manager=True):  # type: ignore[no-untyped-def]
+    def _execute_query_with_cursor(  # type: ignore[no-untyped-def]
+        self, _conn, sql, _params, _use_context_manager=True
+    ):
         if isinstance(sql, str) and sql.strip().upper().startswith("SELECT DBMS_HYBRID_SEARCH.GET_SQL"):
             return [{"query_sql": "SELECT 1"}]
         return []
 
-    def _transform_sql_result(self, result_rows, include):  # type: ignore[no-untyped-def]
+    def _transform_sql_result(self, _result_rows, _include):  # type: ignore[no-untyped-def]
         return {"captured_return_fields": self.captured_return_fields}
 
 
