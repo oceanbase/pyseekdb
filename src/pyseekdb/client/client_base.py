@@ -2475,14 +2475,9 @@ class BaseClient(BaseConnection, AdminAPI):
         knn: dict[str, Any] | None = None,
         rank: dict[str, Any] | None = None,
         n_results: int = 10,
-<<<<<<< HEAD
-        include: Optional[List[str]] = None,
-        return_fields: Optional[List[str]] = None,
-        dimension: Optional[int] = None,
-=======
         include: list[str] | None = None,
         dimension: int | None = None,
->>>>>>> origin/develop
+        return_fields: list[str] | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -2537,7 +2532,6 @@ class BaseClient(BaseConnection, AdminAPI):
             table_name = CollectionNames.table_name(collection_name)
 
         # Build search_parm JSON
-<<<<<<< HEAD
         search_parm = self._build_search_parm(
             query,
             knn,
@@ -2547,9 +2541,6 @@ class BaseClient(BaseConnection, AdminAPI):
             dimension=dimension,
             **kwargs,
         )
-=======
-        search_parm = self._build_search_parm(query, knn, rank, n_results, dimension=dimension, **kwargs)
->>>>>>> origin/develop
 
         # Convert search_parm to JSON string
         search_parm_json = json.dumps(search_parm, ensure_ascii=False)
@@ -2602,12 +2593,8 @@ class BaseClient(BaseConnection, AdminAPI):
         knn: dict[str, Any] | list[dict[str, Any]] | None,
         rank: dict[str, Any] | None,
         n_results: int,
-<<<<<<< HEAD
-        return_fields: Optional[List[str]] = None,
-        dimension: Optional[int] = None,
-=======
+        return_fields: list[str] | None = None,
         dimension: int | None = None,
->>>>>>> origin/develop
         **kwargs,
     ) -> dict[str, Any]:
         """

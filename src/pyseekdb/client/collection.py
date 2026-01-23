@@ -434,14 +434,9 @@ class Collection:
         knn: dict[str, Any] | None = None,
         rank: dict[str, Any] | None = None,
         n_results: int = 10,
-<<<<<<< HEAD
         include: Optional[List[str]] = None,
         search: Optional[HybridSearch] = None,
         return_fields: Optional[List[str]] = None,
-=======
-        include: list[str] | None = None,
-        search: HybridSearch | None = None,
->>>>>>> origin/develop
         **kwargs,
     ) -> dict[str, Any]:
         """
