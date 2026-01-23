@@ -236,6 +236,7 @@ class HybridSearch:
             .query(DOCUMENT.contains("machine learning"), K("category") == "AI", n_results=10, boost=0.5)
             .knn(TEXT("AI research"), K("year") > 2020, n_results=10, boost=0.6)
             .limit(5)
+            .source(["document", "metadata", "_keyword_score", "_semantic_score"])
             .select(IDS, DOCUMENTS, METADATAS, EMBEDDINGS, SCORES)
         )
     """
@@ -248,12 +249,14 @@ class HybridSearch:
         n_results: Optional[int] = None,
         nresult: Optional[int] = None,
         include: Optional[List[str]] = None,
+        _source: Optional[List[str]] = None,
     ):
         self._queries: List[Dict[str, Any]] = []
         self._knns: List[Dict[str, Any]] = []
         self._rank = copy.deepcopy(rank) if rank else None
         self._n_results = n_results if n_results is not None else nresult
         self._include = copy.deepcopy(include) if include is not None else None
+        self._source = copy.deepcopy(_source) if _source is not None else None
 
         if query:
             self._append_query_payload(query)
@@ -431,6 +434,17 @@ class HybridSearch:
         self._n_results = n_results
         return self
 
+    def source(self, fields: Optional[List[str]]) -> "HybridSearch":
+        """
+        Configure OceanBase GET_SQL `_source` field allowlist.
+
+        Notes:
+        - Only list (allowlist) form is supported; no includes/excludes mapping.
+        - The SDK does not auto-complete any fields.
+        """
+        self._source = copy.deepcopy(fields) if fields is not None else None
+        return self
+
     def select(self, *fields: Any) -> "HybridSearch":
         include: List[str] = []
         for field in fields:
@@ -474,6 +488,7 @@ class HybridSearch:
             "include": copy.deepcopy(self._include)
             if self._include is not None
             else None,
+            "_source": copy.deepcopy(self._source) if self._source is not None else None,
         }
 
     @staticmethod

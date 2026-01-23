@@ -435,6 +435,7 @@ class Collection:
         n_results: int = 10,
         include: Optional[List[str]] = None,
         search: Optional[HybridSearch] = None,
+        _source: Optional[List[str]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -457,7 +458,10 @@ class Collection:
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
             search: HybridSearch builder instance (optional). If provided, takes precedence
                 over query/knn/rank/include/n_results arguments.
-            **kwargs: Additional parameters
+            _source: Optional list of returned column names (field allowlist) for OceanBase
+                GET_SQL search_params. The SDK does not auto-complete any fields. When using
+                HybridSearch builder, you can also set it via `HybridSearch.source([...])`.
+            **kwargs: Additional parameters.
 
         Returns:
             Dict with keys (query-compatible format):
@@ -504,6 +508,10 @@ class Collection:
                 n_results = params["n_results"]
             if params.get("include") is not None:
                 include = params["include"]
+            if params.get("_source") is not None:
+                if _source is not None:
+                    raise ValueError("Do not mix HybridSearch.source() with _source=.")
+                _source = params["_source"]
 
         # When no query/knn provided, return only ids/distances by default
         if include is None and not query and not knn:
@@ -517,6 +525,7 @@ class Collection:
             rank=rank,
             n_results=n_results,
             include=include,
+            _source=_source,
             embedding_function=self._embedding_function,
             dimension=self._dimension,
             **kwargs,

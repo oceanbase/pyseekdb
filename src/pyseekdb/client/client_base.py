@@ -2332,6 +2332,7 @@ class BaseClient(BaseConnection, AdminAPI):
         rank: Optional[Dict[str, Any]] = None,
         n_results: int = 10,
         include: Optional[List[str]] = None,
+        _source: Optional[List[str]] = None,
         dimension: Optional[int] = None,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -2360,6 +2361,8 @@ class BaseClient(BaseConnection, AdminAPI):
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (optional)
+            _source: Optional list of returned column names (field allowlist) for OceanBase
+                GET_SQL search_params. The SDK does not auto-complete any fields.
             dimension: Collection vector dimension for validating query_embeddings (optional)
             **kwargs: Additional parameters, including:
                 embedding_function: EmbeddingFunction instance to convert query_texts in knn to embeddings.
@@ -2385,7 +2388,13 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Build search_parm JSON
         search_parm = self._build_search_parm(
-            query, knn, rank, n_results, dimension=dimension, **kwargs
+            query,
+            knn,
+            rank,
+            n_results,
+            _source=_source,
+            dimension=dimension,
+            **kwargs,
         )
 
         # Convert search_parm to JSON string
@@ -2443,6 +2452,7 @@ class BaseClient(BaseConnection, AdminAPI):
         knn: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]],
         rank: Optional[Dict[str, Any]],
         n_results: int,
+        _source: Optional[List[str]] = None,
         dimension: Optional[int] = None,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -2454,6 +2464,8 @@ class BaseClient(BaseConnection, AdminAPI):
             knn: Vector search configuration dict or list of dicts
             rank: Ranking configuration dict
             n_results: Final number of results to return
+            _source: Optional list of returned column names (field allowlist) for OceanBase
+                GET_SQL search_params. The SDK does not auto-complete any fields.
             dimension: Collection dimension for validating query_embeddings (optional)
             **kwargs: Additional parameters, including:
                 embedding_function: EmbeddingFunction instance to convert query_texts in knn to embeddings.
@@ -2503,6 +2515,9 @@ class BaseClient(BaseConnection, AdminAPI):
         # Build rank part
         if rank:
             search_parm["rank"] = rank
+
+        if _source is not None:
+            search_parm["_source"] = _source
 
         return search_parm
 
