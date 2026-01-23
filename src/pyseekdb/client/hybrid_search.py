@@ -219,6 +219,22 @@ def _combine_filters(base: dict[str, Any] | None, extras: list[dict[str, Any]]) 
     return {"$and": filters}
 
 
+def _normalize_return_fields(return_fields: list[str] | None) -> list[str] | None:
+    if return_fields is None:
+        return None
+    if not isinstance(return_fields, list) or not all(isinstance(item, str) for item in return_fields):
+        raise TypeError("return_fields must be a List[str] or None")
+    normalized: list[str] = []
+    for item in return_fields:
+        if item == "":
+            raise ValueError("return_fields items must not be empty strings")
+        if item not in normalized:
+            normalized.append(item)
+    if not normalized:
+        normalized = ["_id"]
+    return normalized
+
+
 class HybridSearch:
     """
     Fluent builder for collection.hybrid_search().
@@ -255,20 +271,7 @@ class HybridSearch:
         if kwargs:
             unexpected = ", ".join(sorted(kwargs))
             raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
-        if return_fields is not None:
-            if not isinstance(return_fields, list) or not all(isinstance(item, str) for item in return_fields):
-                raise TypeError("return_fields must be a List[str] or None")
-            normalized = []
-            for item in return_fields:
-                if item == "":
-                    raise ValueError("return_fields items must not be empty strings")
-                if item not in normalized:
-                    normalized.append(item)
-            if not normalized:
-                normalized = ["_id"]
-            self._return_fields = copy.deepcopy(normalized)
-        else:
-            self._return_fields = None
+        self._return_fields = copy.deepcopy(_normalize_return_fields(return_fields))
 
         if query:
             self._append_query_payload(query)
@@ -440,22 +443,7 @@ class HybridSearch:
         - If omitted, the SDK may infer a minimal allowlist from `include` to avoid fetching large
           unused columns (e.g. `embedding`).
         """
-        if fields is None:
-            self._return_fields = None
-            return self
-        if not isinstance(fields, list) or not all(isinstance(item, str) for item in fields):
-            raise TypeError("return_fields must be a List[str] or None")
-
-        normalized = []
-        for item in fields:
-            if item == "":
-                raise ValueError("return_fields items must not be empty strings")
-            if item not in normalized:
-                normalized.append(item)
-        if not normalized:
-            normalized = ["_id"]
-
-        self._return_fields = copy.deepcopy(normalized)
+        self._return_fields = copy.deepcopy(_normalize_return_fields(fields))
         return self
 
     def select(self, *fields: Any) -> HybridSearch:
