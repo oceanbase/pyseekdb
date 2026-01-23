@@ -836,7 +836,6 @@ results = collection.hybrid_search(
     rank={"rrf": {"rank_window_size": 60, "rank_constant": 60}},
     n_results=5,
     include=["documents", "metadatas", "embeddings"],
-    return_fields=["_id", "document", "metadata", "embedding"],
 )
 
 # Vector-only search using explicit embeddings (dimension is validated)
@@ -844,7 +843,6 @@ results = collection.hybrid_search(
     knn={"query_embeddings": [[0.1, 0.2, 0.3]], "n_results": 8},
     n_results=5,
     include=["documents", "metadatas"],
-    return_fields=["_id", "document", "metadata"],
 )
 
 # Pass a HybridSearch builder (takes precedence over other args)
@@ -863,7 +861,6 @@ search = (
     .query(DOCUMENT.contains("machine learning"), K("category") == "AI", boost=0.6)
     .knn(TEXT("AI research"), K("year") >= 2020, n_results=10, boost=0.8)
     .limit(5)
-    .return_fields(["_id", "document", "metadata", "embedding"])
     .select(DOCUMENTS, METADATAS, EMBEDDINGS)
     .rank({"rrf": {}})
 )
