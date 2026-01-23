@@ -639,7 +639,7 @@ class EmbeddingFunctionRegistry:
                 QwenEmbeddingFunction,
                 SentenceTransformerEmbeddingFunction,
                 SiliconflowEmbeddingFunction,
-                TengxunHunyuanEmbeddingFunction,
+                TencentHunyuanEmbeddingFunction,
                 VoyageaiEmbeddingFunction,
             )
 
@@ -647,7 +647,7 @@ class EmbeddingFunctionRegistry:
             cls._registry["openai"] = OpenAIEmbeddingFunction
             cls._registry["qwen"] = QwenEmbeddingFunction
             cls._registry["siliconflow"] = SiliconflowEmbeddingFunction
-            cls._registry["tengxun_hunyuan"] = TengxunHunyuanEmbeddingFunction
+            cls._registry["tencent_hunyuan"] = TencentHunyuanEmbeddingFunction
             cls._registry["ollama"] = OllamaEmbeddingFunction
             cls._registry["voyageai"] = VoyageaiEmbeddingFunction
             cls._registry["google_vertex"] = GoogleVertexEmbeddingFunction

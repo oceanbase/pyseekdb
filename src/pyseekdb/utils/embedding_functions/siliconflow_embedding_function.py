@@ -77,16 +77,7 @@ class SiliconflowEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         Args:
             model_name (str, optional): Name of the SiliconFlow embedding model.
                 Defaults to "BAAI/bge-large-zh-v1.5".
-                Common options include:
-                - "BAAI/bge-large-zh-v1.5" (1024 dimensions, 512 token limit)
-                - "BAAI/bge-large-en-v1.5" (1024 dimensions, 512 token limit)
-                - "BAAI/bge-m3" (1024 dimensions, 8192 token limit)
-                - "Pro/BAAI/bge-m3" (1024 dimensions, 8192 token limit)
-                - "Qwen/Qwen3-Embedding-8B" (4096 dimensions by default, 32768 token limit, supports variable dimensions)
-                - "Qwen/Qwen3-Embedding-4B" (2560 dimensions by default, 32768 token limit, supports variable dimensions)
-                - "Qwen/Qwen3-Embedding-0.6B" (1024 dimensions by default, 32768 token limit, supports variable dimensions)
-                - "netease-youdao/bce-embedding-base_v1" (768 dimensions, 512 token limit)
-                - See SiliconFlow documentation for available models
+                See SiliconFlow documentation for available models: https://docs.siliconflow.cn/en/api-reference/embeddings/create-embeddings
             api_key_env (str, optional): Name of the environment variable containing the SiliconFlow API key.
                 Defaults to "SILICONFLOW_API_KEY" if not provided.
             api_base (str, optional): Base URL for the SiliconFlow API endpoint.

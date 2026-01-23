@@ -89,14 +89,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         Args:
             model_name (str, optional): Name of the Voyage AI embedding model.
                 Defaults to "voyage-4-large".
-                Recommended options:
-                - "voyage-4-large" (1024 dimensions by default, supports 256, 512, 1024, 2048)
-                - "voyage-4" (1024 dimensions by default, supports 256, 512, 1024, 2048)
-                - "voyage-4-lite" (1024 dimensions by default, supports 256, 512, 1024, 2048)
-                - "voyage-code-3" (1024 dimensions by default, supports 256, 512, 1024, 2048)
-                - "voyage-finance-2" (1024 dimensions)
-                - "voyage-law-2" (1024 dimensions)
-                - See Voyage AI documentation for all available models
+                See Voyage AI documentation for all available models
             api_key_env (str, optional): Name of the environment variable containing the Voyage AI API key.
                 Defaults to "VOYAGE_API_KEY" if not provided.
             input_type (str, optional): Type of the input text. Options: None, "query", "document".
@@ -222,7 +215,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
             raise ValueError(f"Expected {len(documents)} embeddings but got {len(embeddings)} from API")
 
         # Convert to list of lists (in case voyageai returns numpy arrays or other formats)
-        return [list(emb) if not isinstance(emb, list) else emb for emb in embeddings]
+        return embeddings
 
     @staticmethod
     def name() -> str:

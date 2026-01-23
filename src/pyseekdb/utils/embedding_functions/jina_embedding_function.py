@@ -82,23 +82,8 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
 
         Args:
             model_name (str, optional): Name of the Jina AI embedding model.
-                Defaults to "jina-embeddings-v2-base-en".
-                Available options:
-                - "jina-embeddings-v3"
-                - "jina-embeddings-v4"
-                - "jina-embeddings-v2-base-en"
-                - "jina-embeddings-v2-base-zh"
-                - "jina-embeddings-v2-base-es"
-                - "jina-embeddings-v2-base-de"
-                - "jina-embeddings-v2-base-code"
-                - "jina-embeddings-v2-base-multilingual"
-                - "jina-embeddings-v2-small-en"
-                - "jina-embeddings-v2-small-zh"
-                - "jina-embeddings-v2-small-es"
-                - "jina-embeddings-v2-small-de"
-                - "jina-embeddings-v2-small-code"
-                - "jina-embeddings-v2-small-multilingual"
-                - See Jina AI documentation for all available models: https://jina.ai/embeddings
+                Defaults to "jina-embeddings-v3".
+                See Jina AI documentation for all available models: https://jina.ai/embeddings
             api_key_env (str, optional): Name of the environment variable containing the Jina AI API key.
                 Defaults to "JINA_AI_API_KEY" if not provided.
             **kwargs: Additional arguments to pass to LiteLLM.

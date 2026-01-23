@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from pyseekdb.utils.embedding_functions.litellm_base_embedding_function import (
@@ -83,17 +84,7 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         Args:
             model_name (str, optional): Name of the Cohere embedding model.
                 Defaults to "embed-english-v3.0".
-                Available options:
-                - "embed-v4.0" (1536 dimensions)
-                - "embed-english-v3.0" (1024 dimensions)
-                - "embed-multilingual-v3.0" (1024 dimensions)
-                - "embed-english-light-v3.0" (384 dimensions)
-                - "embed-multilingual-light-v3.0" (384 dimensions)
-                - "embed-english-v2.0" (4096 dimensions)
-                - "embed-multilingual-v2.0" (768 dimensions)
-                - "embed-english-light-v2.0" (1024 dimensions)
-                - "embed-multilingual-light-v2.0" (384 dimensions)
-                - See Cohere documentation for all available models: https://docs.cohere.com/docs/cohere-embed
+                See Cohere documentation for available models: https://docs.cohere.com/docs/cohere-embed
             api_key_env (str, optional): Name of the environment variable containing the Cohere API key.
                 Defaults to "COHERE_API_KEY" if not provided.
             input_type (str, optional): Type of the input text. Options: None, "search_document", "search_query".
@@ -115,6 +106,10 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
         if api_key_env is None:
             api_key_env = "COHERE_API_KEY"
 
+        if not os.environ.get(api_key_env):
+            raise ValueError(
+                f"API key environment variable '{api_key_env}' is not set. Please set it before using {self.__class__.__name__}."
+            )
         # Prepare kwargs for LiteLLM
         litellm_kwargs = {**kwargs}
 

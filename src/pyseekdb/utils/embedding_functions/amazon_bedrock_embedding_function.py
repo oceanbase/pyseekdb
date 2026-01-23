@@ -92,12 +92,7 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
                 region_name and profile_name will be extracted from the session for config storage.
             model_name (str, optional): Name of the Amazon Bedrock embedding model.
                 Defaults to "amazon.titan-embed-text-v2".
-                Available options:
-                - "amazon.titan-embed-text-v1" (1536 dimensions)
-                - "amazon.titan-embed-text-v2" (1024 dimensions)
-                - "amazon.titan-embed-g1-text-02" (1024 dimensions)
-                - "amazon.titan-embed-text-v2:0" (1024 dimensions)
-                - See Amazon Bedrock documentation for all available models
+                See Amazon Bedrock documentation for all available models
             **kwargs: Additional arguments passed to boto3.client().
                 Common options include:
                 - endpoint_url: Custom endpoint URL (for testing or custom deployments)

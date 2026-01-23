@@ -168,7 +168,7 @@ class LiteLLMBaseEmbeddingFunction(EmbeddingFunction[Documents]):
             raise ValueError(f"Unexpected response format from LiteLLM: {type(response)}")
 
         # Validate that we got the expected number of embeddings
-        if len(embeddings) != len(input):
-            raise ValueError(f"Expected {len(input)} embeddings but got {len(embeddings)} from LiteLLM")
+        if len(embeddings) != len(documents):
+            raise ValueError(f"Expected {len(documents)} embeddings but got {len(embeddings)} from LiteLLM")
 
         return embeddings

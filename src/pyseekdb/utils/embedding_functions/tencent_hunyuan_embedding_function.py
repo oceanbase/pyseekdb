@@ -9,12 +9,12 @@ from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
 # Source: https://cloud.tencent.com/document/product/1729/111007
 # Note: The embedding interface currently only supports input and model parameters.
 # Model is fixed as hunyuan-embedding, dimensions is fixed at 1024.
-_TENGXUN_HUNYUAN_MODEL_DIMENSIONS = {
+_TENCENT_HUNYUAN_MODEL_DIMENSIONS = {
     "hunyuan-embedding": 1024,
 }
 
 
-class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
+class TencentHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     """
     A convenient embedding function for Tencent Hunyuan embedding models.
 
@@ -31,14 +31,14 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
 
     .. code-block:: python
         import pyseekdb
-        from pyseekdb.utils.embedding_functions import TengxunHunyuanEmbeddingFunction
+        from pyseekdb.utils.embedding_functions import TencentHunyuanEmbeddingFunction
 
         # Using Tencent Hunyuan embedding model
         # Set HUNYUAN_API_KEY environment variable first
-        ef = TengxunHunyuanEmbeddingFunction()
+        ef = TencentHunyuanEmbeddingFunction()
 
         # Using with custom api_key_env and additional parameters
-        ef = TengxunHunyuanEmbeddingFunction(
+        ef = TencentHunyuanEmbeddingFunction(
             api_key_env="HUNYUAN_API_KEY",
             timeout=30
         )
@@ -61,7 +61,7 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         dimensions: int | None = None,
         **kwargs: Any,
     ):
-        """Initialize TengxunHunyuanEmbeddingFunction.
+        """Initialize TencentHunyuanEmbeddingFunction.
 
         Args:
             model_name (str, optional): Name of the Tencent Hunyuan embedding model.
@@ -86,7 +86,6 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
                 UserWarning,
                 stacklevel=2,
             )
-            dimensions = None
 
         # Warn if model_name is not the default
         if model_name != "hunyuan-embedding":
@@ -127,7 +126,7 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         Returns:
             dict[str, int]: Dictionary mapping model names to dimensions
         """
-        return _TENGXUN_HUNYUAN_MODEL_DIMENSIONS
+        return _TENCENT_HUNYUAN_MODEL_DIMENSIONS
 
     @property
     def dimension(self) -> int:
@@ -142,15 +141,15 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
 
     @staticmethod
     def name() -> str:
-        """Get the unique name identifier for TengxunHunyuanEmbeddingFunction.
+        """Get the unique name identifier for TencentHunyuanEmbeddingFunction.
 
         Returns:
             The name identifier for this embedding function type
         """
-        return "tengxun_hunyuan"
+        return "tencent_hunyuan"
 
     def get_config(self) -> dict[str, Any]:
-        """Get the configuration dictionary for the TengxunHunyuanEmbeddingFunction.
+        """Get the configuration dictionary for the TencentHunyuanEmbeddingFunction.
 
         Returns:
             Dictionary containing configuration needed to restore this embedding function
@@ -158,14 +157,14 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         return super().get_config()
 
     @staticmethod
-    def build_from_config(config: dict[str, Any]) -> "TengxunHunyuanEmbeddingFunction":
-        """Build a TengxunHunyuanEmbeddingFunction from its configuration dictionary.
+    def build_from_config(config: dict[str, Any]) -> "TencentHunyuanEmbeddingFunction":
+        """Build a TencentHunyuanEmbeddingFunction from its configuration dictionary.
 
         Args:
             config: Dictionary containing the embedding function's configuration
 
         Returns:
-            Restored TengxunHunyuanEmbeddingFunction instance
+            Restored TencentHunyuanEmbeddingFunction instance
 
         Raises:
             ValueError: If the configuration is invalid or missing required fields
@@ -181,7 +180,7 @@ class TengxunHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         if not isinstance(client_kwargs, dict):
             raise TypeError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
 
-        return TengxunHunyuanEmbeddingFunction(
+        return TencentHunyuanEmbeddingFunction(
             model_name=model_name,
             api_key_env=api_key_env,
             api_base=api_base,
