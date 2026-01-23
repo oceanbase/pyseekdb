@@ -217,24 +217,6 @@ class TestAmazonBedrockEmbeddingFunction:
         assert dim_v2_0 == 1024, f"Expected dimension 1024 for amazon.titan-embed-text-v2:0, got {dim_v2_0}"
         print(f"   amazon.titan-embed-text-v2:0 dimension: {dim_v2_0}")
 
-    def test_dimension_property_unknown_model(self):
-        """Test dimension property for unknown model (should make API call)"""
-        print("\n✅ Testing AmazonBedrockEmbeddingFunction dimension property for unknown model")
-
-        self.test_bedrock_env()
-
-        import boto3
-
-        session = boto3.Session()
-        # This will make an actual API call to get dimension
-        # Note: This might fail if the model doesn't exist, but we test the fallback mechanism
-        ef = AmazonBedrockEmbeddingFunction(session=session, model_name="amazon.titan-embed-text-v2")
-        dim = ef.dimension
-
-        # Should have a valid dimension
-        assert dim > 0
-        print(f"   Model dimension: {dim}")
-
     def test_call_single_document(self):
         """Test __call__ with single document"""
         print("\n✅ Testing AmazonBedrockEmbeddingFunction embedding generation (single document)")

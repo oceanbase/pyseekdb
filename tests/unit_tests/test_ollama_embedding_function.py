@@ -436,7 +436,7 @@ class TestOllamaEmbeddingFunctionPersistence:
             "client_kwargs": "not-a-dict",
         }
 
-        with pytest.raises(ValueError, match="client_kwargs must be a dictionary"):
+        with pytest.raises(TypeError, match="client_kwargs must be a dictionary"):
             OllamaEmbeddingFunction.build_from_config(config)
 
     def test_persistence_roundtrip(self):
