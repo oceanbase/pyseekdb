@@ -8,9 +8,9 @@ Design Pattern:
 4. User-facing interface is completely consistent
 """
 
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from .hybrid_search import HybridSearch
+from .hybrid_search import HybridSearch, _normalize_return_fields
 
 if TYPE_CHECKING:
     from .embedding_function import Documents as EmbeddingDocuments
@@ -434,9 +434,9 @@ class Collection:
         knn: dict[str, Any] | None = None,
         rank: dict[str, Any] | None = None,
         n_results: int = 10,
-        include: Optional[List[str]] = None,
-        search: Optional[HybridSearch] = None,
-        return_fields: Optional[List[str]] = None,
+        include: list[str] | None = None,
+        search: HybridSearch | None = None,
+        return_fields: list[str] | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -498,42 +498,19 @@ class Collection:
         """
         if "_source" in kwargs:
             raise TypeError("Use return_fields= instead of _source=.")
-        if return_fields is not None:
-            if not isinstance(return_fields, list) or not all(
-                isinstance(item, str) for item in return_fields
-            ):
-                raise TypeError("return_fields must be a List[str] or None")
-            normalized = []
-            for item in return_fields:
-                if item == "":
-                    raise ValueError("return_fields items must not be empty strings")
-                if item not in normalized:
-                    normalized.append(item)
-            if not normalized:
-                normalized = ["_id"]
-            return_fields = normalized
+
+        return_fields = _normalize_return_fields(return_fields)
 
         # Allow passing builder as first positional argument
-        if isinstance(query, HybridSearch):
-            search = query
-            query = None
-
-        if isinstance(search, HybridSearch):
-            params = search.to_params(dimension=self._dimension)
-            query = params.get("query")
-            knn = params.get("knn")
-            rank = params.get("rank")
-            if params.get("n_results") is not None:
-                n_results = params["n_results"]
-            if params.get("include") is not None:
-                include = params["include"]
-            builder_return_fields = params.get("return_fields")
-            if builder_return_fields is not None:
-                if return_fields is not None:
-                    raise ValueError(
-                        "Do not mix HybridSearch.return_fields() with return_fields=."
-                    )
-                return_fields = builder_return_fields
+        query, knn, rank, n_results, include, return_fields = self._apply_hybrid_search_builder(
+            query=query,
+            knn=knn,
+            rank=rank,
+            n_results=n_results,
+            include=include,
+            search=search,
+            return_fields=return_fields,
+        )
 
         # When no query/knn provided, return only ids/distances by default
         if include is None and not query and not knn:
@@ -552,6 +529,46 @@ class Collection:
             dimension=self._dimension,
             **kwargs,
         )
+
+    def _apply_hybrid_search_builder(
+        self,
+        query: dict[str, Any] | HybridSearch | None,
+        knn: dict[str, Any] | None,
+        rank: dict[str, Any] | None,
+        n_results: int,
+        include: list[str] | None,
+        search: HybridSearch | None,
+        return_fields: list[str] | None,
+    ) -> tuple[
+        dict[str, Any] | None,
+        dict[str, Any] | None,
+        dict[str, Any] | None,
+        int,
+        list[str] | None,
+        list[str] | None,
+    ]:
+        if isinstance(query, HybridSearch):
+            search = query
+            query = None
+
+        if not isinstance(search, HybridSearch):
+            return query, knn, rank, n_results, include, return_fields
+
+        params = search.to_params(dimension=self._dimension)
+        query = params.get("query")
+        knn = params.get("knn")
+        rank = params.get("rank")
+        if params.get("n_results") is not None:
+            n_results = params["n_results"]
+        if params.get("include") is not None:
+            include = params["include"]
+        builder_return_fields = params.get("return_fields")
+        if builder_return_fields is not None:
+            if return_fields is not None:
+                raise ValueError("Do not mix HybridSearch.return_fields() with return_fields=.")
+            return_fields = builder_return_fields
+
+        return query, knn, rank, n_results, include, return_fields
 
     # ==================== Collection Info ====================
 

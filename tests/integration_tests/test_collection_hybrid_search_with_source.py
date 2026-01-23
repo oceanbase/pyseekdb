@@ -9,7 +9,6 @@ These tests require a running OceanBase/MySQL-compatible endpoint that supports
 import json
 import time
 import uuid
-from typing import List
 
 import pytest
 from pymysql.converters import escape_string
@@ -26,12 +25,10 @@ class TestCollectionHybridSearchSourceRealDB:
 
     def _create_test_collection(self, client, collection_name: str, dimension: int = 3):
         config = HNSWConfiguration(dimension=dimension, distance="l2")
-        collection = client.create_collection(
-            name=collection_name, configuration=config, embedding_function=None
-        )
+        collection = client.create_collection(name=collection_name, configuration=config, embedding_function=None)
         return collection, collection.dimension
 
-    def _generate_query_vector(self, dimension: int) -> List[float]:
+    def _generate_query_vector(self, dimension: int) -> list[float]:
         base = [1.0, 2.0, 3.0]
         if dimension <= len(base):
             return base[:dimension]
@@ -72,7 +69,7 @@ class TestCollectionHybridSearchSourceRealDB:
             document_str = document.replace("'", "\\'")
 
             sql = (
-                f"INSERT INTO `{table_name}` (_id, document, embedding, metadata) "
+                f"INSERT INTO `{table_name}` (_id, document, embedding, metadata) "  # noqa: S608
                 f"VALUES (CAST('{record_id_escaped}' AS BINARY), "
                 f"'{document_str}', '{vector_str}', '{metadata_str}')"
             )
@@ -83,9 +80,7 @@ class TestCollectionHybridSearchSourceRealDB:
     def _get_sql_query(self, client, table_name: str, search_parm: dict) -> str:
         search_parm_json = json.dumps(search_parm, ensure_ascii=False)
         client._server._execute(f"SET @search_parm = '{escape_string(search_parm_json)}'")
-        get_sql_query = (
-            f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"
-        )
+        get_sql_query = f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"  # noqa: S608
         rows = client._server._execute(get_sql_query)
         assert rows and rows[0].get("query_sql")
         query_sql = rows[0]["query_sql"]
@@ -99,9 +94,7 @@ class TestCollectionHybridSearchSourceRealDB:
         even if include asks for it.
         """
         collection_name = self._unique_collection_name("hs_src_knn")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -132,9 +125,7 @@ class TestCollectionHybridSearchSourceRealDB:
         This test executes GET_SQL's returned SQL and inspects result row keys (more robust than SQL parsing).
         """
         collection_name = self._unique_collection_name("hs_get_sql_no_vec")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -157,7 +148,7 @@ class TestCollectionHybridSearchSourceRealDB:
         query_sql = self._get_sql_query(server_client, table_name, search_parm)
         rows = server_client._server._execute(query_sql)
         assert rows
-        keys = {str(k).lower() for k in rows[0].keys()}
+        keys = {str(k).lower() for k in rows[0]}
         assert "embedding" not in keys
 
     def test_get_sql_infers_source_from_include_includes_embedding_columns(self, server_client):
@@ -166,9 +157,7 @@ class TestCollectionHybridSearchSourceRealDB:
         embedding to be returned by the generated SQL.
         """
         collection_name = self._unique_collection_name("hs_get_sql_vec")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -191,7 +180,7 @@ class TestCollectionHybridSearchSourceRealDB:
         query_sql = self._get_sql_query(server_client, table_name, search_parm)
         rows = server_client._server._execute(query_sql)
         assert rows
-        keys = {str(k).lower() for k in rows[0].keys()}
+        keys = {str(k).lower() for k in rows[0]}
         assert "embedding" in keys
 
     def test_return_fields_none_infers_source_from_include_result_shape(self, server_client):
@@ -201,9 +190,7 @@ class TestCollectionHybridSearchSourceRealDB:
         This test focuses on result shape correctness across common include patterns.
         """
         collection_name = self._unique_collection_name("hs_rf_none_matrix")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -265,9 +252,7 @@ class TestCollectionHybridSearchSourceRealDB:
         even if include asks for it.
         """
         collection_name = self._unique_collection_name("hs_src_query")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -291,9 +276,7 @@ class TestCollectionHybridSearchSourceRealDB:
         even if include asks for them.
         """
         collection_name = self._unique_collection_name("hs_rf_empty")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -325,9 +308,7 @@ class TestCollectionHybridSearchSourceRealDB:
         - include can request fields that are filtered out by return_fields
         """
         collection_name = self._unique_collection_name("hs_rf_matrix")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -340,9 +321,7 @@ class TestCollectionHybridSearchSourceRealDB:
         assert default_baseline.get("metadatas") is not None
         assert "embeddings" not in default_baseline
         assert all(isinstance(d, str) for d in default_baseline["documents"][0])
-        assert all(
-            isinstance(m, dict) and m for m in default_baseline["metadatas"][0]
-        )
+        assert all(isinstance(m, dict) and m for m in default_baseline["metadatas"][0])
 
         baseline = collection.hybrid_search(
             knn=knn,
@@ -472,9 +451,7 @@ class TestCollectionHybridSearchSourceRealDB:
         return_fields does not need to include `_id` for the SDK to return `ids`.
         """
         collection_name = self._unique_collection_name("hs_no_id")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -498,19 +475,12 @@ class TestCollectionHybridSearchSourceRealDB:
         call-site include/n_results.
         """
         collection_name = self._unique_collection_name("hs_search_precedence")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
-        hs = (
-            HybridSearch()
-            .knn(query_embeddings=query_vector, n_results=2)
-            .limit(1)
-            .select("embeddings")
-        )
+        hs = HybridSearch().knn(query_embeddings=query_vector, n_results=2).limit(1).select("embeddings")
 
         results = collection.hybrid_search(
             search=hs,
@@ -531,9 +501,7 @@ class TestCollectionHybridSearchSourceRealDB:
         Query + KNN + RRF rank path works, and return_fields can still filter stored columns.
         """
         collection_name = self._unique_collection_name("hs_qk_rrf")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -560,9 +528,7 @@ class TestCollectionHybridSearchSourceRealDB:
         When return_fields includes `embedding`, returned embeddings should be present.
         """
         collection_name = self._unique_collection_name("hs_src_knn_inc")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -589,9 +555,7 @@ class TestCollectionHybridSearchSourceRealDB:
         Same as above, but return_fields is provided via HybridSearch builder.
         """
         collection_name = self._unique_collection_name("hs_builder")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -615,9 +579,7 @@ class TestCollectionHybridSearchSourceRealDB:
         stored columns are returned.
         """
         collection_name = self._unique_collection_name("hs_builder_empty")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
         self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
@@ -644,21 +606,12 @@ class TestCollectionHybridSearchSourceRealDB:
         Guardrail: do not allow both the builder and the call-site to set return_fields.
         """
         collection_name = self._unique_collection_name("hs_rf_conflict")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
 
         query_vector = self._generate_query_vector(dimension)
-        hs = (
-            HybridSearch()
-            .knn(query_embeddings=query_vector, n_results=2)
-            .limit(2)
-            .return_fields(["_id"])
-        )
+        hs = HybridSearch().knn(query_embeddings=query_vector, n_results=2).limit(2).return_fields(["_id"])
 
-        with pytest.raises(
-            ValueError, match="Do not mix HybridSearch\\.return_fields\\(\\) with return_fields="
-        ):
+        with pytest.raises(ValueError, match="Do not mix HybridSearch\\.return_fields\\(\\) with return_fields="):
             collection.hybrid_search(hs, return_fields=["_id", "document"])
 
     def test_source_kwarg_is_rejected(self, server_client):
@@ -666,9 +619,7 @@ class TestCollectionHybridSearchSourceRealDB:
         User-facing API does not accept `_source`; it must be `return_fields`.
         """
         collection_name = self._unique_collection_name("hs_reject_source")
-        collection, dimension = self._create_test_collection(
-            server_client, collection_name
-        )
+        collection, dimension = self._create_test_collection(server_client, collection_name)
 
         query_vector = self._generate_query_vector(dimension)
         with pytest.raises(TypeError, match="Use return_fields= instead of _source="):

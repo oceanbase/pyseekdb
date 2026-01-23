@@ -2,8 +2,8 @@
 Unit tests for HybridSearch/Collection return_fields API surface and internal mapping.
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -13,9 +13,9 @@ project_root = Path(__file__).parent.parent.parent
 src_root = project_root / "src"
 sys.path.insert(0, str(src_root))
 
-from pyseekdb.client.client_base import BaseClient  # type: ignore
-from pyseekdb.client.collection import Collection  # type: ignore
-from pyseekdb.client.hybrid_search import HybridSearch  # type: ignore
+from pyseekdb.client.client_base import BaseClient  # noqa: E402
+from pyseekdb.client.collection import Collection  # noqa: E402
+from pyseekdb.client.hybrid_search import HybridSearch  # noqa: E402
 
 
 class _CapturingClient:
@@ -48,9 +48,7 @@ class TestHybridSearchReturnFieldsUnit:
         client = _CapturingClient()
         collection = Collection(client=client, name="test", dimension=3)
 
-        collection.hybrid_search(
-            query={"where_document": {"$contains": "hi"}}, return_fields=["document"]
-        )
+        collection.hybrid_search(query={"where_document": {"$contains": "hi"}}, return_fields=["document"])
         assert client.captured is not None
         assert client.captured["return_fields"] == ["document"]
 
@@ -58,9 +56,7 @@ class TestHybridSearchReturnFieldsUnit:
         client = _CapturingClient()
         collection = Collection(client=client, name="test", dimension=3)
 
-        hs = HybridSearch().query({"where_document": {"$contains": "hi"}}).return_fields(
-            []
-        )
+        hs = HybridSearch().query({"where_document": {"$contains": "hi"}}).return_fields([])
         collection.hybrid_search(hs)
         assert client.captured is not None
         assert client.captured["return_fields"] == ["_id"]
@@ -83,9 +79,7 @@ class TestHybridSearchReturnFieldsUnit:
         collection = Collection(client=client, name="test", dimension=3)
 
         with pytest.raises(TypeError, match=r"Use return_fields="):
-            collection.hybrid_search(
-                query={"where_document": {"$contains": "hi"}}, _source=["document"]
-            )
+            collection.hybrid_search(query={"where_document": {"$contains": "hi"}}, _source=["document"])
 
     def test_hybrid_search_rejects_legacy_source_kwarg(self) -> None:
         with pytest.raises(TypeError, match=r"Use return_fields="):
