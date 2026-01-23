@@ -87,11 +87,7 @@ class JinaEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
             api_key_env (str, optional): Name of the environment variable containing the Jina AI API key.
                 Defaults to "JINA_AI_API_KEY" if not provided.
             **kwargs: Additional arguments to pass to LiteLLM.
-                Common options include:
-                - api_base: Base URL for the API endpoint
-                - timeout: Request timeout in seconds
-                - max_retries: Maximum number of retries
-                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
+            See https://docs.litellm.ai/docs/providers/jina_ai#sample-usage---embedding for more information.
         """
         # Construct LiteLLM model name format: jina/<model-name>
         litellm_model_name = f"jina_ai/{model_name}"

@@ -9,7 +9,7 @@ from pyseekdb.client.embedding_function import (
 )
 
 # Known Amazon Bedrock embedding model dimensions
-# Source: https://docs.aws.amazon.com/bedrock/latest/userguide/models.html
+# Source: https://docs.aws.amazon.com/bedrock/
 _AMAZON_BEDROCK_MODEL_DIMENSIONS = {
     "amazon.titan-embed-text-v1": 1536,
     "amazon.titan-embed-text-v2": 1024,
@@ -22,19 +22,12 @@ _DEFAULT_MODEL_NAME = "amazon.titan-embed-text-v2"
 
 class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
     """
-    A convenient embedding function for Amazon Bedrock embedding models.
-
-    This class provides a simplified interface to Amazon Bedrock embedding models using boto3.
+    A convenient embedding function for Amazon Bedrock embedding models using boto3.
 
     For more information about Amazon Bedrock models, see
-    https://docs.aws.amazon.com/bedrock/latest/userguide/models.html
+    https://docs.aws.amazon.com/bedrock/
 
-    Authentication:
-        This function uses AWS credentials. Set up authentication by:
-        1. Setting AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables, or
-        2. Using AWS IAM roles, or
-        3. Using AWS credentials file (~/.aws/credentials)
-        Reference https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
+    This embedding function runs remotely on Amazon Bedrock's servers, and requires AWS credentials configured via boto3.
 
     Example:
         pip install pyseekdb boto3
@@ -108,8 +101,10 @@ class AmazonBedrockEmbeddingFunction(EmbeddingFunction[Documents]):
 
         # Extract region_name and profile_name from the session for config storage
         self._session_args = {}
-        self._session_args["region_name"] = session.region_name if hasattr(session, "region_name") else None
-        self._session_args["profile_name"] = session.profile_name if hasattr(session, "profile_name") else None
+        if hasattr(session, "region_name") and session.region_name:
+            self._session_args["region_name"] = session.region_name
+        if hasattr(session, "profile_name") and session.profile_name:
+            self._session_args["profile_name"] = session.profile_name
 
         # Store configuration (for get_config, but NOT credentials)
         self.model_name = model_name

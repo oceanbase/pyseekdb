@@ -24,7 +24,7 @@ class GoogleVertexEmbeddingFunction(EmbeddingFunction[Documents]):
         # Set up authentication first (see Authentication section above)
         ef = GoogleVertexEmbeddingFunction(
             project_id="your-project-id",
-            model_name="textembedding-gecko@003"
+            model_name="textembedding-gecko"
         )
 
         db = pyseekdb.Client(path="./seekdb.db")

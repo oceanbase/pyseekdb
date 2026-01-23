@@ -18,16 +18,19 @@ class OpenAIBaseEmbeddingFunction(EmbeddingFunction[Documents]):
     - Optionally override `__init__` to set model-specific defaults
 
     Example:
-        .. code-block:: python
-            class MyEmbeddingFunction(OpenAIBaseEmbeddingFunction):
-                def _get_default_api_base(self):
-                    return "https://api.example.com/v1"
+    .. code-block:: python
+        import pyseekdb
+        from pyseekdb.utils.embedding_functions import OpenAIBaseEmbeddingFunction
 
-                def _get_default_api_key_env(self):
-                    return "MY_API_KEY"
+        class MyEmbeddingFunction(OpenAIBaseEmbeddingFunction):
+            def _get_default_api_base(self):
+                return "https://api.example.com/v1"
 
-                def _get_model_dimensions(self):
-                    return {"model-v1": 1536, "model-v2": 1024}
+            def _get_default_api_key_env(self):
+                return "MY_API_KEY"
+
+            def _get_model_dimensions(self):
+                return {"model-v1": 1536, "model-v2": 1024}
     """
 
     def __init__(

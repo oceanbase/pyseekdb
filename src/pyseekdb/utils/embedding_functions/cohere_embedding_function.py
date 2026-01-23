@@ -24,9 +24,7 @@ _DEFAULT_MODEL_NAME = "embed-english-v3.0"
 
 class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
     """
-    A convenient embedding function for Cohere embedding models.
-
-    This class provides a simplified interface to Cohere embedding models using LiteLLM.
+    A convenient embedding function for Cohere embedding models using LiteLLM.
 
     For more information about Cohere models, see https://docs.cohere.com/docs/cohere-embed
 
@@ -91,11 +89,7 @@ class CohereEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
                 When set to "search_document" or "search_query", Cohere optimizes embeddings for
                 retrieval/search tasks. Defaults to None.
             **kwargs: Additional arguments to pass to LiteLLM.
-                Common options include:
-                - api_base: Base URL for the API endpoint
-                - timeout: Request timeout in seconds
-                - max_retries: Maximum number of retries
-                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
+        See https://docs.litellm.ai/docs/providers/cohere#embedding for more information.
         """
         # Construct LiteLLM model name format: cohere/<model-name>
         litellm_model_name = f"cohere/{model_name}"

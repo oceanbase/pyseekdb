@@ -9,7 +9,7 @@ from pyseekdb.client.embedding_function import (
 
 class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
     """
-    A custom embedding function using sentence-transformers with a specific model.
+    An embedding function using sentence-transformers with a specific model.
 
     Example:
         pip install pyseekdb sentence-transformers
@@ -70,14 +70,6 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
         self._model = self.models[model_name]
 
     def __call__(self, documents: Documents) -> Embeddings:
-        """Generate embeddings for the given documents.
-
-        Args:
-            documents: Documents to generate embeddings for.
-
-        Returns:
-            Embeddings for the documents.
-        """
         embeddings = self._model.encode(
             list(documents),
             convert_to_numpy=True,
@@ -88,19 +80,9 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
 
     @staticmethod
     def name() -> str:
-        """Get the unique name identifier for SentenceTransformerEmbeddingFunction.
-
-        Returns:
-            The name identifier for this embedding function type
-        """
         return "sentence_transformer"
 
     def get_config(self) -> dict[str, Any]:
-        """Get the configuration dictionary for the SentenceTransformerEmbeddingFunction.
-
-        Returns:
-            Dictionary containing configuration needed to restore this embedding function
-        """
         return {
             "model_name": self.model_name,
             "device": self.device,
@@ -112,17 +94,6 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction[Documents]):
     def build_from_config(
         config: dict[str, Any],
     ) -> "SentenceTransformerEmbeddingFunction":
-        """Build a SentenceTransformerEmbeddingFunction from its configuration dictionary.
-
-        Args:
-            config: Dictionary containing the embedding function's configuration
-
-        Returns:
-            Restored SentenceTransformerEmbeddingFunction instance
-
-        Raises:
-            ValueError: If the configuration is invalid or missing required fields
-        """
         model_name = config.get("model_name", "all-MiniLM-L6-v2")
         device = config.get("device", "cpu")
         normalize_embeddings = config.get("normalize_embeddings", False)

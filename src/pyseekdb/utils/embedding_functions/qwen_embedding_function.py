@@ -69,12 +69,7 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
 
         Args:
             model_name (str): Name of the Qwen embedding model.
-                Examples:
-                - "text-embedding-v1"
-                - "text-embedding-v2"
-                - "text-embedding-v3"
-                - "text-embedding-v4"
-                - See Qwen documentation for available models
+                See Qwen documentation for available models.
             api_key_env (str, optional): Name of the environment variable containing the Qwen API key.
                 Defaults to "DASHSCOPE_API_KEY" if not provided.
             api_base (str, optional): Base URL for the Qwen API endpoint.
@@ -138,17 +133,6 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
 
     @staticmethod
     def build_from_config(config: dict[str, Any]) -> "QwenEmbeddingFunction":
-        """Build a QwenEmbeddingFunction from its configuration dictionary.
-
-        Args:
-            config: Dictionary containing the embedding function's configuration
-
-        Returns:
-            Restored QwenEmbeddingFunction instance
-
-        Raises:
-            ValueError: If the configuration is invalid or missing required fields
-        """
         model_name = config.get("model_name")
         if model_name is None:
             raise ValueError("Missing required field 'model_name' in configuration")

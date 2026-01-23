@@ -11,35 +11,21 @@ class LiteLLMBaseEmbeddingFunction(EmbeddingFunction[Documents]):
     LiteLLM provides a unified interface to access embedding models from multiple providers
     including OpenAI, Hugging Face, Cohere, and many others.
 
+    You can extend this class to create your own embedding function by overriding the __call__ method.
+    See https://docs.litellm.ai/docs/embedding/supported_embedding for more information.
+
     Example:
         pip install pyseekdb litellm
 
     .. code-block:: python
         import pyseekdb
-        from pyseekdb.utils.embedding_functions import LiteLLMEmbeddingFunction
+        from pyseekdb.utils.embedding_functions import LiteLLMBaseEmbeddingFunction
 
-        # Using OpenAI embeddings (API key from environment variable)
-        # Set OPENAI_API_KEY environment variable first
-        ef = LiteLLMEmbeddingFunction(
-            model_name="text-embedding-ada-002",
-            api_key_env="OPENAI_API_KEY"
-        )
+        class MyEmbeddingFunction(LiteLLMBaseEmbeddingFunction):
+            def __call__(self, documents: Documents) -> Embeddings:
+                return super().__call__(documents)
 
-        # Using Hugging Face embeddings (API key from environment variable)
-        # Set HUGGINGFACE_API_KEY environment variable first
-        ef = LiteLLMEmbeddingFunction(
-            model_name="huggingface/sentence-transformers/all-MiniLM-L6-v2",
-            api_key_env="HUGGINGFACE_API_KEY"
-        )
-
-        # Using with additional parameters via kwargs
-        ef = LiteLLMEmbeddingFunction(
-            model_name="text-embedding-ada-002",
-            api_key_env="OPENAI_API_KEY",
-            api_base="https://api.openai.com/v1",
-            timeout=30,
-            max_retries=3
-        )
+        ef = MyEmbeddingFunction(model_name="my-embedding-model", api_key_env="MY_API_KEY")
 
         db = pyseekdb.Client(path="./seekdb.db")
         collection = db.create_collection(name="my_collection", embedding_function=ef)
@@ -61,24 +47,13 @@ class LiteLLMBaseEmbeddingFunction(EmbeddingFunction[Documents]):
 
         Args:
             model_name (str): Identifier of the embedding model.
-                Examples:
-                - "text-embedding-ada-002" (OpenAI)
-                - "text-embedding-3-small" (OpenAI)
-                - "huggingface/sentence-transformers/all-MiniLM-L6-v2" (Hugging Face)
-                - "cohere/embed-english-v3.0" (Cohere)
-                - See https://docs.litellm.ai/docs/embedding/supported_embedding for full list
+                See https://docs.litellm.ai/docs/embedding/supported_embedding for full list.
             api_key_env (str, optional): Name of the environment variable containing the API key.
                 If not provided, LiteLLM will try to use default environment variables based on the provider.
                 For example, "OPENAI_API_KEY" for OpenAI, "HUGGINGFACE_API_KEY" for Hugging Face.
                 See https://docs.litellm.ai/docs/set_keys for a complete list of default environment variable names.
             **kwargs: Additional arguments to pass to the LiteLLM embedding function.
-                Common options include:
-                - api_base: Base URL for the API endpoint (useful for LiteLLM proxy or custom endpoints)
-                - timeout: Request timeout in seconds
-                - max_retries: Maximum number of retries
-                - api_version: API version (provider-specific)
-                - user: User identifier for usage tracking
-                - See https://docs.litellm.ai/docs/embedding/supported_embedding for more options
+                See https://docs.litellm.ai/docs/embedding/supported_embedding for more information.
         """
         try:
             from litellm import embedding
@@ -121,7 +96,7 @@ class LiteLLMBaseEmbeddingFunction(EmbeddingFunction[Documents]):
             if api_key is None:
                 raise ValueError(
                     f"API key environment variable '{self.api_key_env}' is not set. "
-                    f"Please set it before using LiteLLMEmbeddingFunction."
+                    f"Please set it before using {self.__class__.__name__}."
                 )
             embedding_kwargs["api_key"] = api_key
 

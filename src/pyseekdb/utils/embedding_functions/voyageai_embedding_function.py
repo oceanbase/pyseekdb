@@ -142,18 +142,6 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
 
     @property
     def dimension(self) -> int:
-        """Get the dimension of embeddings produced by this function.
-
-        Returns the known dimension for models without making an API call.
-        If the output_dimension parameter is specified, that value is returned.
-        Otherwise, the default dimension for the model is returned.
-
-        If the model is not in the known dimensions list, falls back to making
-        an API call to get the embedding and infer the dimension.
-
-        Returns:
-            int: The dimension of embeddings for this model.
-        """
         # If output_dimension is explicitly set, use it
         if self._dimension is not None:
             return self._dimension
@@ -173,14 +161,6 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         return self._dimension
 
     def __call__(self, documents: Documents) -> Embeddings:
-        """Generate embeddings for the given documents.
-
-        Args:
-            documents: Documents to generate embeddings for. Can be a single string or list of strings.
-
-        Returns:
-            Embeddings for the documents as a list of lists of floats.
-        """
         # Handle single string input
         if isinstance(documents, str):
             documents = [documents]
@@ -219,21 +199,9 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
 
     @staticmethod
     def name() -> str:
-        """Get the unique name identifier for VoyageaiEmbeddingFunction.
-
-        Returns:
-            The name identifier for this embedding function type
-        """
         return "voyageai"
 
     def get_config(self) -> dict[str, Any]:
-        """Get the configuration dictionary for the VoyageaiEmbeddingFunction.
-
-        Returns:
-            Dictionary containing configuration needed to restore this embedding function
-        """
-        # Note: We don't store the API key in config for security reasons
-        # It should be provided via environment variable or parameter when restoring
         return {
             "model_name": self.model_name,
             "api_key_env": self.api_key_env,
@@ -245,17 +213,6 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
 
     @staticmethod
     def build_from_config(config: dict[str, Any]) -> "VoyageaiEmbeddingFunction":
-        """Build a VoyageaiEmbeddingFunction from its configuration dictionary.
-
-        Args:
-            config: Dictionary containing the embedding function's configuration
-
-        Returns:
-            Restored VoyageaiEmbeddingFunction instance
-
-        Raises:
-            ValueError: If the configuration is invalid or missing required fields
-        """
         model_name = config.get("model_name")
         if model_name is None:
             raise ValueError("Missing required field 'model_name' in configuration")
@@ -266,7 +223,7 @@ class VoyageaiEmbeddingFunction(EmbeddingFunction[Documents]):
         output_dimension = config.get("output_dimension")
         kwargs = config.get("client_kwargs", {})
         if not isinstance(kwargs, dict):
-            raise TypeError(f"kwargs must be a dictionary, but got {kwargs}")
+            raise TypeError(f"client_kwargs must be a dictionary, but got {kwargs}")
 
         return VoyageaiEmbeddingFunction(
             model_name=model_name,

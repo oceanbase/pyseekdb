@@ -11,6 +11,7 @@ from .google_vertex_embedding_function import GoogleVertexEmbeddingFunction
 from .jina_embedding_function import JinaEmbeddingFunction
 from .litellm_base_embedding_function import LiteLLMBaseEmbeddingFunction
 from .ollama_embedding_function import OllamaEmbeddingFunction
+from .openai_base_embedding_function import OpenAIBaseEmbeddingFunction
 from .openai_embedding_function import OpenAIEmbeddingFunction
 from .qwen_embedding_function import QwenEmbeddingFunction
 from .sentence_transformer_embedding_function import (
@@ -27,6 +28,7 @@ __all__ = [
     "JinaEmbeddingFunction",
     "LiteLLMBaseEmbeddingFunction",
     "OllamaEmbeddingFunction",
+    "OpenAIBaseEmbeddingFunction",
     "OpenAIEmbeddingFunction",
     "QwenEmbeddingFunction",
     "SentenceTransformerEmbeddingFunction",

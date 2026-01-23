@@ -6,11 +6,7 @@ from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
 )
 
 # Known Ollama embedding model dimensions
-# Source: https://docs.ollama.com/api/openai-compatibility
-# Note: Model dimensions may vary. Common embedding models include:
-# - nomic-embed-text (768 dimensions)
-# - all-minilm (384 dimensions)
-# Users should check model documentation or pull model info for exact dimensions
+# Source: https://docs.ollama.com/capabilities/embeddings
 _OLLAMA_MODEL_DIMENSIONS = {
     "nomic-embed-text": 768,
     "all-minilm": 384,
@@ -24,7 +20,7 @@ class OllamaEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     This class provides a simplified interface to Ollama embedding models using the OpenAI-compatible API.
     Ollama provides OpenAI-compatible API endpoints for embedding generation.
 
-    For more information about Ollama models, see https://docs.ollama.com/api/openai-compatibility
+    For more information about Ollama, see https://docs.ollama.com/
 
     Note: Before using a model, you need to pull it locally using `ollama pull <model_name>`.
 
@@ -79,10 +75,7 @@ class OllamaEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         Args:
             model_name (str, optional): Name of the Ollama embedding model.
                 Defaults to "nomic-embed-text".
-                Common options include:
-                - "nomic-embed-text" (768 dimensions)
-                - "all-minilm" (384 dimensions)
-                - See Ollama documentation for available models
+                See Ollama documentation for available models: https://docs.ollama.com/capabilities/embeddings
                 Note: Models must be pulled locally first using `ollama pull <model_name>`
             api_key_env (str, optional): Name of the environment variable containing the Ollama API key.
                 Defaults to "OLLAMA_API_KEY" if not provided.
@@ -94,10 +87,7 @@ class OllamaEmbeddingFunction(OpenAIBaseEmbeddingFunction):
             dimensions (int, optional): The number of dimensions the resulting embeddings should have.
                 Supported if the model supports it. Check model documentation for supported dimensions.
             **kwargs: Additional arguments to pass to the OpenAI client.
-                Common options include:
-                - timeout: Request timeout in seconds
-                - max_retries: Maximum number of retries
-                - See https://github.com/openai/openai-python for more options
+                See https://github.com/openai/openai-python for more information.
         """
         # Set default API key env if not provided
         if api_key_env is None:
@@ -152,26 +142,10 @@ class OllamaEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         return "ollama"
 
     def get_config(self) -> dict[str, Any]:
-        """Get the configuration dictionary for the OllamaEmbeddingFunction.
-
-        Returns:
-            Dictionary containing configuration needed to restore this embedding function
-        """
         return super().get_config()
 
     @staticmethod
     def build_from_config(config: dict[str, Any]) -> "OllamaEmbeddingFunction":
-        """Build an OllamaEmbeddingFunction from its configuration dictionary.
-
-        Args:
-            config: Dictionary containing the embedding function's configuration
-
-        Returns:
-            Restored OllamaEmbeddingFunction instance
-
-        Raises:
-            ValueError: If the configuration is invalid or missing required fields
-        """
         model_name = config.get("model_name")
         if model_name is None:
             raise ValueError("Missing required field 'model_name' in configuration")

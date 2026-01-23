@@ -105,70 +105,27 @@ class TencentHunyuanEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         )
 
     def _get_default_api_base(self) -> str:
-        """Get the default API base URL for Tencent Hunyuan.
-
-        Returns:
-            str: Default Tencent Hunyuan API base URL
-        """
         return "https://api.hunyuan.cloud.tencent.com/v1"
 
     def _get_default_api_key_env(self) -> str:
-        """Get the default API key environment variable name for Tencent Hunyuan.
-
-        Returns:
-            str: Default Tencent Hunyuan API key environment variable name
-        """
         return "HUNYUAN_API_KEY"
 
     def _get_model_dimensions(self) -> dict[str, int]:
-        """Get a dictionary mapping Tencent Hunyuan model names to their default dimensions.
-
-        Returns:
-            dict[str, int]: Dictionary mapping model names to dimensions
-        """
         return _TENCENT_HUNYUAN_MODEL_DIMENSIONS
 
     @property
     def dimension(self) -> int:
-        """Get the dimension of embeddings produced by this function.
-
-        Tencent Hunyuan embeddings are fixed at 1024 dimensions.
-
-        Returns:
-            int: The dimension of embeddings (always 1024)
-        """
         return 1024
 
     @staticmethod
     def name() -> str:
-        """Get the unique name identifier for TencentHunyuanEmbeddingFunction.
-
-        Returns:
-            The name identifier for this embedding function type
-        """
         return "tencent_hunyuan"
 
     def get_config(self) -> dict[str, Any]:
-        """Get the configuration dictionary for the TencentHunyuanEmbeddingFunction.
-
-        Returns:
-            Dictionary containing configuration needed to restore this embedding function
-        """
         return super().get_config()
 
     @staticmethod
     def build_from_config(config: dict[str, Any]) -> "TencentHunyuanEmbeddingFunction":
-        """Build a TencentHunyuanEmbeddingFunction from its configuration dictionary.
-
-        Args:
-            config: Dictionary containing the embedding function's configuration
-
-        Returns:
-            Restored TencentHunyuanEmbeddingFunction instance
-
-        Raises:
-            ValueError: If the configuration is invalid or missing required fields
-        """
         model_name = config.get("model_name")
         if model_name is None:
             raise ValueError("Missing required field 'model_name' in configuration")
