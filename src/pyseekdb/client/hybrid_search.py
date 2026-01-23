@@ -432,7 +432,7 @@ class HybridSearch:
         self._n_results = n_results
         return self
 
-    def return_fields(self, fields: Optional[List[str]]) -> "HybridSearch":
+    def return_fields(self, fields: list[str] | None) -> "HybridSearch":
         """
         Configure OceanBase GET_SQL return fields allowlist.
 
