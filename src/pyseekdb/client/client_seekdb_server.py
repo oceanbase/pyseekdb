@@ -4,15 +4,14 @@ Supports both seekdb Server and OceanBase Server
 """
 
 import logging
-from typing import Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 import pymysql
 from pymysql.cursors import DictCursor
 
-from .client_base import BaseClient
-from .collection import Collection
-from .database import Database
 from .admin_client import DEFAULT_TENANT
+from .client_base import BaseClient
+from .database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +60,7 @@ class RemoteServerClient(BaseClient):
         self.full_user = f"{user}@{tenant}"
         self._connection = None
 
-        logger.info(
-            f"Initialize RemoteServerClient: {self.full_user}@{self.host}:{self.port}/{self.database}"
-        )
+        logger.info(f"Initialize RemoteServerClient: {self.full_user}@{self.host}:{self.port}/{self.database}")
 
     # ==================== Connection Management ====================
 
@@ -81,9 +78,7 @@ class RemoteServerClient(BaseClient):
                 autocommit=True,
                 **self.kwargs,
             )
-            logger.info(
-                f"✅ Connected to remote server: {self.host}:{self.port}/{self.database}"
-            )
+            logger.info(f"✅ Connected to remote server: {self.host}:{self.port}/{self.database}")
 
         return self._connection
 
@@ -97,7 +92,7 @@ class RemoteServerClient(BaseClient):
     def is_connected(self) -> bool:
         """Check connection status"""
         return self._connection is not None and self._connection.open
-    
+
     def get_raw_connection(self) -> pymysql.Connection:
         """Get raw connection object"""
         return self._ensure_connection()
@@ -146,7 +141,7 @@ class RemoteServerClient(BaseClient):
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
         return super().create_database(name=name, tenant=tenant)
-    
+
     def get_database(self, name: str, tenant: str = DEFAULT_TENANT) -> Database:
         """
         Get database object (remote server has tenant concept, uses client's tenant)
@@ -162,7 +157,7 @@ class RemoteServerClient(BaseClient):
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
         return super().get_database(name=name, tenant=tenant)
-    
+
     def delete_database(self, name: str, tenant: str = DEFAULT_TENANT) -> None:
         """
         Delete database (remote server has tenant concept, uses client's tenant)
@@ -175,11 +170,11 @@ class RemoteServerClient(BaseClient):
             Remote server has multi-tenant architecture. Database is scoped to client's tenant.
         """
         return super().delete_database(name=name, tenant=tenant)
-    
+
     def list_databases(
         self,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        limit: int | None = None,
+        offset: int | None = None,
         tenant: str = DEFAULT_TENANT,
     ) -> Sequence[Database]:
         """
@@ -198,13 +193,13 @@ class RemoteServerClient(BaseClient):
         """
         return super().list_databases(limit=limit, offset=offset, tenant=tenant)
 
-    def _database_tenant(self, tenant: str) -> Optional[str]:
+    def _database_tenant(self, tenant: str) -> str | None:
         if tenant != self.tenant and tenant != DEFAULT_TENANT:
             logger.warning(
                 f"Specified tenant '{tenant}' differs from client tenant '{self.tenant}', using client tenant"
             )
         return self.tenant
-    
+
     def __repr__(self):
         status = "connected" if self.is_connected() else "disconnected"
         return f"<RemoteServerClient {self.full_user}@{self.host}:{self.port}/{self.database} status={status}>"

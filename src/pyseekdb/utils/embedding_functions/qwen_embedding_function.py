@@ -1,7 +1,8 @@
+from typing import Any
+
 from pyseekdb.utils.embedding_functions.openai_base_embedding_function import (
     OpenAIBaseEmbeddingFunction,
 )
-from typing import Any, Optional
 
 # Known Qwen embedding model dimensions
 # Source: Qwen/DashScope documentation
@@ -59,21 +60,16 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
     def __init__(
         self,
         model_name: str,
-        api_key_env: Optional[str] = None,
-        api_base: Optional[str] = None,
-        dimensions: Optional[int] = None,
+        api_key_env: str | None = None,
+        api_base: str | None = None,
+        dimensions: int | None = None,
         **kwargs: Any,
     ):
         """Initialize QwenEmbeddingFunction.
 
         Args:
             model_name (str): Name of the Qwen embedding model.
-                Examples:
-                - "text-embedding-v1"
-                - "text-embedding-v2"
-                - "text-embedding-v3"
-                - "text-embedding-v4"
-                - See Qwen documentation for available models
+                See Qwen documentation for available models.
             api_key_env (str, optional): Name of the environment variable containing the Qwen API key.
                 Defaults to "DASHSCOPE_API_KEY" if not provided.
             api_base (str, optional): Base URL for the Qwen API endpoint.
@@ -137,17 +133,6 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
 
     @staticmethod
     def build_from_config(config: dict[str, Any]) -> "QwenEmbeddingFunction":
-        """Build a QwenEmbeddingFunction from its configuration dictionary.
-
-        Args:
-            config: Dictionary containing the embedding function's configuration
-
-        Returns:
-            Restored QwenEmbeddingFunction instance
-
-        Raises:
-            ValueError: If the configuration is invalid or missing required fields
-        """
         model_name = config.get("model_name")
         if model_name is None:
             raise ValueError("Missing required field 'model_name' in configuration")
@@ -157,12 +142,12 @@ class QwenEmbeddingFunction(OpenAIBaseEmbeddingFunction):
         dimensions = config.get("dimensions")
         client_kwargs = config.get("client_kwargs", {})
         if not isinstance(client_kwargs, dict):
-            raise ValueError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
+            raise TypeError(f"client_kwargs must be a dictionary, but got {client_kwargs}")
 
         return QwenEmbeddingFunction(
             model_name=model_name,
             api_key_env=api_key_env,
             api_base=api_base,
             dimensions=dimensions,
-            **client_kwargs
+            **client_kwargs,
         )

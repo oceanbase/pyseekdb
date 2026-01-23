@@ -1,8 +1,10 @@
 """
 Unit tests for DefaultEmbeddingFunction.
 """
+
+from typing import Any
+
 import pytest
-from typing import Dict, Any
 
 from pyseekdb.client.embedding_function import DefaultEmbeddingFunction
 
@@ -30,7 +32,7 @@ class TestDefaultEmbeddingFunctionPersistence:
 
     def test_build_from_config_creates_default_instance(self):
         """Test that build_from_config() creates a default instance"""
-        config: Dict[str, Any] = {}
+        config: dict[str, Any] = {}
 
         restored_ef = DefaultEmbeddingFunction.build_from_config(config)
 
@@ -55,6 +57,7 @@ class TestDefaultEmbeddingFunctionPersistence:
 
         assert isinstance(restored_ef, DefaultEmbeddingFunction)
         assert restored_ef.model_name == original_ef.model_name
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

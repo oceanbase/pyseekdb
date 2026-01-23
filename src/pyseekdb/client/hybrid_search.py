@@ -15,36 +15,37 @@ so the server-side SQL generation remains unchanged.
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, Iterable, List, Optional, Union
+from collections.abc import Iterable
+from typing import Any
 
 __all__ = [
-    "HybridSearch",
     "DOCUMENT",
-    "TEXT",
-    "EMBEDDINGS",
-    "K",
-    "IDS",
     "DOCUMENTS",
-    "METADATAS",
+    "EMBEDDINGS",
     "EMBEDDINGS_FIELD",
+    "IDS",
+    "METADATAS",
     "SCORES",
+    "TEXT",
+    "HybridSearch",
+    "K",
 ]
 
 
 class DocumentExpression:
     """Wrapper for document filter expressions."""
 
-    def __init__(self, expression: Dict[str, Any]):
+    def __init__(self, expression: dict[str, Any]):
         self._expression = expression
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return copy.deepcopy(self._expression)
 
-    def __and__(self, other: Any) -> "DocumentExpression":
+    def __and__(self, other: Any) -> DocumentExpression:
         other_expr = _as_document_expression(other)
         return DocumentExpression({"$and": [self.to_dict(), other_expr.to_dict()]})
 
-    def __or__(self, other: Any) -> "DocumentExpression":
+    def __or__(self, other: Any) -> DocumentExpression:
         other_expr = _as_document_expression(other)
         return DocumentExpression({"$or": [self.to_dict(), other_expr.to_dict()]})
 
@@ -62,7 +63,7 @@ def _as_document_expression(value: Any) -> DocumentExpression:
 class _DocumentBuilder:
     """Entry point for building document filter expressions."""
 
-    def contains(self, text: Union[str, List[str]]) -> DocumentExpression:
+    def contains(self, text: str | list[str]) -> DocumentExpression:
         if isinstance(text, list):
             if len(text) == 1:
                 return DocumentExpression({"$contains": text[0]})
@@ -79,21 +80,21 @@ DOCUMENT = _DocumentBuilder()
 class MetadataExpression:
     """Wrapper for metadata filter expressions."""
 
-    def __init__(self, expression: Dict[str, Any]):
+    def __init__(self, expression: dict[str, Any]):
         self._expression = expression
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return copy.deepcopy(self._expression)
 
-    def __and__(self, other: Any) -> "MetadataExpression":
+    def __and__(self, other: Any) -> MetadataExpression:
         other_expr = _as_metadata_expression(other)
         return MetadataExpression({"$and": [self.to_dict(), other_expr.to_dict()]})
 
-    def __or__(self, other: Any) -> "MetadataExpression":
+    def __or__(self, other: Any) -> MetadataExpression:
         other_expr = _as_metadata_expression(other)
         return MetadataExpression({"$or": [self.to_dict(), other_expr.to_dict()]})
 
-    def __invert__(self) -> "MetadataExpression":
+    def __invert__(self) -> MetadataExpression:
         return MetadataExpression({"$not": self.to_dict()})
 
 
@@ -151,7 +152,7 @@ def K(key: str) -> MetadataField:
 class TextQuery:
     """Container for knn query_texts."""
 
-    def __init__(self, texts: Union[str, List[str]]):
+    def __init__(self, texts: str | list[str]):
         if isinstance(texts, str):
             self.texts = [texts]
         else:
@@ -161,15 +162,11 @@ class TextQuery:
 class EmbeddingsQuery:
     """Container for knn query_embeddings."""
 
-    def __init__(self, embeddings: Union[List[float], List[List[float]]]):
+    def __init__(self, embeddings: list[float] | list[list[float]]):
         if embeddings is None:
             raise ValueError("query_embeddings cannot be None")
-        vectors: List[List[float]] = []
-        if (
-            isinstance(embeddings, list)
-            and embeddings
-            and isinstance(embeddings[0], list)
-        ):
+        vectors: list[list[float]] = []
+        if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
             vectors = [list(vec) for vec in embeddings]  # type: ignore[arg-type]
         elif isinstance(embeddings, list):
             vectors = [list(embeddings)]  # type: ignore[arg-type]
@@ -181,16 +178,14 @@ class EmbeddingsQuery:
 
 
 class _TextBuilder:
-    def __call__(self, texts: Union[str, List[str]]) -> TextQuery:
+    def __call__(self, texts: str | list[str]) -> TextQuery:
         return TextQuery(texts)
 
 
 class _EmbeddingsBuilder:
     field_name = "embeddings"
 
-    def __call__(
-        self, embeddings: Union[List[float], List[List[float]]]
-    ) -> EmbeddingsQuery:
+    def __call__(self, embeddings: list[float] | list[list[float]]) -> EmbeddingsQuery:
         return EmbeddingsQuery(embeddings)
 
 
@@ -205,17 +200,15 @@ EMBEDDINGS_FIELD = "embeddings"
 SCORES = "scores"
 
 
-def _pop_n_results(kwargs: Dict[str, Any]) -> Optional[int]:
+def _pop_n_results(kwargs: dict[str, Any]) -> int | None:
     for key in ("n_results", "n_result", "nresult"):
         if key in kwargs:
             return kwargs.pop(key)
     return None
 
 
-def _combine_filters(
-    base: Optional[Dict[str, Any]], extras: List[Dict[str, Any]]
-) -> Optional[Dict[str, Any]]:
-    filters: List[Dict[str, Any]] = []
+def _combine_filters(base: dict[str, Any] | None, extras: list[dict[str, Any]]) -> dict[str, Any] | None:
+    filters: list[dict[str, Any]] = []
     if base:
         filters.append(copy.deepcopy(base))
     filters.extend(copy.deepcopy(item) for item in extras if item)
@@ -243,17 +236,17 @@ class HybridSearch:
 
     def __init__(
         self,
-        query: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
-        knn: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
-        rank: Optional[Dict[str, Any]] = None,
-        n_results: Optional[int] = None,
-        nresult: Optional[int] = None,
-        include: Optional[List[str]] = None,
-        return_fields: Optional[List[str]] = None,
+        query: dict[str, Any] | list[dict[str, Any]] | None = None,
+        knn: dict[str, Any] | list[dict[str, Any]] | None = None,
+        rank: dict[str, Any] | None = None,
+        n_results: int | None = None,
+        nresult: int | None = None,
+        include: list[str] | None = None,
+        return_fields: list[str] | None = None,
         **kwargs,
     ):
-        self._queries: List[Dict[str, Any]] = []
-        self._knns: List[Dict[str, Any]] = []
+        self._queries: list[dict[str, Any]] = []
+        self._knns: list[dict[str, Any]] = []
         self._rank = copy.deepcopy(rank) if rank else None
         self._n_results = n_results if n_results is not None else nresult
         self._include = copy.deepcopy(include) if include is not None else None
@@ -284,30 +277,26 @@ class HybridSearch:
         if knn:
             self._append_knn_payload(knn)
 
-    def _append_query_payload(
-        self, payload: Union[Dict[str, Any], List[Dict[str, Any]]]
-    ) -> None:
+    def _append_query_payload(self, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
         if isinstance(payload, list):
             self._queries.extend(copy.deepcopy(payload))
         else:
             self._queries.append(copy.deepcopy(payload))
 
-    def _append_knn_payload(
-        self, payload: Union[Dict[str, Any], List[Dict[str, Any]]]
-    ) -> None:
+    def _append_knn_payload(self, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
         if isinstance(payload, list):
             self._knns.extend(copy.deepcopy(payload))
         else:
             self._knns.append(copy.deepcopy(payload))
 
-    def query(self, *filters: Any, **kwargs) -> "HybridSearch":
+    def query(self, *filters: Any, **kwargs) -> HybridSearch:  # noqa: C901
         n_results = _pop_n_results(kwargs)
         boost = kwargs.pop("boost", None)
         where = kwargs.pop("where", None)
         where_document = kwargs.pop("where_document", None)
 
-        doc_filters: List[Dict[str, Any]] = []
-        meta_filters: List[Dict[str, Any]] = []
+        doc_filters: list[dict[str, Any]] = []
+        meta_filters: list[dict[str, Any]] = []
         for item in filters:
             if isinstance(item, DocumentExpression):
                 doc_filters.append(item.to_dict())
@@ -315,9 +304,7 @@ class HybridSearch:
                 meta_filters.append(item.to_dict())
             elif isinstance(item, dict):
                 # Heuristic: document filter keys contain $contains/$not_contains/$and/$or
-                if any(
-                    key in item for key in ("$contains", "$not_contains", "$and", "$or")
-                ):
+                if any(key in item for key in ("$contains", "$not_contains", "$and", "$or")):
                     doc_filters.append(copy.deepcopy(item))
                 else:
                     meta_filters.append(copy.deepcopy(item))
@@ -327,7 +314,7 @@ class HybridSearch:
         final_where_document = _combine_filters(where_document, doc_filters)
         final_where = _combine_filters(where, meta_filters)
 
-        query_payload: Dict[str, Any] = {}
+        query_payload: dict[str, Any] = {}
         if final_where_document is not None:
             query_payload["where_document"] = final_where_document
         if final_where is not None:
@@ -341,22 +328,18 @@ class HybridSearch:
             self._queries.append(query_payload)
         return self
 
-    def knn(self, *filters: Any, **kwargs) -> "HybridSearch":
+    def knn(self, *filters: Any, **kwargs) -> HybridSearch:  # noqa: C901
         n_results = _pop_n_results(kwargs)
         boost = kwargs.pop("boost", None)
         where = kwargs.pop("where", None)
         query_texts = kwargs.pop("query_texts", None)
         query_embeddings = kwargs.pop("query_embeddings", None)
 
-        text_arg: Optional[TextQuery] = None
-        emb_arg: Optional[EmbeddingsQuery] = None
-        meta_filters: List[Dict[str, Any]] = []
+        text_arg: TextQuery | None = None
+        emb_arg: EmbeddingsQuery | None = None
+        meta_filters: list[dict[str, Any]] = []
 
-        if (
-            len(filters) == 1
-            and isinstance(filters[0], dict)
-            and not any([query_texts, query_embeddings, where])
-        ):
+        if len(filters) == 1 and isinstance(filters[0], dict) and not any([query_texts, query_embeddings, where]):
             # Direct knn payload
             knn_payload = copy.deepcopy(filters[0])
             if n_results is not None:
@@ -385,7 +368,7 @@ class HybridSearch:
 
         final_where = _combine_filters(where, meta_filters)
 
-        knn_payload: Dict[str, Any] = {}
+        knn_payload: dict[str, Any] = {}
         if query_texts is not None:
             knn_payload["query_texts"] = query_texts
         if query_embeddings is not None:
@@ -397,17 +380,13 @@ class HybridSearch:
         if boost is not None:
             knn_payload["boost"] = boost
 
-        if not knn_payload.get("query_texts") and not knn_payload.get(
-            "query_embeddings"
-        ):
+        if not knn_payload.get("query_texts") and not knn_payload.get("query_embeddings"):
             raise ValueError("knn requires either query_texts or query_embeddings")
 
         self._knns.append(knn_payload)
         return self
 
-    def rank(
-        self, rank: Optional[Union[str, Dict[str, Any]]] = None, **kwargs
-    ) -> "HybridSearch":
+    def rank(self, rank: str | dict[str, Any] | None = None, **kwargs) -> HybridSearch:
         """
         Configure the ranking strategy.
 
@@ -418,7 +397,7 @@ class HybridSearch:
             rank({"rrf": {"rank_window_size": 60}}) -> legacy dict style
         """
 
-        def _validate_and_build(method: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        def _validate_and_build(method: str, params: dict[str, Any]) -> dict[str, Any]:
             if method != "rrf":
                 raise ValueError("Only 'rrf' rank method is supported")
             if not isinstance(params, dict):
@@ -426,9 +405,7 @@ class HybridSearch:
             allowed_keys = {"rank_window_size", "rank_constant"}
             unsupported = set(params) - allowed_keys
             if unsupported:
-                raise ValueError(
-                    f"Unsupported parameters for rrf rank: {sorted(unsupported)}"
-                )
+                raise ValueError(f"Unsupported parameters for rrf rank: {sorted(unsupported)}")
             # Drop None values to avoid sending unset params
             return {k: copy.deepcopy(v) for k, v in params.items() if v is not None}
 
@@ -451,7 +428,7 @@ class HybridSearch:
         self._rank = {method: validated}
         return self
 
-    def limit(self, n_results: int) -> "HybridSearch":
+    def limit(self, n_results: int) -> HybridSearch:
         self._n_results = n_results
         return self
 
@@ -482,8 +459,8 @@ class HybridSearch:
         self._return_fields = copy.deepcopy(normalized)
         return self
 
-    def select(self, *fields: Any) -> "HybridSearch":
-        include: List[str] = []
+    def select(self, *fields: Any) -> HybridSearch:
+        include: list[str] = []
         for field in fields:
             if field is None:
                 continue
@@ -493,27 +470,20 @@ class HybridSearch:
                 continue
             if isinstance(field, str):
                 name = field.lower()
-                if name in ("documents", "metadatas", "embeddings"):
-                    if name not in include:
-                        include.append(name)
+                if name in ("documents", "metadatas", "embeddings") and name not in include:
+                    include.append(name)
         self._include = include
         return self
 
-    def to_params(self, dimension: Optional[int] = None) -> Dict[str, Any]:
+    def to_params(self, dimension: int | None = None) -> dict[str, Any]:
         """Return a dict containing query/knn/rank/include/n_results for hybrid_search."""
-        query_param: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
+        query_param: dict[str, Any] | list[dict[str, Any]] | None = None
         if self._queries:
-            query_param = (
-                self._queries[0]
-                if len(self._queries) == 1
-                else copy.deepcopy(self._queries)
-            )
+            query_param = self._queries[0] if len(self._queries) == 1 else copy.deepcopy(self._queries)
 
-        knn_param: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
+        knn_param: dict[str, Any] | list[dict[str, Any]] | None = None
         if self._knns:
-            knn_param = (
-                self._knns[0] if len(self._knns) == 1 else copy.deepcopy(self._knns)
-            )
+            knn_param = self._knns[0] if len(self._knns) == 1 else copy.deepcopy(self._knns)
 
         self._validate_knn_embeddings(knn_param, dimension)
 
@@ -522,37 +492,27 @@ class HybridSearch:
             "knn": knn_param,
             "rank": copy.deepcopy(self._rank) if self._rank else None,
             "n_results": self._n_results,
-            "include": copy.deepcopy(self._include)
-            if self._include is not None
-            else None,
-            "return_fields": copy.deepcopy(self._return_fields)
-            if self._return_fields is not None
-            else None,
+            "include": copy.deepcopy(self._include) if self._include is not None else None,
+            "return_fields": copy.deepcopy(self._return_fields) if self._return_fields is not None else None,
         }
 
     @staticmethod
     def _validate_knn_embeddings(
-        knn_param: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]],
-        dimension: Optional[int],
+        knn_param: dict[str, Any] | list[dict[str, Any]] | None,
+        dimension: int | None,
     ) -> None:
         if dimension is None or not knn_param:
             return
 
-        def _validate_vector(vec: List[Any]) -> None:
+        def _validate_vector(vec: list[Any]) -> None:
             if len(vec) != dimension:
-                raise ValueError(
-                    f"Embedding dimension mismatch: expected {dimension}, got {len(vec)}"
-                )
+                raise ValueError(f"Embedding dimension mismatch: expected {dimension}, got {len(vec)}")
 
-        def _extract_vectors(payload: Dict[str, Any]) -> List[List[Any]]:
+        def _extract_vectors(payload: dict[str, Any]) -> list[list[Any]]:
             embeddings = payload.get("query_embeddings")
             if embeddings is None:
                 return []
-            if (
-                isinstance(embeddings, list)
-                and embeddings
-                and isinstance(embeddings[0], list)
-            ):
+            if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
                 return embeddings  # type: ignore[return-value]
             if isinstance(embeddings, list):
                 return [embeddings]  # type: ignore[list-item]

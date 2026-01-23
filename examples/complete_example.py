@@ -12,27 +12,26 @@ This example demonstrates all available operations:
 This is a complete reference for all client capabilities.
 """
 
+import logging
 import uuid
-import random
-import pyseekdb
 
+import pyseekdb
+from pyseekdb import HNSWConfiguration
+
+logging.basicConfig(level=logging.DEBUG)
 # ============================================================================
 # PART 1: CLIENT CONNECTION
 # ============================================================================
 
 # Option 1: Embedded mode (local seekdb)
 client = pyseekdb.Client(
-    # path="./seekdb",
+    # path="./seekdb.db",
     # database="test"
 )
 
 # Option 2: Server mode (remote seekdb server)
 # client = pyseekdb.Client(
-#     host="127.0.0.1",
-#     port=2881,
-#     database="test",
-#     user="root",
-#     password=""
+#     host="127.0.0.1", port=2881, database="test", user="root", password=""
 # )
 
 # Option 3: Remote server mode (OceanBase Server)
@@ -50,26 +49,28 @@ client = pyseekdb.Client(
 # ============================================================================
 
 collection_name = "comprehensive_example"
-dimension = 128
+dimension = 384
 
 # 2.1 Create a collection
-from pyseekdb import HNSWConfiguration
+# create a collection with default configuration and default embedding function
+collection = client.get_or_create_collection(
+    name="demo_default_collection",
+)
 
+# 2.2 Create a collection with custom configuration and no embedding function
 config = HNSWConfiguration(dimension=dimension, distance="cosine")
+default_ef = pyseekdb.DefaultEmbeddingFunction()
 collection = client.get_or_create_collection(
     name=collection_name,
     configuration=config,
-    embedding_function=None,  # Explicitly set to None since we're using custom 128-dim embeddings
+    embedding_function=None,  # Explicitly set to None since we're using custom 384-dim embeddings
 )
 
-# 2.2 Check if collection exists
+# 2.3 Check if collection exists
 exists = client.has_collection(collection_name)
 
-# 2.3 Get collection object
+# 2.4 Get collection object
 retrieved_collection = client.get_collection(collection_name, embedding_function=None)
-
-# 2.4 List all collections
-all_collections = client.list_collections()
 
 # 2.5 Get or create collection (creates if doesn't exist)
 config2 = HNSWConfiguration(dimension=64, distance="cosine")
@@ -79,12 +80,42 @@ collection2 = client.get_or_create_collection(
     embedding_function=None,  # Explicitly set to None since we're using custom 64-dim embeddings
 )
 
+
+# 2.6 Create a collection with custom embedding function
+@pyseekdb.register_embedding_function
+class CustomEmbeddingFunction(pyseekdb.EmbeddingFunction):
+    def __init__(self):
+        self._ef = pyseekdb.DefaultEmbeddingFunction()  # use the default embedding function
+
+    def __call__(self, documents):
+        return self._ef(documents)
+
+    def get_config(self) -> dict:
+        return self._ef.get_config()
+
+    @staticmethod
+    def build_from_config(_config: dict) -> "CustomEmbeddingFunction":
+        return CustomEmbeddingFunction()
+
+    @staticmethod
+    def name() -> str:
+        return "custom_embedding"
+
+
+custom_ef = CustomEmbeddingFunction()
+collection3 = client.get_or_create_collection(
+    name="custom_embedding_collection",
+    embedding_function=custom_ef,
+)
+
+# 2.7 List all collections
+all_collections = client.list_collections()
+
 # ============================================================================
 # PART 3: DML OPERATIONS - ADD DATA
 # ============================================================================
 
 # Generate sample data
-random.seed(42)
 documents = [
     "Machine learning is transforming the way we solve problems",
     "Python programming language is widely used in data science",
@@ -97,19 +128,17 @@ documents = [
 ]
 
 # Generate embeddings (in real usage, use an embedding model)
-embeddings = []
-for i in range(len(documents)):
-    vector = [random.random() for _ in range(dimension)]
-    embeddings.append(vector)
+embeddings = default_ef(documents)
 
 ids = [str(uuid.uuid4()) for _ in documents]
 
 # 3.1 Add single item
 single_id = str(uuid.uuid4())
+document = "This is a single document"
 collection.add(
     ids=single_id,
     documents="This is a single document",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=default_ef(document),
     metadatas={"type": "single", "category": "test"},
 )
 
@@ -134,7 +163,7 @@ collection.add(
 vector_only_ids = [str(uuid.uuid4()) for _ in range(2)]
 collection.add(
     ids=vector_only_ids,
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    embeddings=default_ef([str(i) for i in range(2)]),
     metadatas=[{"type": "vector_only"}, {"type": "vector_only"}],
 )
 
@@ -155,10 +184,14 @@ collection.update(
 )
 
 # 4.2 Update multiple items
+update_documents = [
+    "Updated document 1",
+    "Updated document 2",
+]
 collection.update(
     ids=ids[1:3],
-    documents=["Updated document 1", "Updated document 2"],
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    documents=update_documents,
+    embeddings=default_ef(update_documents),
     metadatas=[
         {"category": "Programming", "score": 95, "updated": True},
         {"category": "Database", "score": 97, "updated": True},
@@ -166,8 +199,12 @@ collection.update(
 )
 
 # 4.3 Update embeddings
-new_embeddings = [[random.random() for _ in range(dimension)] for _ in range(2)]
-collection.update(ids=ids[2:4], embeddings=new_embeddings)
+update_documents = [
+    "Search engines find relevant documents using semantic vectors",
+    "Deep learning architectures are inspired by biological neurons",
+]
+update_embeddings = default_ef(update_documents)
+collection.update(ids=ids[2:4], embeddings=update_embeddings)
 
 # ============================================================================
 # PART 5: DML OPERATIONS - UPSERT DATA
@@ -177,25 +214,31 @@ collection.update(ids=ids[2:4], embeddings=new_embeddings)
 collection.upsert(
     ids=ids[0],
     documents="Upserted document (was updated)",
-    embeddings=[random.random() for _ in range(dimension)],
+    embeddings=default_ef("Upserted document (was updated)"),
     metadatas={"category": "AI", "upserted": True},
 )
 
 # 5.2 Upsert new item (will insert)
 new_id = str(uuid.uuid4())
+new_document = "This is a new document from upsert"
 collection.upsert(
     ids=new_id,
-    documents="This is a new document from upsert",
-    embeddings=[random.random() for _ in range(dimension)],
+    documents=new_document,
+    embeddings=default_ef(new_document),
     metadatas={"category": "New", "upserted": True},
 )
 
 # 5.3 Upsert multiple items
 upsert_ids = [ids[4], str(uuid.uuid4())]  # One existing, one new
+upsert_documents = [
+    "Upserted document 1",
+    "Upserted document 2",
+]
+upsert_embeddings = default_ef(upsert_documents)
 collection.upsert(
     ids=upsert_ids,
-    documents=["Upserted doc 1", "Upserted doc 2"],
-    embeddings=[[random.random() for _ in range(dimension)] for _ in range(2)],
+    documents=upsert_documents,
+    embeddings=upsert_embeddings,
     metadatas=[{"upserted": True}, {"upserted": True}],
 )
 
@@ -209,14 +252,10 @@ results = collection.query(query_embeddings=query_vector, n_results=3)
 print(f"Query results: {len(results['ids'][0])} items")
 
 # 6.2 Query with metadata filter (simplified equality)
-results = collection.query(
-    query_embeddings=query_vector, where={"category": "AI"}, n_results=5
-)
+results = collection.query(query_embeddings=query_vector, where={"category": "AI"}, n_results=5)
 
 # 6.3 Query with comparison operators
-results = collection.query(
-    query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5
-)
+results = collection.query(query_embeddings=query_vector, where={"score": {"$gte": 90}}, n_results=5)
 
 # 6.4 Query with $in operator
 results = collection.query(
@@ -291,9 +330,7 @@ results = collection.get(where={"score": {"$gte": 90}}, limit=5)
 results = collection.get(where={"tag": {"$in": ["ml", "python"]}}, limit=5)
 
 # 7.6 Get with logical operators (simplified equality)
-results = collection.get(
-    where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5
-)
+results = collection.get(where={"$or": [{"category": "AI"}, {"category": "Programming"}]}, limit=5)
 
 # 7.7 Get by document filter
 results = collection.get(where_document={"$contains": "Python"}, limit=5)
@@ -349,9 +386,7 @@ collection.delete(where={"type": {"$eq": "vector_only"}})
 collection.delete(where_document={"$contains": "Updated document"})
 
 # 9.4 Delete with combined filters
-collection.delete(
-    where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"}
-)
+collection.delete(where={"category": {"$eq": "CV"}}, where_document={"$contains": "vision"})
 
 # ============================================================================
 # PART 10: COLLECTION INFORMATION

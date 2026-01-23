@@ -1,10 +1,11 @@
 import os
 import traceback
+
 import streamlit as st
 from dotenv import load_dotenv
 from embedding_function_factory import create_embedding_function
-from seekdb_utils import get_seekdb_client, get_database_stats, seekdb_query
 from llm import get_llm_answer, get_llm_client
+from seekdb_utils import get_database_stats, get_seekdb_client, seekdb_query
 
 load_dotenv()
 # Page config
@@ -25,9 +26,7 @@ def init_clients():
     """Initialize and cache all clients."""
     seekdb_client = get_seekdb_client(db_dir=DB_DIR, db_name=DB_NAME)
 
-    collection = seekdb_client.get_collection(
-        name=COLLECTION_NAME, embedding_function=create_embedding_function()
-    )
+    collection = seekdb_client.get_collection(name=COLLECTION_NAME, embedding_function=create_embedding_function())
 
     llm = get_llm_client()
 
@@ -160,9 +159,7 @@ with st.sidebar:
 
     if st.session_state.results:
         for idx, result in enumerate(st.session_state.results, 1):
-            filename = (
-                os.path.basename(result["source"]) if result["source"] else "Unknown"
-            )
+            filename = os.path.basename(result["source"]) if result["source"] else "Unknown"
 
             with st.expander(f"{idx}. {filename}", expanded=False):
                 st.caption(f"L2 Distance: {result['distance']:.4f}")

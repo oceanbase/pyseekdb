@@ -1,12 +1,12 @@
-import sys
 import os
+import sys
+from collections.abc import Iterator
 from glob import glob
-from tqdm import tqdm
-from typing import Dict, List, Iterator
 
+from dotenv import load_dotenv
 from embedding_function_factory import create_embedding_function
 from seekdb_utils import get_seekdb_client, get_seekdb_collection, insert_embeddings
-from dotenv import load_dotenv
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -14,7 +14,7 @@ MAX_TEXT_LENGTH = 8000
 BATCH_SIZE = 10
 
 
-def load_markdown_files(data_path: str) -> Dict[str, List[str]]:
+def load_markdown_files(data_path: str) -> dict[str, list[str]]:
     """Load markdown files from a directory or a single file and split into chunks by headers."""
     text_dict = {}
 
@@ -24,9 +24,7 @@ def load_markdown_files(data_path: str) -> Dict[str, List[str]]:
             print(f"Loading single markdown file: {data_path}")
             files = [data_path]
         else:
-            print(
-                f"Warning: File '{data_path}' is not a markdown file (.md). Skipping."
-            )
+            print(f"Warning: File '{data_path}' is not a markdown file (.md). Skipping.")
             return text_dict
     else:
         # Treat as directory
@@ -35,7 +33,7 @@ def load_markdown_files(data_path: str) -> Dict[str, List[str]]:
 
     for file_path in files:
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 chunks = [c.strip() for c in f.read().split("# ") if c.strip()]
                 if chunks:
                     text_dict[file_path] = chunks
@@ -46,7 +44,7 @@ def load_markdown_files(data_path: str) -> Dict[str, List[str]]:
     return text_dict
 
 
-def prepare_data(text_dict: Dict[str, List[str]]) -> Iterator[dict]:
+def prepare_data(text_dict: dict[str, list[str]]) -> Iterator[dict]:
     """Prepare data for insertion (text only, embeddings will be auto-generated)."""
     total_chunks = sum(len(chunks) for chunks in text_dict.values())
 
@@ -66,7 +64,10 @@ def prepare_data(text_dict: Dict[str, List[str]]) -> Iterator[dict]:
 
 
 def process_and_insert_data(
-    data_path: str, db_dir: str = None, db_name: str = None, collection_name: str = None
+    data_path: str,
+    db_dir: str | None = None,
+    db_name: str | None = None,
+    collection_name: str | None = None,
 ):
     """Process text data and insert into seekdb using local embedding model."""
     # Read from environment variables if not provided

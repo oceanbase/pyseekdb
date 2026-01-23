@@ -16,36 +16,39 @@ All factories use the underlying ServerAPI implementations:
 - RemoteServerClient - Remote server via pymysql (supports both seekdb Server and OceanBase Server)
 """
 
-import os
 import logging
-from typing import Optional, Any
+import os
+from typing import Any
+
+from .admin_client import AdminAPI, _AdminClientProxy, _ClientProxy
 from .base_connection import BaseConnection
 from .client_base import BaseClient, ClientAPI
-from .configuration import Configuration, HNSWConfiguration, FulltextParserConfig
-from .embedding_function import (
-    EmbeddingFunction,
-    DefaultEmbeddingFunction,
-    get_default_embedding_function,
-)
 from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
+from .configuration import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
 from .database import Database
-from .version import Version
-from .admin_client import AdminAPI, _AdminClientProxy, _ClientProxy
-from .hybrid_search import (
-    HybridSearch,
-    DOCUMENT,
-    TEXT,
-    EMBEDDINGS,
-    K,
-    IDS,
-    DOCUMENTS,
-    METADATAS,
-    EMBEDDINGS_FIELD,
-    SCORES,
+from .embedding_function import (
+    DefaultEmbeddingFunction,
+    EmbeddingFunction,
+    get_default_embedding_function,
+    register_embedding_function,
 )
+from .hybrid_search import (
+    DOCUMENT,
+    DOCUMENTS,
+    EMBEDDINGS,
+    EMBEDDINGS_FIELD,
+    IDS,
+    METADATAS,
+    SCORES,
+    TEXT,
+    HybridSearch,
+    K,
+)
+from .version import Version
 
 logger = logging.getLogger(__name__)
+
 
 def _resolve_password(password: str) -> str:
     """Get password from env if not provided (keeps existing behavior)."""
@@ -59,12 +62,12 @@ def _default_seekdb_path() -> str:
 
 def _create_server_client(
     *,
-    path: Optional[str],
-    host: Optional[str],
-    port: Optional[int],
+    path: str | None,
+    host: str | None,
+    port: int | None,
     tenant: str,
     database: str,
-    user: Optional[str],
+    user: str | None,
     password: str,
     is_admin: bool,
     **kwargs: Any,
@@ -77,9 +80,9 @@ def _create_server_client(
     """
     if path is not None:
         if is_admin:
-            logger.info(f"Creating embedded admin client: path={path}")
+            logger.debug(f"Creating embedded admin client: path={path}")
         else:
-            logger.info(f"Creating embedded client: path={path}, database={database}")
+            logger.debug(f"Creating embedded client: path={path}, database={database}")
         return SeekdbEmbeddedClient(path=path, database=database, **kwargs)
 
     if host is not None:
@@ -89,9 +92,9 @@ def _create_server_client(
         if user is None:
             user = "root"
         if is_admin:
-            logger.info(f"Creating remote server admin client: {user}@{tenant}@{host}:{port}")
+            logger.debug(f"Creating remote server admin client: {user}@{tenant}@{host}:{port}")
         else:
-            logger.info(f"Creating remote server client: {user}@{tenant}@{host}:{port}/{database}")
+            logger.debug(f"Creating remote server client: {user}@{tenant}@{host}:{port}/{database}")
         return RemoteServerClient(
             host=host,
             port=port,
@@ -108,9 +111,9 @@ def _create_server_client(
     if _PYLIBSEEKDB_AVAILABLE:
         default_path = _default_seekdb_path()
         if is_admin:
-            logger.info(f"Creating embedded admin client (default): path={default_path}")
+            logger.debug(f"Creating embedded admin client (default): path={default_path}")
         else:
-            logger.info(f"Creating embedded client (default): path={default_path}, database={database}")
+            logger.debug(f"Creating embedded client (default): path={default_path}, database={database}")
         return SeekdbEmbeddedClient(path=default_path, database=database, **kwargs)
 
     raise ValueError(
@@ -118,43 +121,45 @@ def _create_server_client(
         "Please provide host/port parameters to use RemoteServerClient."
     )
 
+
 __all__ = [
-    "BaseConnection",
-    "BaseClient",
-    "ClientAPI",
-    "HNSWConfiguration",
-    "Configuration",
-    "FulltextParserConfig",
-    "EmbeddingFunction",
-    "DefaultEmbeddingFunction",
-    "get_default_embedding_function",
-    "SeekdbEmbeddedClient",
-    "RemoteServerClient",
-    "Client",
+    "DOCUMENT",
+    "DOCUMENTS",
+    "EMBEDDINGS",
+    "EMBEDDINGS_FIELD",
+    "IDS",
+    "METADATAS",
+    "SCORES",
+    "TEXT",
     "AdminAPI",
     "AdminClient",
+    "BaseClient",
+    "BaseConnection",
+    "Client",
+    "ClientAPI",
+    "Configuration",
     "Database",
+    "DefaultEmbeddingFunction",
+    "EmbeddingFunction",
+    "FulltextAnalyzerConfig",
+    "HNSWConfiguration",
     "HybridSearch",
-    "DOCUMENT",
-    "TEXT",
-    "EMBEDDINGS",
     "K",
-    "IDS",
-    "DOCUMENTS",
-    "METADATAS",
-    "EMBEDDINGS_FIELD",
-    "SCORES",
+    "RemoteServerClient",
+    "SeekdbEmbeddedClient",
     "Version",
+    "get_default_embedding_function",
+    "register_embedding_function",
 ]
 
 
 def Client(
-    path: Optional[str] = None,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    path: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
     tenant: str = "sys",
     database: str = "test",
-    user: Optional[str] = None,
+    user: str | None = None,
     password: str = "",  # Can be retrieved from SEEKDB_PASSWORD environment variable
     **kwargs,
 ) -> _ClientProxy:
@@ -230,11 +235,11 @@ def Client(
 
 
 def AdminClient(
-    path: Optional[str] = None,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    path: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
     tenant: str = "sys",
-    user: Optional[str] = None,
+    user: str | None = None,
     password: str = "",  # Can be retrieved from SEEKDB_PASSWORD environment variable
     **kwargs,
 ) -> _AdminClientProxy:

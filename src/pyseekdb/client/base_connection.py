@@ -2,8 +2,11 @@
 Base connection interface definition
 """
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class BaseConnection(ABC):
@@ -60,7 +63,7 @@ class BaseConnection(ABC):
         try:
             if hasattr(self, "_connection") and self.is_connected():
                 self._cleanup()
-        except Exception:
+        except Exception as exc:
             # Ignore all exceptions in destructor
             # Avoid issues during interpreter shutdown
-            pass
+            logger.debug("Failed to cleanup connection in destructor: %s", exc)

@@ -4,8 +4,26 @@ Utility functions and classes for SQL string generation and escaping in seekdb c
 Provides helpers to safely stringify values and SQL identifiers for insertion into SQL expressions.
 """
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
+
 from pymysql.converters import escape_string
+
+
+def escape_percent_for_sql(value: str) -> str:
+    """
+    Escape percent signs in SQL string values to prevent format string interpretation.
+
+    When pymysql's cursor.execute() processes SQL strings, it may interpret % as format
+    specifiers. This function escapes % to %% to prevent that.
+
+    Args:
+        value: String value that may contain % characters
+
+    Returns:
+        String with % escaped as %%
+    """
+    return value.replace("%", "%%")
 
 
 def is_query_sql(sql: str) -> bool:
@@ -26,11 +44,9 @@ def render_sql_with_params(sql: str, params: Sequence[Any]) -> str:
     parts = sql.split("%s")
     placeholder_count = len(parts) - 1
     if placeholder_count != len(params):
-        raise ValueError(
-            f"Expected {placeholder_count} parameters, got {len(params)}"
-        )
+        raise ValueError(f"Expected {placeholder_count} parameters, got {len(params)}")
     rendered_parts = [parts[0]]
-    for param, part in zip(params, parts[1:]):
+    for param, part in zip(params, parts[1:], strict=True):
         if param is None:
             replacement = "NULL"
         elif isinstance(param, (bytes, bytearray, memoryview)):

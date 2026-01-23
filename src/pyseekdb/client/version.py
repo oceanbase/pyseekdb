@@ -2,8 +2,6 @@
 Version class for representing and comparing database versions
 """
 
-from typing import List, Optional, Tuple
-
 
 class Version:
     """
@@ -38,23 +36,19 @@ class Version:
 
         parts = version_str.split(".")
         if len(parts) not in (3, 4):
-            raise ValueError(
-                f"Version format should be x.x.x or x.x.x.x (3 or 4 numeric parts), got: {version_str}"
-            )
+            raise ValueError(f"Version format should be x.x.x or x.x.x.x (3 or 4 numeric parts), got: {version_str}")
 
         try:
             self._parts = [int(part) for part in parts]
         except ValueError as e:
-            raise ValueError(
-                f"Version parts must be numeric, got: {version_str}"
-            ) from e
+            raise ValueError(f"Version parts must be numeric, got: {version_str}") from e
 
         # Normalize to 4 parts for comparison (pad with 0 if needed)
         if len(self._parts) == 3:
             self._parts.append(0)
 
     @property
-    def parts(self) -> Tuple[int, int, int, int]:
+    def parts(self) -> tuple[int, int, int, int]:
         """Get version parts as tuple"""
         return tuple(self._parts)
 

@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union, Any, Dict
-from .embedding_function import get_default_embedding_function, dimension_of
 
 # Default configuration constants
 # Note: Default embedding function (DefaultEmbeddingFunction) produces 384-dim embeddings
@@ -23,17 +21,17 @@ class DistanceMetric(str, Enum):
 
 
 @dataclass
-class FulltextParserConfig:
+class FulltextAnalyzerConfig:
     """
-    Fulltext parser configuration for fulltext indexing.
+    Fulltext analyzer configuration for fulltext indexing.
 
     Args:
-        parser: Parser name, can be 'space', 'ngram', 'ngram2', 'beng', 'ik' and so on (default: 'ik')
-        params: Optional dictionary of parser-specific parameters (key: string, value: primitive type)
+        analyzer: Analyzer name, can be 'space', 'ngram', 'ngram2', 'beng', 'ik' and so on (default: 'ik')
+        properties: Optional dictionary of parser-specific parameters (key: string, value: primitive type)
     """
 
-    parser: str = "ik"
-    params: Optional[Dict[str, Union[str, int, float, bool]]] = None
+    analyzer: str = "ik"
+    properties: dict[str, str | int | float | bool] | None = None
 
 
 @dataclass
@@ -47,16 +45,14 @@ class HNSWConfiguration:
     """
 
     dimension: int
-    distance: str = DistanceMetric.L2
+    distance: str = DistanceMetric.L2.value
 
     def __post_init__(self):
         if self.dimension <= 0:
             raise ValueError(f"dimension must be positive, got {self.dimension}")
         valid_distances = [e.value for e in DistanceMetric]
         if self.distance not in valid_distances:
-            raise ValueError(
-                f"distance must be one of {valid_distances}, got {self.distance}"
-            )
+            raise ValueError(f"distance must be one of {valid_distances}, got {self.distance}")
 
 
 class Configuration:
@@ -65,17 +61,17 @@ class Configuration:
 
     Args:
         hnsw: HNSWConfiguration or None
-        fulltext_config: FulltextParserConfig or None. If None, defaults to FulltextParserConfig(parser='ik')
+        fulltext_config: FulltextAnalyzerConfig or None. If None, defaults to FulltextAnalyzerConfig(analyzer='ik')
     """
 
     def __init__(
         self,
-        hnsw: Optional[HNSWConfiguration] = None,
-        fulltext_config: Optional[FulltextParserConfig] = None,
+        hnsw: HNSWConfiguration | None = None,
+        fulltext_config: FulltextAnalyzerConfig | None = None,
     ):
         self.hnsw = hnsw
         self.fulltext_config = fulltext_config
 
 
 # Type alias for configuration parameter that can be HNSWConfiguration, None, or sentinel
-ConfigurationParam = Union[Configuration, HNSWConfiguration, None]
+ConfigurationParam = Configuration | HNSWConfiguration | None

@@ -3,8 +3,9 @@ Empty value handling tests - testing upsert operations with empty strings, empty
 Tests the fixes for falsy value handling bugs in _collection_upsert method using db_client fixture
 """
 
-import pytest
 import time
+
+import pytest
 
 import pyseekdb
 
@@ -46,19 +47,17 @@ class TestEmptyValueHandling:
             # Test 5: Mixed empty and non-empty values in batch operations
             self._test_mixed_empty_values_batch(collection)
 
-            print(f"✅ All empty value tests passed")
+            print("✅ All empty value tests passed")
         finally:
             # Cleanup
             try:
                 db_client.delete_collection(name=collection_name)
             except Exception as cleanup_error:
-                print(
-                    f"Warning: failed to cleanup collection '{collection_name}': {cleanup_error}"
-                )
+                print(f"Warning: failed to cleanup collection '{collection_name}': {cleanup_error}")
 
     def _test_upsert_update_empty_document(self, collection):
         """Test upsert update path with empty string document (Line 1072 fix)"""
-        print(f"\n🔍 Testing upsert update path - empty document")
+        print("\n🔍 Testing upsert update path - empty document")
 
         # Add initial document
         test_id = f"update_test_{int(time.time() * 1000)}"
@@ -77,7 +76,7 @@ class TestEmptyValueHandling:
         ]
 
         for doc_value, description in test_cases:
-            print(f"   Testing {description}: {repr(doc_value)}")
+            print(f"   Testing {description}: {doc_value!r}")
 
             # Upsert with empty/falsy document value (triggers Line 1072 fix)
             collection.upsert(
@@ -88,25 +87,19 @@ class TestEmptyValueHandling:
 
             # Verify the document was stored correctly
             results = collection.get(ids=[test_id], include=["documents", "metadatas"])
-            assert len(results["ids"]) == 1, (
-                f"Should find exactly one result for {description}"
-            )
+            assert len(results["ids"]) == 1, f"Should find exactly one result for {description}"
 
             actual_doc = results["documents"][0]
-            assert actual_doc == doc_value, (
-                f"Expected {repr(doc_value)}, got {repr(actual_doc)} for {description}"
-            )
+            assert actual_doc == doc_value, f"Expected {doc_value!r}, got {actual_doc!r} for {description}"
 
             # Ensure it's not the literal string 'NULL'
-            assert actual_doc != "NULL", (
-                f"Document should not be literal 'NULL' string for {description}"
-            )
+            assert actual_doc != "NULL", f"Document should not be literal 'NULL' string for {description}"
 
-            print(f"   ✅ {description} correctly stored as {repr(actual_doc)}")
+            print(f"   ✅ {description} correctly stored as {actual_doc!r}")
 
     def _test_upsert_insert_empty_document(self, collection):
         """Test upsert insert path with empty string document (Line 1093 fix)"""
-        print(f"\n🔍 Testing upsert insert path - empty document")
+        print("\n🔍 Testing upsert insert path - empty document")
 
         # Test cases for empty document values in insert path
         test_cases = [
@@ -118,7 +111,7 @@ class TestEmptyValueHandling:
 
         for i, (doc_value, description) in enumerate(test_cases):
             test_id = f"insert_test_{i}_{int(time.time() * 1000)}"
-            print(f"   Testing {description}: {repr(doc_value)}")
+            print(f"   Testing {description}: {doc_value!r}")
 
             # Upsert non-existing record (triggers Line 1093 fix)
             collection.upsert(
@@ -129,32 +122,24 @@ class TestEmptyValueHandling:
 
             # Verify the document was stored correctly
             results = collection.get(ids=[test_id], include=["documents", "metadatas"])
-            assert len(results["ids"]) == 1, (
-                f"Should create exactly one result for {description}"
-            )
+            assert len(results["ids"]) == 1, f"Should create exactly one result for {description}"
 
             actual_doc = results["documents"][0]
-            assert actual_doc == doc_value, (
-                f"Expected {repr(doc_value)}, got {repr(actual_doc)} for {description}"
-            )
+            assert actual_doc == doc_value, f"Expected {doc_value!r}, got {actual_doc!r} for {description}"
 
             # Ensure it's not None/NULL
-            assert actual_doc is not None, (
-                f"Document should not be None for {description}"
-            )
+            assert actual_doc is not None, f"Document should not be None for {description}"
 
-            print(f"   ✅ {description} correctly stored as {repr(actual_doc)}")
+            print(f"   ✅ {description} correctly stored as {actual_doc!r}")
 
     def _test_upsert_empty_metadata(self, collection):
         """Test upsert with empty metadata (should work correctly)"""
-        print(f"\n🔍 Testing upsert empty metadata")
+        print("\n🔍 Testing upsert empty metadata")
 
         test_id = f"meta_test_{int(time.time() * 1000)}"
 
         # Add initial document
-        collection.add(
-            ids=[test_id], documents=["test document"], metadatas=[{"initial": "value"}]
-        )
+        collection.add(ids=[test_id], documents=["test document"], metadatas=[{"initial": "value"}])
 
         # Test cases for metadata values
         test_cases = [
@@ -170,26 +155,20 @@ class TestEmptyValueHandling:
             print(f"   Testing {description}: {meta_value}")
 
             # Upsert with test metadata
-            collection.upsert(
-                ids=[test_id], documents=["updated document"], metadatas=[meta_value]
-            )
+            collection.upsert(ids=[test_id], documents=["updated document"], metadatas=[meta_value])
 
             # Verify the metadata was stored correctly
             results = collection.get(ids=[test_id], include=["documents", "metadatas"])
-            assert len(results["ids"]) == 1, (
-                f"Should find exactly one result for {description}"
-            )
+            assert len(results["ids"]) == 1, f"Should find exactly one result for {description}"
 
             actual_meta = results["metadatas"][0]
-            assert actual_meta == meta_value, (
-                f"Expected {meta_value}, got {actual_meta} for {description}"
-            )
+            assert actual_meta == meta_value, f"Expected {meta_value}, got {actual_meta} for {description}"
 
             print(f"   ✅ {description} correctly stored as {actual_meta}")
 
     def _test_add_empty_values_baseline(self, collection):
         """Test add method with empty values as baseline (should work correctly)"""
-        print(f"\n🔍 Testing add method baseline - empty values")
+        print("\n🔍 Testing add method baseline - empty values")
 
         # Test cases for add method with empty values
         test_cases = [
@@ -200,7 +179,7 @@ class TestEmptyValueHandling:
 
         for i, (doc_value, description) in enumerate(test_cases):
             test_id = f"add_baseline_{i}_{int(time.time() * 1000)}"
-            print(f"   Testing {description}: {repr(doc_value)}")
+            print(f"   Testing {description}: {doc_value!r}")
 
             # Add with empty document value (baseline test)
             collection.add(
@@ -211,16 +190,12 @@ class TestEmptyValueHandling:
 
             # Verify the document was stored correctly
             results = collection.get(ids=[test_id], include=["documents", "metadatas"])
-            assert len(results["ids"]) == 1, (
-                f"Should find exactly one result for {description}"
-            )
+            assert len(results["ids"]) == 1, f"Should find exactly one result for {description}"
 
             actual_doc = results["documents"][0]
-            assert actual_doc == doc_value, (
-                f"Expected {repr(doc_value)}, got {repr(actual_doc)} for {description}"
-            )
+            assert actual_doc == doc_value, f"Expected {doc_value!r}, got {actual_doc!r} for {description}"
 
-            print(f"   ✅ {description} correctly stored as {repr(actual_doc)}")
+            print(f"   ✅ {description} correctly stored as {actual_doc!r}")
 
     def _test_mixed_empty_values_batch(self, collection):
         """Test mixed empty and non-empty values in batch operations"""
@@ -243,18 +218,12 @@ class TestEmptyValueHandling:
         results = collection.get(ids=test_ids, include=["documents", "metadatas"])
         assert len(results["ids"]) == 4, "Should find all 4 results"
 
-        for i, (expected_doc, expected_meta) in enumerate(
-            zip(updated_docs, updated_metas)
-        ):
+        for i, (expected_doc, expected_meta) in enumerate(zip(updated_docs, updated_metas, strict=True)):
             actual_doc = results["documents"][i]
             actual_meta = results["metadatas"][i]
 
-            assert actual_doc == expected_doc, (
-                f"Document {i}: expected {repr(expected_doc)}, got {repr(actual_doc)}"
-            )
-            assert actual_meta == expected_meta, (
-                f"Metadata {i}: expected {expected_meta}, got {actual_meta}"
-            )
+            assert actual_doc == expected_doc, f"Document {i}: expected {expected_doc!r}, got {actual_doc!r}"
+            assert actual_meta == expected_meta, f"Metadata {i}: expected {expected_meta}, got {actual_meta}"
 
         print("✅ Mixed empty and non-empty values handled correctly")
 

@@ -8,15 +8,14 @@ Supports:
 """
 
 import json
-import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, ClassVar
 
 
 class FilterBuilder:
     """Build SQL WHERE clauses from filter dictionaries"""
 
     # Comparison operators mapping
-    COMPARISON_OPS = {
+    COMPARISON_OPS: ClassVar[dict[str, str]] = {
         "$eq": "=",
         "$lt": "<",
         "$gt": ">",
@@ -26,15 +25,13 @@ class FilterBuilder:
     }
 
     # Logical operators
-    LOGICAL_OPS = ["$and", "$or", "$not"]
+    LOGICAL_OPS: ClassVar[list[str]] = ["$and", "$or", "$not"]
 
     # Document operators
-    DOCUMENT_OPS = ["$contains", "$regex"]
+    DOCUMENT_OPS: ClassVar[list[str]] = ["$contains", "$regex"]
 
     @staticmethod
-    def build_metadata_filter(
-        where: Dict[str, Any], metadata_column: str = "metadata"
-    ) -> Tuple[str, List[Any]]:
+    def build_metadata_filter(where: dict[str, Any], metadata_column: str = "metadata") -> tuple[str, list[Any]]:
         """
         Build WHERE clause for metadata filtering
 
@@ -59,8 +56,8 @@ class FilterBuilder:
 
     @staticmethod
     def build_document_filter(
-        where_document: Dict[str, Any], document_column: str = "document"
-    ) -> Tuple[str, List[Any]]:
+        where_document: dict[str, Any], document_column: str = "document"
+    ) -> tuple[str, list[Any]]:
         """
         Build WHERE clause for document filtering
 
@@ -84,11 +81,11 @@ class FilterBuilder:
         return FilterBuilder._build_document_condition(where_document, document_column)
 
     @staticmethod
-    def _build_condition(
-        condition: Dict[str, Any],
+    def _build_condition(  # noqa: C901
+        condition: dict[str, Any],
         metadata_column: str,
-        params: Optional[List[Any]] = None,
-    ) -> Tuple[str, List[Any]]:
+        params: list[Any] | None = None,
+    ) -> tuple[str, list[Any]]:
         """Recursively build condition from nested dictionary"""
         if params is None:
             params = []
@@ -101,25 +98,19 @@ class FilterBuilder:
                 if key == "$and":
                     sub_clauses = []
                     for sub_condition in value:
-                        sub_clause, params = FilterBuilder._build_condition(
-                            sub_condition, metadata_column, params
-                        )
+                        sub_clause, params = FilterBuilder._build_condition(sub_condition, metadata_column, params)
                         sub_clauses.append(sub_clause)
                     clauses.append(f"({' AND '.join(sub_clauses)})")
 
                 elif key == "$or":
                     sub_clauses = []
                     for sub_condition in value:
-                        sub_clause, params = FilterBuilder._build_condition(
-                            sub_condition, metadata_column, params
-                        )
+                        sub_clause, params = FilterBuilder._build_condition(sub_condition, metadata_column, params)
                         sub_clauses.append(sub_clause)
                     clauses.append(f"({' OR '.join(sub_clauses)})")
 
                 elif key == "$not":
-                    sub_clause, params = FilterBuilder._build_condition(
-                        value, metadata_column, params
-                    )
+                    sub_clause, params = FilterBuilder._build_condition(value, metadata_column, params)
                     clauses.append(f"NOT ({sub_clause})")
 
             elif isinstance(value, dict):
@@ -128,9 +119,7 @@ class FilterBuilder:
                     if op == "$eq":
                         # Use JSON_OVERLAPS for $eq to support both scalar and array fields
                         json_value = json.dumps([op_value])
-                        clauses.append(
-                            f"JSON_OVERLAPS(JSON_EXTRACT({metadata_column}, '$.{key}'), CAST(%s AS JSON))"
-                        )
+                        clauses.append(f"JSON_OVERLAPS(JSON_EXTRACT({metadata_column}, '$.{key}'), CAST(%s AS JSON))")
                         params.append(json_value)
                     elif op == "$ne":
                         # Use NOT JSON_OVERLAPS for $ne to support both scalar and array fields
@@ -141,9 +130,7 @@ class FilterBuilder:
                         params.append(json_value)
                     elif op in FilterBuilder.COMPARISON_OPS:
                         sql_op = FilterBuilder.COMPARISON_OPS[op]
-                        clauses.append(
-                            f"JSON_EXTRACT({metadata_column}, '$.{key}') {sql_op} %s"
-                        )
+                        clauses.append(f"JSON_EXTRACT({metadata_column}, '$.{key}') {sql_op} %s")
                         params.append(op_value)
 
                     elif op == "$in":
@@ -156,9 +143,7 @@ class FilterBuilder:
 
                         # Use single JSON_OVERLAPS (supports both scalar and array fields)
                         json_array = json.dumps(list(op_value))
-                        clauses.append(
-                            f"JSON_OVERLAPS(JSON_EXTRACT({metadata_column}, '$.{key}'), CAST(%s AS JSON))"
-                        )
+                        clauses.append(f"JSON_OVERLAPS(JSON_EXTRACT({metadata_column}, '$.{key}'), CAST(%s AS JSON))")
                         params.append(json_array)
 
                     elif op == "$nin":
@@ -179,9 +164,7 @@ class FilterBuilder:
                 # Direct equality comparison (no operator specified)
                 # Use JSON_OVERLAPS to support both scalar and array fields
                 json_value = json.dumps([value])
-                clauses.append(
-                    f"JSON_OVERLAPS(JSON_EXTRACT({metadata_column}, '$.{key}'), CAST(%s AS JSON))"
-                )
+                clauses.append(f"JSON_OVERLAPS(JSON_EXTRACT({metadata_column}, '$.{key}'), CAST(%s AS JSON))")
                 params.append(json_value)
 
         where_clause = " AND ".join(clauses) if clauses else "1=1"
@@ -189,10 +172,10 @@ class FilterBuilder:
 
     @staticmethod
     def _build_document_condition(
-        condition: Dict[str, Any],
+        condition: dict[str, Any],
         document_column: str,
-        params: Optional[List[Any]] = None,
-    ) -> Tuple[str, List[Any]]:
+        params: list[Any] | None = None,
+    ) -> tuple[str, list[Any]]:
         """Build document filter condition"""
         if params is None:
             params = []
@@ -202,9 +185,7 @@ class FilterBuilder:
         for key, value in condition.items():
             if key == "$contains":
                 # Full-text search using MATCH AGAINST
-                clauses.append(
-                    f"MATCH({document_column}) AGAINST (%s IN NATURAL LANGUAGE MODE)"
-                )
+                clauses.append(f"MATCH({document_column}) AGAINST (%s IN NATURAL LANGUAGE MODE)")
                 params.append(value)
 
             elif key == "$regex":
@@ -215,18 +196,14 @@ class FilterBuilder:
             elif key == "$and":
                 sub_clauses = []
                 for sub_condition in value:
-                    sub_clause, params = FilterBuilder._build_document_condition(
-                        sub_condition, document_column, params
-                    )
+                    sub_clause, params = FilterBuilder._build_document_condition(sub_condition, document_column, params)
                     sub_clauses.append(sub_clause)
                 clauses.append(f"({' AND '.join(sub_clauses)})")
 
             elif key == "$or":
                 sub_clauses = []
                 for sub_condition in value:
-                    sub_clause, params = FilterBuilder._build_document_condition(
-                        sub_condition, document_column, params
-                    )
+                    sub_clause, params = FilterBuilder._build_document_condition(sub_condition, document_column, params)
                     sub_clauses.append(sub_clause)
                 clauses.append(f"({' OR '.join(sub_clauses)})")
 
@@ -235,8 +212,8 @@ class FilterBuilder:
 
     @staticmethod
     def combine_filters(
-        metadata_filter: Tuple[str, List[Any]], document_filter: Tuple[str, List[Any]]
-    ) -> Tuple[str, List[Any]]:
+        metadata_filter: tuple[str, list[Any]], document_filter: tuple[str, list[Any]]
+    ) -> tuple[str, list[Any]]:
         """
         Combine metadata and document filters
 
@@ -269,8 +246,8 @@ class FilterBuilder:
 
     @staticmethod
     def build_search_filter(
-        where: Optional[Dict[str, Any]],
-    ) -> Optional[List[Dict[str, Any]]]:
+        where: dict[str, Any] | None,
+    ) -> list[dict[str, Any]] | None:
         """
         Build search_params filter format from where condition for hybrid search
 
@@ -296,9 +273,9 @@ class FilterBuilder:
         return None
 
     @staticmethod
-    def _build_search_filter_condition(
-        condition: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+    def _build_search_filter_condition(  # noqa: C901
+        condition: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """Recursively build search_params filter condition from nested dictionary"""
         if not condition:
             return None
@@ -349,14 +326,10 @@ class FilterBuilder:
 
                 for op, op_value in value.items():
                     if op == "$eq":
-                        term_conditions.append(
-                            {"term": {field_name: {"value": op_value}}}
-                        )
+                        term_conditions.append({"term": {field_name: {"value": op_value}}})
                         has_conditions = True
                     elif op == "$ne":
-                        result["bool"]["must_not"].append(
-                            {"term": {field_name: {"value": op_value}}}
-                        )
+                        result["bool"]["must_not"].append({"term": {field_name: {"value": op_value}}})
                         has_conditions = True
                     elif op == "$lt":
                         range_conditions["lt"] = op_value
@@ -376,15 +349,11 @@ class FilterBuilder:
                         has_conditions = True
                     elif op == "$nin":
                         for val in op_value:
-                            nin_conditions.append(
-                                {"term": {field_name: {"value": val}}}
-                            )
+                            nin_conditions.append({"term": {field_name: {"value": val}}})
                         has_conditions = True
 
                 if range_conditions:
-                    result["bool"]["must"].append(
-                        {"range": {field_name: range_conditions}}
-                    )
+                    result["bool"]["must"].append({"range": {field_name: range_conditions}})
                 if term_conditions:
                     result["bool"]["must"].extend(term_conditions)
                 if in_conditions:
@@ -409,7 +378,7 @@ class FilterBuilder:
 
         # If only one type of condition, simplify
         if len(result["bool"]) == 1:
-            key = list(result["bool"].keys())[0]
+            key = next(iter(result["bool"]))
             conditions = result["bool"][key]
             if len(conditions) == 1:
                 return conditions[0]

@@ -1,10 +1,11 @@
-from pyseekdb import EmbeddingFunction, DefaultEmbeddingFunction
-from typing import List, Union
 import os
+
 from openai import OpenAI
 
-Documents = Union[str, List[str]]
-Embeddings = List[List[float]]
+from pyseekdb import DefaultEmbeddingFunction, EmbeddingFunction
+
+Documents = str | list[str]
+Embeddings = list[list[float]]
 
 
 class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
@@ -22,9 +23,7 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
             model_name: Name of the sentence-transformers model to use
             device: Device to run the model on ('cpu' or 'cuda')
         """
-        self.model_name = model_name or os.environ.get(
-            "SENTENCE_TRANSFORMERS_MODEL_NAME"
-        )
+        self.model_name = model_name or os.environ.get("SENTENCE_TRANSFORMERS_MODEL_NAME")
         self.device = device or os.environ.get("SENTENCE_TRANSFORMERS_DEVICE")
         self._model = None
         self._dimension = None
@@ -39,11 +38,10 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
                 # Get dimension from model
                 test_embedding = self._model.encode(["test"], convert_to_numpy=True)
                 self._dimension = len(test_embedding[0])
-            except ImportError:
+            except ImportError as exc:
                 raise ImportError(
-                    "sentence-transformers is not installed. "
-                    "Please install it with: pip install sentence-transformers"
-                )
+                    "sentence-transformers is not installed. Please install it with: pip install sentence-transformers"
+                ) from exc
 
     @property
     def dimension(self) -> int:
@@ -51,12 +49,12 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
         self._ensure_model_loaded()
         return self._dimension
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """
         Generate embeddings for the given documents.
 
         Args:
-            input: Single document (str) or list of documents (List[str])
+            documents: Single document (str) or list of documents (List[str])
 
         Returns:
             List of embedding vectors
@@ -64,17 +62,15 @@ class SentenceTransformerCustomEmbeddingFunction(EmbeddingFunction[Documents]):
         self._ensure_model_loaded()
 
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         # Generate embeddings
-        embeddings = self._model.encode(
-            input, convert_to_numpy=True, show_progress_bar=False
-        )
+        embeddings = self._model.encode(documents, convert_to_numpy=True, show_progress_bar=False)
 
         # Convert numpy arrays to lists
         return [embedding.tolist() for embedding in embeddings]
@@ -107,7 +103,7 @@ class OpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
             response = client.embeddings.create(model=self.model_name, input=["test"])
             self._dimension = len(response.data[0].embedding)
         except Exception as e:
-            raise ValueError(f"Failed to load Embedding API model: {e}")
+            raise ValueError(f"Failed to load Embedding API model: {e}") from e
 
     @property
     def dimension(self) -> int:
@@ -115,27 +111,27 @@ class OpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
         self._ensure_model_loaded()
         return self._dimension
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def __call__(self, documents: Documents) -> Embeddings:
         """
         Generate embeddings using Embedding API.
 
         Args:
-            input: Single document (str) or list of documents (List[str])
+            documents: Single document (str) or list of documents (List[str])
 
         Returns:
             List of embedding vectors
         """
         # Handle single string input
-        if isinstance(input, str):
-            input = [input]
+        if isinstance(documents, str):
+            documents = [documents]
 
         # Handle empty input
-        if not input:
+        if not documents:
             return []
 
         # Call Embedding API
         client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-        response = client.embeddings.create(model=self.model_name, input=input)
+        response = client.embeddings.create(model=self.model_name, input=documents)
 
         # Extract Embedding API embeddings
         embeddings = [item.embedding for item in response.data]
@@ -154,6 +150,4 @@ def create_embedding_function() -> EmbeddingFunction:
         print("Using Default embedding function")
         return DefaultEmbeddingFunction()
     else:
-        raise ValueError(
-            f"Unsupported embedding function type: {embedding_function_type}"
-        )
+        raise ValueError(f"Unsupported embedding function type: {embedding_function_type}")

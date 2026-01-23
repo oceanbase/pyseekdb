@@ -3,12 +3,12 @@ Collection DML tests using db_client fixture
 Testing collection.add(), collection.delete(), collection.upsert(), collection.update() interfaces
 """
 
-import pytest
 import time
 import uuid
 
+import pytest
+
 import pyseekdb
-from pyseekdb.client.meta_info import CollectionNames, CollectionFieldNames
 
 
 class TestCollectionDML:
@@ -22,27 +22,17 @@ class TestCollectionDML:
         """
         # Create test collection using execute
         collection_name = f"test_dml_{int(time.time() * 1000)}"
-        table_name = CollectionNames.table_name(collection_name)
         dimension = 3
 
-        # Create table using execute
-        create_table_sql = f"""CREATE TABLE `{table_name}` (
-            {CollectionFieldNames.ID} varbinary(512) PRIMARY KEY NOT NULL,
-            {CollectionFieldNames.DOCUMENT} string,
-            {CollectionFieldNames.EMBEDDING} vector({dimension}),
-            {CollectionFieldNames.METADATA} json,
-            FULLTEXT INDEX idx_fts({CollectionFieldNames.DOCUMENT}),
-            VECTOR INDEX idx_vec ({CollectionFieldNames.EMBEDDING}) with(distance=cosine, type=hnsw, lib=vsag)
-        ) ORGANIZATION = HEAP;"""
-        db_client._server._execute(create_table_sql)
-
         # Get collection object
-        collection = db_client.get_collection(
-            name=collection_name, embedding_function=None
+        collection = db_client.get_or_create_collection(
+            name=collection_name,
+            configuration=pyseekdb.HNSWConfiguration(dimension=dimension),
+            embedding_function=None,
         )
 
         # Test 1: collection.add - Add single item
-        print(f"\n✅ Testing collection.add() - single item")
+        print("\n✅ Testing collection.add() - single item")
         test_id_1 = str(uuid.uuid4())
         collection.add(
             ids=test_id_1,
@@ -60,7 +50,7 @@ class TestCollectionDML:
         print(f"   Successfully added and verified item with ID: {test_id_1}")
 
         # Test 2: collection.add - Add multiple items
-        print(f"✅ Testing collection.add() - multiple items")
+        print("✅ Testing collection.add() - multiple items")
         test_ids = [str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())]
         collection.add(
             ids=test_ids,
@@ -79,10 +69,8 @@ class TestCollectionDML:
         print(f"   Successfully added and verified {len(results['ids'])} items")
 
         # Test 3: collection.update - Update existing item
-        print(f"✅ Testing collection.update() - update existing item")
-        collection.update(
-            ids=test_id_1, metadatas={"category": "test", "score": 95, "updated": True}
-        )
+        print("✅ Testing collection.update() - update existing item")
+        collection.update(ids=test_id_1, metadatas={"category": "test", "score": 95, "updated": True})
 
         # Verify update using collection.get
         results = collection.get(ids=test_id_1)
@@ -94,7 +82,7 @@ class TestCollectionDML:
         print(f"   Successfully updated and verified item with ID: {test_id_1}")
 
         # Test 4: collection.update - Update multiple items
-        print(f"✅ Testing collection.update() - update multiple items")
+        print("✅ Testing collection.update() - update multiple items")
         collection.update(
             ids=test_ids[:2],
             embeddings=[[2.1, 3.1, 4.1], [3.1, 4.1, 5.1]],
@@ -110,7 +98,7 @@ class TestCollectionDML:
         print(f"   Successfully updated and verified {len(results['ids'])} items")
 
         # Test 5: collection.upsert - Upsert existing item (should update)
-        print(f"✅ Testing collection.upsert() - upsert existing item (update)")
+        print("✅ Testing collection.upsert() - upsert existing item (update)")
         collection.upsert(
             ids=test_id_1,
             embeddings=[1.0, 2.0, 3.0],  # Use original vector
@@ -123,12 +111,10 @@ class TestCollectionDML:
         assert len(results["ids"]) == 1
         assert results["documents"][0] == "Upserted document 1"
         assert results["metadatas"][0].get("score") == 98
-        print(
-            f"   Successfully upserted (update) and verified item with ID: {test_id_1}"
-        )
+        print(f"   Successfully upserted (update) and verified item with ID: {test_id_1}")
 
         # Test 6: collection.upsert - Upsert new item (should insert)
-        print(f"✅ Testing collection.upsert() - upsert new item (insert)")
+        print("✅ Testing collection.upsert() - upsert new item (insert)")
         test_id_new = str(uuid.uuid4())
         collection.upsert(
             ids=test_id_new,
@@ -142,12 +128,10 @@ class TestCollectionDML:
         assert len(results["ids"]) == 1
         assert results["documents"][0] == "New upserted document"
         assert results["metadatas"][0].get("category") == "new"
-        print(
-            f"   Successfully upserted (insert) and verified item with ID: {test_id_new}"
-        )
+        print(f"   Successfully upserted (insert) and verified item with ID: {test_id_new}")
 
         # Test 7: collection.delete - Delete by ID
-        print(f"✅ Testing collection.delete() - delete by ID")
+        print("✅ Testing collection.delete() - delete by ID")
         # Delete one of the test items
         collection.delete(ids=test_ids[0])
 
@@ -159,20 +143,20 @@ class TestCollectionDML:
         # Verify other items still exist
         results = collection.get(ids=test_ids[1:])
         assert len(results["ids"]) == 2
-        print(f"   Verified other items still exist")
+        print("   Verified other items still exist")
 
         # Test 8: collection.delete - Delete by metadata filter
-        print(f"✅ Testing collection.delete() - delete by metadata filter")
+        print("✅ Testing collection.delete() - delete by metadata filter")
         # Delete items with category="demo"
         collection.delete(where={"category": {"$eq": "demo"}})
 
         # Verify deletion using collection.get
         results = collection.get(where={"category": {"$eq": "demo"}})
         assert len(results["ids"]) == 0
-        print(f"   Successfully deleted items with category='demo'")
+        print("   Successfully deleted items with category='demo'")
 
         # Test 9: collection.delete - Delete by document filter
-        print(f"✅ Testing collection.delete() - delete by document filter")
+        print("✅ Testing collection.delete() - delete by document filter")
         # Add an item with specific document content
         test_id_doc = str(uuid.uuid4())
         collection.add(
@@ -188,10 +172,10 @@ class TestCollectionDML:
         # Verify deletion using collection.get
         results = collection.get(where_document={"$contains": "Delete this"})
         assert len(results["ids"]) == 0
-        print(f"   Successfully deleted items by document filter")
+        print("   Successfully deleted items by document filter")
 
         # Test 10: Verify final state using collection.get
-        print(f"✅ Testing final state verification")
+        print("✅ Testing final state verification")
         all_results = collection.get(limit=100)
         print(f"   Final collection count: {len(all_results['ids'])} items")
         assert len(all_results["ids"]) > 0

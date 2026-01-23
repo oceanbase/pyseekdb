@@ -2,19 +2,18 @@
 Tests for fulltext parser configuration in collection creation using db_client fixture
 """
 
-import pytest
+import contextlib
 import time
 
-import pyseekdb
-from pyseekdb import Configuration, HNSWConfiguration, FulltextParserConfig
+import pytest
+
+from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
 
 
-class TestFulltextParserConfig:
+class TestFulltextAnalyzerConfig:
     """Test fulltext parser configuration using parameterized db_client fixture"""
 
-    def _test_fulltext_parser_config(
-        self, client, parser_name: str, params: dict = None
-    ):
+    def _test_fulltext_parser_config(self, client, parser_name: str, params: dict | None = None):
         """
         Test creating a collection with a specific fulltext parser configuration
 
@@ -27,16 +26,14 @@ class TestFulltextParserConfig:
         test_dimension = 128
 
         # Create configuration with fulltext parser
-        fulltext_config = FulltextParserConfig(parser=parser_name, params=params)
+        fulltext_config = FulltextAnalyzerConfig(analyzer=parser_name, properties=params)
         config = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
             fulltext_config=fulltext_config,
         )
 
         # Create collection
-        collection = client.create_collection(
-            name=test_collection_name, configuration=config, embedding_function=None
-        )
+        collection = client.create_collection(name=test_collection_name, configuration=config, embedding_function=None)
 
         # Verify collection was created
         assert collection is not None
@@ -46,24 +43,21 @@ class TestFulltextParserConfig:
         # Verify the fulltext index was created with correct parser
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
             # Get CREATE TABLE statement
-            create_table_result = client._server._execute(
-                f"SHOW CREATE TABLE `{table_name}`"
-            )
+            create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             assert create_table_result is not None
             assert len(create_table_result) > 0
 
             # Extract CREATE TABLE statement
             if isinstance(create_table_result[0], dict):
-                create_stmt = create_table_result[0].get(
-                    "Create Table", create_table_result[0].get("create table", "")
-                )
+                create_stmt = create_table_result[0].get("Create Table", create_table_result[0].get("create table", ""))
             elif isinstance(create_table_result[0], (tuple, list)):
-                create_stmt = (
-                    create_table_result[0][1] if len(create_table_result[0]) > 1 else ""
-                )
+                create_stmt = create_table_result[0][1] if len(create_table_result[0]) > 1 else ""
             else:
                 create_stmt = str(create_table_result[0])
 
@@ -75,35 +69,25 @@ class TestFulltextParserConfig:
             if params:
                 for key, value in params.items():
                     # Check if parameter appears in SQL (may be formatted differently)
-                    param_pattern = (
-                        f"{key}={value}"
-                        if not isinstance(value, str)
-                        else f"{key}='{value}'"
-                    )
+                    param_pattern = f"{key}={value}" if not isinstance(value, str) else f"{key}='{value}'"
                     # Also check without quotes for string values
                     if isinstance(value, str):
                         assert key in create_stmt or param_pattern in create_stmt
                     else:
                         assert str(value) in create_stmt
 
-            print(
-                f"\n✅ Collection '{test_collection_name}' created with parser '{parser_name}'"
-            )
+            print(f"\n✅ Collection '{test_collection_name}' created with parser '{parser_name}'")
             print(f"   CREATE TABLE statement contains: PARSER {parser_name}")
 
         except Exception as e:
             # Clean up and fail
-            try:
+            with contextlib.suppress(Exception):
                 client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
-            except Exception:
-                pass
             pytest.fail(f"Failed to verify fulltext parser configuration: {e}")
 
         # Clean up
-        try:
+        with contextlib.suppress(Exception):
             client.delete_collection(test_collection_name)
-        except Exception:
-            pass
 
     def _test_default_parser(self, client):
         """Test that default parser (ik) is used when not specified"""
@@ -116,43 +100,36 @@ class TestFulltextParserConfig:
             # fulltext_config not specified, should default to ik
         )
 
-        collection = client.create_collection(
-            name=test_collection_name, configuration=config, embedding_function=None
-        )
+        collection = client.create_collection(name=test_collection_name, configuration=config, embedding_function=None)
 
         assert collection is not None
 
         # Verify default parser (ik) is used
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
-            create_table_result = client._server._execute(
-                f"SHOW CREATE TABLE `{table_name}`"
-            )
+            create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             create_stmt = (
                 create_table_result[0][1]
                 if isinstance(create_table_result[0], (tuple, list))
-                else create_table_result[0].get(
-                    "Create Table", create_table_result[0].get("create table", "")
-                )
+                else create_table_result[0].get("Create Table", create_table_result[0].get("create table", ""))
             )
 
             assert "PARSER IK" in create_stmt.upper()
-            print(f"\n✅ Default parser (ik) used correctly")
+            print("\n✅ Default parser (ik) used correctly")
 
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
-            except Exception:
-                pass
             pytest.fail(f"Failed to verify default parser: {e}")
 
         # Clean up
-        try:
+        with contextlib.suppress(Exception):
             client.delete_collection(test_collection_name)
-        except Exception:
-            pass
 
     def _test_backward_compatibility(self, client):
         """Test backward compatibility with HNSWConfiguration (no fulltext config)"""
@@ -162,45 +139,36 @@ class TestFulltextParserConfig:
         # Create collection with HNSWConfiguration only (old style)
         config = HNSWConfiguration(dimension=test_dimension, distance="cosine")
 
-        collection = client.create_collection(
-            name=test_collection_name, configuration=config, embedding_function=None
-        )
+        collection = client.create_collection(name=test_collection_name, configuration=config, embedding_function=None)
 
         assert collection is not None
 
         # Verify default parser (ik) is used for backward compatibility
         from pyseekdb.client.meta_info import CollectionNames
 
-        table_name = CollectionNames.table_name(test_collection_name)
+        if collection.id is not None:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(test_collection_name)
         try:
-            create_table_result = client._server._execute(
-                f"SHOW CREATE TABLE `{table_name}`"
-            )
+            create_table_result = client._server._execute(f"SHOW CREATE TABLE `{table_name}`")
             create_stmt = (
                 create_table_result[0][1]
                 if isinstance(create_table_result[0], (tuple, list))
-                else create_table_result[0].get(
-                    "Create Table", create_table_result[0].get("create table", "")
-                )
+                else create_table_result[0].get("Create Table", create_table_result[0].get("create table", ""))
             )
 
             assert "PARSER IK" in create_stmt.upper()
-            print(
-                f"\n✅ Backward compatibility: HNSWConfiguration defaults to ik parser"
-            )
+            print("\n✅ Backward compatibility: HNSWConfiguration defaults to ik parser")
 
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 client._server._execute(f"DROP TABLE IF EXISTS `{table_name}`")
-            except Exception:
-                pass
             pytest.fail(f"Failed to verify backward compatibility: {e}")
 
         # Clean up
-        try:
+        with contextlib.suppress(Exception):
             client.delete_collection(test_collection_name)
-        except Exception:
-            pass
 
     def test_fulltext_parser(self, db_client):
         """
@@ -214,9 +182,7 @@ class TestFulltextParserConfig:
             self._test_fulltext_parser_config(db_client, parser)
 
         # Test parser with parameters
-        self._test_fulltext_parser_config(
-            db_client, "ngram", params={"ngram_token_size": 3}
-        )
+        self._test_fulltext_parser_config(db_client, "ngram", params={"ngram_token_size": 3})
 
         # Test default parser
         self._test_default_parser(db_client)

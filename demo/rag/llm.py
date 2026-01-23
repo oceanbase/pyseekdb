@@ -1,6 +1,6 @@
 import os
+
 from openai import OpenAI
-from typing import Optional
 
 
 def get_llm_client() -> OpenAI:
@@ -15,9 +15,9 @@ def get_llm_answer(
     client: OpenAI,
     context: str,
     question: str,
-    model: str = None,
+    model: str | None = None,
     temperature: float = 0.7,
-    max_tokens: Optional[int] = None,
+    max_tokens: int | None = None,
 ) -> str:
     """
     Generate answer using OpenAI-compatible LLM based on context and question.
@@ -73,16 +73,14 @@ def get_llm_answer(
             request_params["max_tokens"] = max_tokens
 
         response = client.chat.completions.create(**request_params)
-
-        answer = response.choices[0].message.content
-        return answer
-
     except Exception as e:
         print(f"Error generating LLM response: {e}")
-        return f"Sorry, an error occurred while generating the answer: {str(e)}"
+        return f"Sorry, an error occurred while generating the answer: {e!s}"
+    else:
+        return response.choices[0].message.content
 
 
-def get_llm_summary(client: OpenAI, text: str, model: str = None) -> str:
+def get_llm_summary(client: OpenAI, text: str, model: str | None = None) -> str:
     """
     Generate a summary of the given text using OpenAI-compatible LLM.
 
@@ -119,10 +117,8 @@ def get_llm_summary(client: OpenAI, text: str, model: str = None) -> str:
             ],
             temperature=0.3,
         )
-
-        summary = response.choices[0].message.content
-        return summary
-
     except Exception as e:
         print(f"Error generating summary: {e}")
-        return f"Error occurred while generating summary: {str(e)}"
+        return f"Error occurred while generating summary: {e!s}"
+    else:
+        return response.choices[0].message.content

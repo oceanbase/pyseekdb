@@ -2,42 +2,45 @@
 Base client interface definition
 """
 
+import contextlib
 import json
 import logging
 import re
 import struct
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING, Tuple, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .version import Version
 from pymysql.converters import escape_string
 
+from .admin_client import DEFAULT_TENANT, AdminAPI
 from .base_connection import BaseConnection
-from .admin_client import AdminAPI, DEFAULT_TENANT
-from .meta_info import CollectionNames, CollectionFieldNames
-from .filters import FilterBuilder
+from .collection import Collection
 from .configuration import (
-    HNSWConfiguration,
+    DEFAULT_DISTANCE_METRIC,
+    DEFAULT_VECTOR_DIMENSION,
     Configuration,
     ConfigurationParam,
-    FulltextParserConfig,
-    DEFAULT_VECTOR_DIMENSION,
-    DEFAULT_DISTANCE_METRIC,
+    FulltextAnalyzerConfig,
+    HNSWConfiguration,
+)
+from .database import Database
+from .embedding_function import (
+    Documents as EmbeddingDocuments,
 )
 from .embedding_function import (
     EmbeddingFunction,
+    EmbeddingFunctionRegistry,
     get_default_embedding_function,
-    Documents as EmbeddingDocuments,
 )
-
-from .collection import Collection
-from .database import Database
+from .filters import FilterBuilder
+from .meta_info import CollectionFieldNames, CollectionNames
 from .sql_utils import is_query_sql
 
-
 # Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
-EmbeddingFunctionParam = Union[EmbeddingFunction[EmbeddingDocuments], None, Any]
+EmbeddingFunctionParam = EmbeddingFunction[EmbeddingDocuments] | None | Any
 
 _COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
@@ -57,7 +60,7 @@ class _NotProvided:
 _NOT_PROVIDED = _NotProvided()
 
 
-def _extract_hnsw_config(config: ConfigurationParam) -> Optional[HNSWConfiguration]:
+def _extract_hnsw_config(config: ConfigurationParam) -> HNSWConfiguration | None:
     if config is None:
         return None
     elif isinstance(config, HNSWConfiguration):
@@ -65,15 +68,12 @@ def _extract_hnsw_config(config: ConfigurationParam) -> Optional[HNSWConfigurati
     elif isinstance(config, Configuration):
         return config.hnsw
     else:
-        raise TypeError(
-            f"configuration must be Configuration, HNSWConfiguration, or None, "
-            f"got {type(config)}"
-        )
+        raise TypeError(f"configuration must be Configuration, HNSWConfiguration, or None, got {type(config)}")
 
 
 def _extract_fulltext_config(
     config: ConfigurationParam,
-) -> Optional[FulltextParserConfig]:
+) -> FulltextAnalyzerConfig | None:
     if config is None:
         return None
     elif isinstance(config, HNSWConfiguration):
@@ -106,8 +106,7 @@ def _validate_collection_name(name: str) -> None:
         raise ValueError("Collection name must not be empty")
     if len(name) > _MAX_COLLECTION_NAME_LENGTH:
         raise ValueError(
-            f"Collection name too long: {len(name)} characters; "
-            f"maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}."
+            f"Collection name too long: {len(name)} characters; maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}."
         )
     if _COLLECTION_NAME_PATTERN.match(name) is None:
         raise ValueError(
@@ -117,13 +116,13 @@ def _validate_collection_name(name: str) -> None:
 
 
 def _get_fulltext_index_sql(
-    fulltext_config: Optional[FulltextParserConfig] = None,
+    fulltext_config: FulltextAnalyzerConfig | None = None,
 ) -> str:
     """
     Generate FULLTEXT INDEX SQL clause from fulltext configuration.
 
     Args:
-        fulltext_config: FulltextParserConfig or None. If None, defaults to IK parser.
+        fulltext_config: FulltextAnalyzerConfig or None. If None, defaults to IK parser.
 
     Returns:
         SQL clause string for FULLTEXT INDEX (e.g., "WITH PARSER ik" or "WITH PARSER ngram PARSER_PROPERTIES=(size=2)")
@@ -132,15 +131,15 @@ def _get_fulltext_index_sql(
         # Default to IK parser for backward compatibility
         return "WITH PARSER ik"
 
-    parser_name = fulltext_config.parser
-    params = fulltext_config.params or {}
+    parser_name = fulltext_config.analyzer
+    properties = fulltext_config.properties or {}
 
     # Build SQL clause with parser name
-    if params:
+    if properties:
         # Format parameters as key=value pairs
         # Quote string values, leave numbers and booleans as-is
         param_parts = []
-        for k, v in params.items():
+        for k, v in properties.items():
             if isinstance(v, str):
                 param_parts.append(f"{k}='{v}'")
             else:
@@ -158,7 +157,7 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag)"
 
 
-def _embedding_to_hexstring(embedding: List[float]) -> str:
+def _embedding_to_hexstring(embedding: list[float]) -> str:
     """
     Convert embedding (list of floats) to a hex string.
 
@@ -197,7 +196,7 @@ class ClientAPI(ABC):
             name: Collection name
             configuration: Index configuration (Configuration or HNSWConfiguration).
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext parser configuration (FulltextParserConfig).
+                          Configuration can include fulltext analyzer configuration (FulltextAnalyzerConfig).
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -208,9 +207,7 @@ class ClientAPI(ABC):
         pass
 
     @abstractmethod
-    def get_collection(
-        self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
-    ) -> "Collection":
+    def get_collection(self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED) -> "Collection":
         """
         Get collection object
 
@@ -228,7 +225,7 @@ class ClientAPI(ABC):
         pass
 
     @abstractmethod
-    def list_collections(self) -> List["Collection"]:
+    def list_collections(self) -> list["Collection"]:
         """List all collections"""
         pass
 
@@ -257,7 +254,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
     # ==================== Database Type Detection ====================
 
-    def detect_db_type_and_version(self) -> Tuple[str, "Version"]:
+    def detect_db_type_and_version(self) -> tuple[str, "Version"]:  # noqa: C901
         """
         Detect database type and version.
 
@@ -277,7 +274,7 @@ class BaseClient(BaseConnection, AdminAPI):
         """
         from .version import Version
 
-        def _get_value(result, key: str) -> Optional[str]:
+        def _get_value(result, key: str) -> str | None:
             """Extract value from query result"""
             if not result or len(result) == 0:
                 return None
@@ -290,7 +287,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 value = str(row)
             return str(value).strip() if value else None
 
-        def _query(sql: str, key: str) -> Optional[str]:
+        def _query(sql: str, key: str) -> str | None:
             """Execute SQL and return value"""
             try:
                 result = self._execute(sql)
@@ -299,7 +296,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 logger.debug(f"Failed to execute {sql}: {e}")
                 return None
 
-        def _extract_seekdb_version(version_str: str) -> Optional[str]:
+        def _extract_seekdb_version(version_str: str) -> str | None:
             """Extract version from seekdb version string (case-insensitive)"""
             # Use case-insensitive pattern matching
             for pattern in [
@@ -321,16 +318,14 @@ class BaseClient(BaseConnection, AdminAPI):
             if seekdb_version_str:
                 return ("seekdb", Version(seekdb_version_str))
             else:
-                raise ValueError(
-                    f"Detected seekdb in version string, but failed to extract version: {version_result}"
-                )
+                raise ValueError(f"Detected seekdb in version string, but failed to extract version: {version_result}")
         # Query ob_version() for OceanBase
         ob_version_str = _query("SELECT ob_version() as ob_version", "ob_version")
         if ob_version_str:
             # Try to parse OceanBase version (may have different format)
             try:
                 return ("oceanbase", Version(ob_version_str))
-            except ValueError:
+            except ValueError as e:
                 # If OceanBase version doesn't match standard format, try to extract numeric parts
                 parts = re.findall(r"\d+", ob_version_str)
                 if len(parts) >= 3:
@@ -340,9 +335,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 else:
                     # Fallback: return as-is but wrap in Version with minimal format
                     # This handles edge cases where version format is unusual
-                    raise ValueError(
-                        f"Unable to parse OceanBase version: {ob_version_str}"
-                    )
+                    raise ValueError(f"Unable to parse OceanBase version: {ob_version_str}") from e
 
         # Truncate potentially verbose or sensitive database responses in error message
         def _truncate(val, length=20):
@@ -358,17 +351,14 @@ class BaseClient(BaseConnection, AdminAPI):
 
     # ==================== Database Management (User-facing) ====================
 
-    def _database_tenant(self, tenant: str) -> Optional[str]:
+    def _database_tenant(self, tenant: str) -> str | None:
         """Resolve effective tenant for database operations."""
         return None
 
-    def _database_context(self, tenant: Optional[str]) -> str:
+    def _database_context(self, tenant: str | None) -> str:
         return f" in tenant: {tenant}" if tenant else ""
 
-    def _parse_schema_row(
-        self,
-        row: Any
-    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    def _parse_schema_row(self, row: Any) -> tuple[str | None, str | None, str | None]:
         if isinstance(row, dict):
             return (
                 row.get("SCHEMA_NAME"),
@@ -443,9 +433,9 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def list_databases(
         self,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-        tenant: str = DEFAULT_TENANT
+        limit: int | None = None,
+        offset: int | None = None,
+        tenant: str = DEFAULT_TENANT,
     ) -> Sequence[Database]:
         """
         List all databases
@@ -472,18 +462,21 @@ class BaseClient(BaseConnection, AdminAPI):
             db_name, charset, collation = self._parse_schema_row(row)
             if not db_name:
                 continue
-            databases.append(Database(
-                name=db_name,
-                tenant=effective_tenant,
-                charset=charset,
-                collation=collation,
-            ))
+            databases.append(
+                Database(
+                    name=db_name,
+                    tenant=effective_tenant,
+                    charset=charset,
+                    collation=collation,
+                )
+            )
 
         logger.debug(f"✅ Found {len(databases)} databases{self._database_context(effective_tenant)}")
         return databases
+
     # ==================== Collection Management (User-facing) ====================
 
-    def create_collection(
+    def create_collection(  # noqa: C901
         self,
         name: str,
         configuration: ConfigurationParam = _NOT_PROVIDED,
@@ -496,11 +489,11 @@ class BaseClient(BaseConnection, AdminAPI):
         Args:
             name: Collection name
             configuration: Index configuration (Configuration or HNSWConfiguration).
-                          If not provided, uses default configuration (dimension=384, distance='cosine', parser='ik').
+                          If not provided, uses default configuration (dimension=384, distance='cosine', analyzer='ik').
                           If explicitly set to None, will try to calculate dimension from embedding_function.
                           If embedding_function is also None, will raise an error.
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext parser configuration (FulltextParserConfig with parser='ik', 'space', 'ngram', 'ngram2', or 'beng').
+                          Configuration can include fulltext analyzer configuration (FulltextAnalyzerConfig with analyzer='ik', 'space', 'ngram', 'ngram2', or 'beng').
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -534,24 +527,24 @@ class BaseClient(BaseConnection, AdminAPI):
             ... )
 
             # Using Configuration wrapper with IK parser (default)
-            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextParserConfig
+            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextAnalyzerConfig
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextParserConfig(parser='ik')
+            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='ik')
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Using Space parser
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextParserConfig(parser='space')
+            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='space')
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Using Ngram parser with parameters
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextParserConfig(parser='ngram', params={'size': 2})
+            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='ngram', properties={'size': 2})
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
@@ -563,6 +556,9 @@ class BaseClient(BaseConnection, AdminAPI):
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
         """
         _validate_collection_name(name)
+        if self.has_collection(name):
+            raise ValueError(f"Collection '{name}' already exists")
+
         # Handle embedding function first
         # If not provided (sentinel), use default embedding function
         if embedding_function is _NOT_PROVIDED:
@@ -576,20 +572,16 @@ class BaseClient(BaseConnection, AdminAPI):
                 # This avoids initializing the model (e.g., onnxruntime) during collection creation
                 if hasattr(embedding_function, "dimension"):
                     actual_dimension = embedding_function.dimension
-                    logger.info(
-                        f"Using embedding function dimension: {actual_dimension}"
-                    )
+                    logger.debug(f"Using embedding function dimension: {actual_dimension}")
                 else:
                     # Fallback: if no dimension attribute, call the function to calculate dimension
                     # This may trigger model initialization, but is necessary for custom embedding functions
                     test_embeddings = embedding_function.__call__("seekdb")
                     if test_embeddings and len(test_embeddings) > 0:
                         actual_dimension = len(test_embeddings[0])
-                        logger.info(
-                            f"Calculated embedding function dimension: {actual_dimension}"
-                        )
+                        logger.info(f"Calculated embedding function dimension: {actual_dimension}")
                     else:
-                        raise ValueError(
+                        raise ValueError(  # noqa: TRY301
                             "Embedding function returned empty result when called with 'seekdb'"
                         )
             except Exception as e:
@@ -605,13 +597,9 @@ class BaseClient(BaseConnection, AdminAPI):
         if configuration is _NOT_PROVIDED:
             # Use default configuration, but if embedding_function is provided, use its dimension
             if actual_dimension is not None:
-                hnsw_config = HNSWConfiguration(
-                    dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC
-                )
+                hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
             else:
-                hnsw_config = HNSWConfiguration(
-                    dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC
-                )
+                hnsw_config = HNSWConfiguration(dimension=DEFAULT_VECTOR_DIMENSION, distance=DEFAULT_DISTANCE_METRIC)
         elif configuration is None:
             # Configuration is explicitly set to None
             # Try to calculate dimension from embedding_function
@@ -627,9 +615,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
             # Use calculated dimension from embedding function and default distance metric
             if actual_dimension is not None:
-                hnsw_config = HNSWConfiguration(
-                    dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC
-                )
+                hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
             else:
                 raise ValueError(
                     "Failed to calculate dimension from embedding function. "
@@ -642,9 +628,7 @@ class BaseClient(BaseConnection, AdminAPI):
             # If Configuration was provided but hnsw is None, create default HNSWConfiguration
             if hnsw_config is None:
                 if actual_dimension is not None:
-                    hnsw_config = HNSWConfiguration(
-                        dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC
-                    )
+                    hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
                 else:
                     hnsw_config = HNSWConfiguration(
                         dimension=DEFAULT_VECTOR_DIMENSION,
@@ -665,6 +649,7 @@ class BaseClient(BaseConnection, AdminAPI):
             # No embedding function, use configuration dimension
             dimension = hnsw_config.dimension
 
+        logger.info(f"actual dimension: {dimension}, hnsw_config: {hnsw_config}")
         # Extract distance from configuration
         distance = hnsw_config.distance
 
@@ -673,7 +658,14 @@ class BaseClient(BaseConnection, AdminAPI):
         fulltext_index_clause = _get_fulltext_index_sql(fulltext_config)
 
         # Construct table name
-        table_name = CollectionNames.table_name(name)
+        collection_id = None
+        if kwargs.get("_collection_version", 2) == 1:
+            # for testing purpose
+            table_name = self._create_collection_meta_v1(name)
+        else:
+            collection_meta = self._create_collection_meta_v2(name, embedding_function)
+            collection_id = collection_meta.get("collection_id")
+            table_name = collection_meta["table_name"]
 
         # Construct CREATE TABLE SQL statement with HEAP organization
         sql = f"""CREATE TABLE `{table_name}` (
@@ -686,21 +678,250 @@ class BaseClient(BaseConnection, AdminAPI):
         ) ORGANIZATION = HEAP;"""
 
         # Execute SQL to create table
+        logger.debug(f"Creating table: {table_name} with SQL: {sql}")
         self._execute(sql)
 
         # Create and return Collection object
         return Collection(
             client=self,
             name=name,
+            collection_id=collection_id,
             dimension=dimension,
             embedding_function=embedding_function,
             distance=distance,
             **kwargs,
         )
 
-    def get_collection(
-        self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED
-    ) -> "Collection":
+    def _create_sdk_collections_if_not_exists(self) -> None:
+        try:
+            create_table_sql = """CREATE TABLE IF NOT EXISTS sdk_collections (
+                collection_id CHAR(32) PRIMARY KEY DEFAULT (replace(uuid(), '-', '')),
+                collection_name STRING,
+                settings JSON COMMENT "Generated by SDK, don't modify",
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_name(collection_name)
+            ) COMMENT='Settings of collections created by SDK';"""
+            self._execute(create_table_sql)
+        except Exception as e:
+            raise ValueError(f"Failed to create sdk_collections table: {e}") from e
+
+    def _create_collection_meta_v2(self, collection_name: str, embedding_function) -> dict[str, str]:
+        try:
+            results = {}
+            settings = {"version": 2}
+            if embedding_function is not None and EmbeddingFunction.support_persistence(embedding_function):
+                settings["embedding_function"] = {
+                    "name": embedding_function.name(),
+                    "properties": embedding_function.get_config(),
+                }
+
+            settings_str = escape_string(json.dumps(settings))
+
+            self._create_sdk_collections_if_not_exists()
+            collection_name_in_table = escape_string(collection_name)
+            delete_sql = f"DELETE FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
+            self._execute(delete_sql)
+            insert_sql = f"INSERT INTO `{CollectionNames.sdk_collections_table_name()}` (COLLECTION_NAME, SETTINGS) VALUES ('{collection_name_in_table}', '{settings_str}')"
+            self._execute(insert_sql)
+            query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
+            rows = self._execute(query_sql)
+            if not rows or len(rows) == 0:
+                raise ValueError(  # noqa: TRY301
+                    "Failed to create collection metadata: cannot find collection name in sdk_collections table"
+                )
+            row = rows[0]
+            # Extract collection id
+            if isinstance(row, dict):
+                # Server client returns dict, get the first value
+                collection_id = next(iter(row.values()), "")
+            elif isinstance(row, (tuple, list)):
+                # Embedded client returns tuple, first element is collection id
+                collection_id = row[0] if len(row) > 0 else ""
+            else:
+                collection_id = str(row)
+            results["collection_id"] = collection_id
+            results["table_name"] = CollectionNames.table_name_v2(collection_id)
+            return results  # noqa: TRY300
+        except Exception as e:
+            raise ValueError(f"Failed to create collection metadata: {e}") from e
+
+    def _create_collection_meta_v1(self, collection_name: str) -> str:
+        try:
+            table_name = CollectionNames.table_name(collection_name)
+            return table_name  # noqa: TRY300
+        except Exception as e:
+            raise ValueError(f"Failed to create collection metadata: {e}") from e
+
+    def get_collection(self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED) -> "Collection":
+        try:
+            collection = self._get_collection_v1(name, embedding_function)
+        except ValueError as e:
+            logger.debug(f"Failed to get collection v1: {e}, trying v2...")
+            collection = self._get_collection_v2(name, embedding_function)
+        return collection
+
+    def _resolve_collection_metadata_from_table(self, table_name: str, collection_name: str) -> dict[str, Any]:  # noqa: C901
+        metadata = {
+            "dimension": None,
+            "distance": None,
+        }
+        # Check if table exists by describing it
+        try:
+            table_info = self._execute(f"DESCRIBE `{table_name}`")
+            if not table_info or len(table_info) == 0:
+                raise ValueError(  # noqa: TRY301
+                    f"Collection ('{collection_name}') not found: Table('{table_name}') not exists"
+                )
+        except Exception as e:
+            # If DESCRIBE fails, check if it's because table doesn't exist
+            error_msg = str(e).lower()
+            if "doesn't exist" in error_msg or "not found" in error_msg or "table" in error_msg:
+                raise ValueError(f"Collection ('{collection_name}') not found: Table('{table_name}') not exists") from e
+            raise
+
+        # Extract dimension from embedding column
+        for row in table_info:
+            # Handle both dict and tuple formats
+            if isinstance(row, dict):
+                field_name = row.get("Field", row.get("field", ""))
+                field_type = row.get("Type", row.get("type", ""))
+            elif isinstance(row, (tuple, list)):
+                field_name = row[0] if len(row) > 0 else ""
+                field_type = row[1] if len(row) > 1 else ""
+            else:
+                continue
+
+            if field_name == "embedding" and "vector" in str(field_type).lower():
+                # Extract dimension from vector(dimension) format
+                match = re.search(r"vector\s*\(\s*(\d+)\s*\)", str(field_type), re.IGNORECASE)
+                if match:
+                    metadata["dimension"] = int(match.group(1))
+                break
+
+        # Extract distance from CREATE TABLE statement
+        try:
+            create_table_result = self._execute(f"SHOW CREATE TABLE `{table_name}`")
+            if create_table_result and len(create_table_result) > 0:
+                # Handle both dict and tuple formats
+                if isinstance(create_table_result[0], dict):
+                    create_stmt = create_table_result[0].get(
+                        "Create Table", create_table_result[0].get("create table", "")
+                    )
+                elif isinstance(create_table_result[0], (tuple, list)):
+                    # CREATE TABLE statement is usually in the second column
+                    create_stmt = create_table_result[0][1] if len(create_table_result[0]) > 1 else ""
+                else:
+                    create_stmt = str(create_table_result[0])
+
+                # Extract distance from VECTOR INDEX ... with(distance=..., ...)
+                # Pattern: VECTOR INDEX ... with(distance=l2, ...) or with(distance='l2', ...)
+                # Match: with(distance=value, ...) where value can be l2, cosine, inner_product, or ip
+                distance_match = re.search(
+                    r'with\s*\([^)]*distance\s*=\s*([\'"]?)(\w+)\1',
+                    create_stmt,
+                    re.IGNORECASE,
+                )
+                if distance_match:
+                    distance = metadata["distance"] = distance_match.group(2).lower()
+                    # Normalize distance values
+                    if distance == "ip":
+                        distance = "inner_product"
+                    elif distance in ["l2", "cosine", "inner_product"]:
+                        pass
+                    else:
+                        # Unknown distance, default to None
+                        logger.warning(
+                            f"Unknown distance value '{distance}' in CREATE TABLE statement, defaulting to None"
+                        )
+                        metadata["distance"] = None
+        except Exception as e:
+            # If SHOW CREATE TABLE fails, log warning but continue
+            logger.warning(f"Failed to get CREATE TABLE statement for '{table_name}': {e}")
+
+        return metadata
+
+    def _resolve_embedding_function(self, settings: str | None) -> EmbeddingFunction[EmbeddingDocuments]:
+        if not settings:
+            return None
+        settings_json = json.loads(settings)
+        ef_settings = settings_json.get("embedding_function", {})
+        ef_name = ef_settings.get("name", "")
+        if not ef_name:
+            return None
+        embedding_function_class = EmbeddingFunctionRegistry.get_class(ef_name)
+        if not embedding_function_class:
+            raise ValueError(f"Embedding function class '{ef_name}' not found")
+        return embedding_function_class.build_from_config(ef_settings.get("properties", {}))
+
+    def _validate_embedding_function(
+        self,
+        embedding_function: EmbeddingFunction | None,
+        embedding_function_persistence: EmbeddingFunction | None,
+    ) -> EmbeddingFunction[EmbeddingDocuments]:
+        """
+        Validate embedding function
+
+        Args:
+            embedding_function: Embedding function user provided
+            embedding_function_persistence: Embedding function restored from table metadata
+
+        Returns:
+            Embedding function
+        """
+
+        if embedding_function_persistence is not None and embedding_function is not _NOT_PROVIDED:
+            if embedding_function is None or embedding_function_persistence.name() != embedding_function.name():
+                raise ValueError(
+                    "Both embedding function from parameter (not _NOT_PROVIDED, default value) and embedding function from persistence provided."
+                )
+            else:
+                return embedding_function_persistence
+        if embedding_function is _NOT_PROVIDED:
+            return (
+                embedding_function_persistence
+                if embedding_function_persistence is not None
+                else get_default_embedding_function()
+            )
+        else:
+            return embedding_function
+
+    def _get_collection_v2(self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED) -> "Collection":
+        try:
+            name_in_table = escape_string(name)
+            query_sql = f"SELECT COLLECTION_ID, COLLECTION_NAME, SETTINGS FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{name_in_table}'"
+            rows = self._execute(query_sql)
+            if not rows or len(rows) == 0:
+                raise ValueError(f"Collection '{name}' not found")  # noqa: TRY301
+            row = rows[0]
+            if isinstance(row, dict):
+                # Server client returns dict, get the first value
+                collection_id = row["COLLECTION_ID"]
+                collection_name = row["COLLECTION_NAME"]
+                settings = row["SETTINGS"]
+            elif isinstance(row, (tuple, list)):
+                # Embedded client returns tuple, first element is collection id
+                collection_id = row[0] if len(row) > 0 else ""
+                collection_name = row[1] if len(row) > 1 else ""
+                settings = row[2] if len(row) > 2 else ""
+
+            embedding_function_persistence = self._resolve_embedding_function(settings)
+            embedding_function = self._validate_embedding_function(embedding_function, embedding_function_persistence)
+            metadata = self._resolve_collection_metadata_from_table(
+                CollectionNames.table_name_v2(collection_id), collection_name
+            )
+            return Collection(
+                client=self,
+                name=collection_name,
+                collection_id=collection_id,
+                embedding_function=embedding_function,
+                dimension=metadata["dimension"],
+                distance=metadata["distance"],
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to get collection: {e}") from e
+
+    def _get_collection_v1(self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED) -> "Collection":
         """
         Get a collection object (user-facing API)
 
@@ -719,96 +940,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # Construct table name
         table_name = CollectionNames.table_name(name)
 
-        # Check if table exists by describing it
-        try:
-            table_info = self._execute(f"DESCRIBE `{table_name}`")
-            if not table_info or len(table_info) == 0:
-                raise ValueError(
-                    f"Collection '{name}' does not exist (table '{table_name}' not found)"
-                )
-        except Exception as e:
-            # If DESCRIBE fails, check if it's because table doesn't exist
-            error_msg = str(e).lower()
-            if (
-                "doesn't exist" in error_msg
-                or "not found" in error_msg
-                or "table" in error_msg
-            ):
-                raise ValueError(
-                    f"Collection '{name}' does not exist (table '{table_name}' not found)"
-                ) from e
-            raise
-
-        # Extract dimension from embedding column
-        dimension = None
-        for row in table_info:
-            # Handle both dict and tuple formats
-            if isinstance(row, dict):
-                field_name = row.get("Field", row.get("field", ""))
-                field_type = row.get("Type", row.get("type", ""))
-            elif isinstance(row, (tuple, list)):
-                field_name = row[0] if len(row) > 0 else ""
-                field_type = row[1] if len(row) > 1 else ""
-            else:
-                continue
-
-            if field_name == "embedding" and "vector" in str(field_type).lower():
-                # Extract dimension from vector(dimension) format
-                match = re.search(
-                    r"vector\s*\(\s*(\d+)\s*\)", str(field_type), re.IGNORECASE
-                )
-                if match:
-                    dimension = int(match.group(1))
-                break
-
-        # Extract distance from CREATE TABLE statement
-        distance = None
-        try:
-            create_table_result = self._execute(f"SHOW CREATE TABLE `{table_name}`")
-            if create_table_result and len(create_table_result) > 0:
-                # Handle both dict and tuple formats
-                if isinstance(create_table_result[0], dict):
-                    create_stmt = create_table_result[0].get(
-                        "Create Table", create_table_result[0].get("create table", "")
-                    )
-                elif isinstance(create_table_result[0], (tuple, list)):
-                    # CREATE TABLE statement is usually in the second column
-                    create_stmt = (
-                        create_table_result[0][1]
-                        if len(create_table_result[0]) > 1
-                        else ""
-                    )
-                else:
-                    create_stmt = str(create_table_result[0])
-
-                # Extract distance from VECTOR INDEX ... with(distance=..., ...)
-                # Pattern: VECTOR INDEX ... with(distance=l2, ...) or with(distance='l2', ...)
-                # Match: with(distance=value, ...) where value can be l2, cosine, inner_product, or ip
-                distance_match = re.search(
-                    r'with\s*\([^)]*distance\s*=\s*([\'"]?)(\w+)\1',
-                    create_stmt,
-                    re.IGNORECASE,
-                )
-                if distance_match:
-                    distance = distance_match.group(2).lower()
-                    # Normalize distance values
-                    if distance == "l2":
-                        distance = "l2"
-                    elif distance == "cosine":
-                        distance = "cosine"
-                    elif distance == "inner_product" or distance == "ip":
-                        distance = "inner_product"
-                    else:
-                        # Unknown distance, default to None
-                        logger.warning(
-                            f"Unknown distance value '{distance}' in CREATE TABLE statement, defaulting to None"
-                        )
-                        distance = None
-        except Exception as e:
-            # If SHOW CREATE TABLE fails, log warning but continue
-            logger.warning(
-                f"Failed to get CREATE TABLE statement for '{table_name}': {e}"
-            )
+        metadata = self._resolve_collection_metadata_from_table(table_name, name)
 
         # Handle embedding function
         # If not provided (sentinel), use default embedding function
@@ -816,15 +948,39 @@ class BaseClient(BaseConnection, AdminAPI):
             embedding_function = get_default_embedding_function()
 
         # Create and return Collection object
-        return Collection(
-            client=self,
-            name=name,
-            dimension=dimension,
-            embedding_function=embedding_function,
-            distance=distance,
-        )
+        return Collection(client=self, name=name, embedding_function=embedding_function, **metadata)
 
     def delete_collection(self, name: str) -> None:
+        """
+        Delete a collection (user-facing API)
+
+        Args:
+            name: Collection name
+        """
+        try:
+            self._delete_collection_v2(name)
+            logger.debug(f"✅ Successfully deleted collection v2 '{name}' from sdk_collections table")
+        except ValueError:
+            self._delete_collection_v1(name)
+            logger.debug(f"✅ Successfully deleted collection v1 '{name}' from table")
+
+    def _delete_collection_v2(self, name: str) -> None:
+        """
+        Delete a collection (user-facing API)
+
+        Args:
+            name: Collection name
+        """
+        collection = self._get_collection_v2(name)
+        if not collection:
+            raise ValueError(f"Collection '{name}' does not exist")
+        drop_table_sql = f"DROP TABLE `{CollectionNames.table_name_v2(collection.id)}`"
+        query_sql = f"DELETE FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{name}'"
+        self._execute(drop_table_sql)
+        self._execute(query_sql)
+        logger.debug(f"✅ Successfully deleted collection '{name}' from sdk_collections table")
+
+    def _delete_collection_v1(self, name: str) -> None:
         """
         Delete a collection (user-facing API)
 
@@ -838,17 +994,67 @@ class BaseClient(BaseConnection, AdminAPI):
         table_name = CollectionNames.table_name(name)
 
         # Check if table exists first
-        if not self.has_collection(name):
-            raise ValueError(
-                f"Collection '{name}' does not exist (table '{table_name}' not found)"
-            )
+        if not self._has_collection_v1(name):
+            raise ValueError(f"Collection '{name}' does not exist")
 
         # Execute DROP TABLE SQL
         self._execute(f"DROP TABLE IF EXISTS `{table_name}`")
 
-    def list_collections(self) -> List["Collection"]:
+    def list_collections(self) -> list["Collection"]:
         """
         List all collections (user-facing API)
+
+        Returns:
+            List of Collection objects
+        """
+        collections = self._list_collections_v1()
+        collections.extend(self._list_collections_v2())
+        return collections
+
+    def _list_collections_v2(self) -> list["Collection"]:
+        collections = []
+        try:
+            # Detect if the sdk_collections table exists before querying it
+            sdk_collections_table = CollectionNames.sdk_collections_table_name()
+            has_sdk_collections = False
+            try:
+                check_table_sql = f"SHOW TABLES LIKE '{sdk_collections_table}'"
+                check_result = self._execute(check_table_sql)
+                if check_result:
+                    # Table exists (SHOW TABLES LIKE returns at least one row if exists)
+                    has_sdk_collections = True
+            except Exception:
+                has_sdk_collections = False
+
+            if has_sdk_collections:
+                query_sql = f"SELECT COLLECTION_NAME FROM {sdk_collections_table}"
+                rows = self._execute(query_sql)
+                for row in rows:
+                    try:
+                        # Extract collection name
+                        if isinstance(row, dict):
+                            # Server client returns dict, get the first value
+                            collection_name = next(iter(row.values()), "")
+                        elif isinstance(row, (tuple, list)):
+                            # Embedded client returns tuple, first element is collection name
+                            collection_name = row[0] if len(row) > 0 else ""
+                        else:
+                            collection_name = str(row)
+                        collection = self.get_collection(collection_name)
+                        collections.append(collection)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to get collection. The data may be corrupted. The collection name: '{collection_name}': {e}"
+                        )
+                        continue
+
+        except Exception as e:
+            raise ValueError(f"Failed to list collections: {e}") from e
+        return collections
+
+    def _list_collections_v1(self) -> list["Collection"]:
+        """
+        List all collections (user-facing API) from table names that start with collection prefix
 
         Returns:
             List of Collection objects
@@ -883,7 +1089,7 @@ class BaseClient(BaseConnection, AdminAPI):
             # Extract table name
             if isinstance(row, dict):
                 # Server client returns dict, get the first value
-                table_name = list(row.values())[0] if row else ""
+                table_name = next(iter(row.values()), "")
             elif isinstance(row, (tuple, list)):
                 # Embedded client returns tuple, first element is table name
                 table_name = row[0] if len(row) > 0 else ""
@@ -898,8 +1104,8 @@ class BaseClient(BaseConnection, AdminAPI):
                 try:
                     collection = self.get_collection(collection_name)
                     collections.append(collection)
-                except Exception:
-                    # Skip if we can't get collection info
+                except Exception as e:
+                    logger.debug(f"Failed to get collection '{collection_name}': {e}")
                     continue
 
         return collections
@@ -919,6 +1125,33 @@ class BaseClient(BaseConnection, AdminAPI):
         return len(collections)
 
     def has_collection(self, name: str) -> bool:
+        """
+        Check if a collection exists (user-facing API)
+
+        Args:
+            name: Collection name
+        """
+        return self._has_collection_v2(name) or self._has_collection_v1(name)
+
+    def _has_collection_v2(self, name: str) -> bool:
+        try:
+            query_sql = f"SELECT COLLECTION_ID FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{name}'"
+            rows = self._execute(query_sql)
+            if not rows or len(rows) == 0:
+                return False
+            if isinstance(rows[0], dict):
+                collection_id = rows[0]["COLLECTION_ID"]
+            elif isinstance(rows[0], (tuple, list)):
+                collection_id = rows[0][0] if len(rows[0]) > 0 else ""
+            else:
+                collection_id = str(rows[0])
+            desc_sql = f"DESCRIBE `{CollectionNames.table_name_v2(collection_id)}`"
+            desc_result = self._execute(desc_sql)
+            return not (not desc_result or len(desc_result) == 0)
+        except Exception:
+            return False
+
+    def _has_collection_v1(self, name: str) -> bool:
         """
         Check if a collection exists (user-facing API)
 
@@ -995,15 +1228,15 @@ class BaseClient(BaseConnection, AdminAPI):
 
     # -------------------- DML Operations --------------------
 
-    def _collection_add(
+    def _collection_add(  # noqa: C901
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        ids: Union[str, List[str]],
-        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        metadatas: Optional[Union[Dict, List[Dict]]] = None,
-        documents: Optional[Union[str, List[str]]] = None,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        ids: str | list[str],
+        embeddings: list[float] | list[list[float]] | None = None,
+        metadatas: dict | list[dict] | None = None,
+        documents: str | list[str] | None = None,
+        embedding_function: EmbeddingFunction[EmbeddingDocuments] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -1022,7 +1255,7 @@ class BaseClient(BaseConnection, AdminAPI):
                                and returns Embeddings (List[List[float]]).
             **kwargs: Additional parameters
         """
-        logger.info(f"Adding data to collection '{collection_name}'")
+        logger.debug(f"Adding data to collection '{collection_name}'")
 
         # Normalize inputs to lists
         if isinstance(ids, str):
@@ -1031,13 +1264,13 @@ class BaseClient(BaseConnection, AdminAPI):
             documents = [documents]
         if metadatas is not None and isinstance(metadatas, dict):
             metadatas = [metadatas]
-        if embeddings is not None:
-            if (
-                isinstance(embeddings, list)
-                and len(embeddings) > 0
-                and not isinstance(embeddings[0], list)
-            ):
-                embeddings = [embeddings]
+        if (
+            embeddings is not None
+            and isinstance(embeddings, list)
+            and len(embeddings) > 0
+            and not isinstance(embeddings[0], list)
+        ):
+            embeddings = [embeddings]
 
         # Handle vector generation logic:
         # 1. If embeddings are provided, use them directly without embedding
@@ -1045,6 +1278,10 @@ class BaseClient(BaseConnection, AdminAPI):
         #    - If embedding_function is provided, use it to generate embeddings from documents
         #    - If embedding_function is not provided, raise an error
         # 3. If neither embeddings nor documents are provided, raise an error
+        # NOTE: The embedding_function is passed through `get_collection` and `create_collection` parameters.
+        # If embedding_function parameter passed in `get_collection` and `create_collection` is None,
+        # then the embedding function is not provided. If developers passed through `_NOT_PROVIDED` (default value),
+        # then the embedding function is the default embedding function.
 
         if embeddings:
             # embeddings provided, use them directly without embedding
@@ -1052,19 +1289,13 @@ class BaseClient(BaseConnection, AdminAPI):
         elif documents:
             # embeddings not provided but documents are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info(
-                    f"Generating embeddings for {len(documents)} documents using embedding function"
-                )
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.info(
-                        f"✅ Successfully generated {len(embeddings)} embeddings"
-                    )
+                    logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
-                    logger.error(f"Failed to generate embeddings: {e}")
-                    raise ValueError(
-                        f"Failed to generate embeddings from documents: {e}"
-                    )
+                    logger.exception("Failed to generate embeddings")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
             else:
                 raise ValueError(
                     "Documents provided but no embeddings and no embedding function. "
@@ -1097,24 +1328,19 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Validate lengths match
         if ids and len(ids) != num_items:
-            raise ValueError(
-                f"Number of ids ({len(ids)}) does not match number of items ({num_items})"
-            )
+            raise ValueError(f"Number of ids ({len(ids)}) does not match number of items ({num_items})")
         if documents and len(documents) != num_items:
-            raise ValueError(
-                f"Number of documents ({len(documents)}) does not match number of items ({num_items})"
-            )
+            raise ValueError(f"Number of documents ({len(documents)}) does not match number of items ({num_items})")
         if metadatas and len(metadatas) != num_items:
-            raise ValueError(
-                f"Number of metadatas ({len(metadatas)}) does not match number of items ({num_items})"
-            )
+            raise ValueError(f"Number of metadatas ({len(metadatas)}) does not match number of items ({num_items})")
         if embeddings and len(embeddings) != num_items:
-            raise ValueError(
-                f"Number of embeddings ({len(embeddings)}) does not match number of items ({num_items})"
-            )
+            raise ValueError(f"Number of embeddings ({len(embeddings)}) does not match number of items ({num_items})")
 
         # Get table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Build INSERT SQL
         values_list = []
@@ -1159,19 +1385,17 @@ class BaseClient(BaseConnection, AdminAPI):
 
         logger.debug(f"Executing SQL: {sql}")
         self._execute(sql)
-        logger.info(
-            f"✅ Successfully added {num_items} item(s) to collection '{collection_name}'"
-        )
+        logger.info(f"✅ Successfully added {num_items} item(s) to collection '{collection_name}'")
 
-    def _collection_update(
+    def _collection_update(  # noqa: C901
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        ids: Union[str, List[str]],
-        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        metadatas: Optional[Union[Dict, List[Dict]]] = None,
-        documents: Optional[Union[str, List[str]]] = None,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        ids: str | list[str],
+        embeddings: list[float] | list[list[float]] | None = None,
+        metadatas: dict | list[dict] | None = None,
+        documents: str | list[str] | None = None,
+        embedding_function: EmbeddingFunction[EmbeddingDocuments] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -1190,7 +1414,7 @@ class BaseClient(BaseConnection, AdminAPI):
                                and returns Embeddings (List[List[float]]).
             **kwargs: Additional parameters
         """
-        logger.info(f"Updating data in collection '{collection_name}'")
+        logger.debug(f"Updating data in collection '{collection_name}'")
 
         # Normalize inputs to lists
         if isinstance(ids, str):
@@ -1199,13 +1423,13 @@ class BaseClient(BaseConnection, AdminAPI):
             documents = [documents]
         if metadatas is not None and isinstance(metadatas, dict):
             metadatas = [metadatas]
-        if embeddings is not None:
-            if (
-                isinstance(embeddings, list)
-                and len(embeddings) > 0
-                and not isinstance(embeddings[0], list)
-            ):
-                embeddings = [embeddings]
+        if (
+            embeddings is not None
+            and isinstance(embeddings, list)
+            and len(embeddings) > 0
+            and not isinstance(embeddings[0], list)
+        ):
+            embeddings = [embeddings]
 
         # Handle vector generation logic:
         # 1. If embeddings are provided, use them directly without embedding
@@ -1222,19 +1446,13 @@ class BaseClient(BaseConnection, AdminAPI):
         elif documents:
             # embeddings not provided but documents are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info(
-                    f"Generating embeddings for {len(documents)} documents using embedding function"
-                )
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.info(
-                        f"✅ Successfully generated {len(embeddings)} embeddings"
-                    )
+                    logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
-                    logger.error(f"Failed to generate embeddings: {e}")
-                    raise ValueError(
-                        f"Failed to generate embeddings from documents: {e}"
-                    )
+                    logger.exception("Failed to generate embeddings")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
             else:
                 raise ValueError(
                     "Documents provided but no embeddings and no embedding function. "
@@ -1258,20 +1476,17 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Validate lengths match
         if documents and len(documents) != len(ids):
-            raise ValueError(
-                f"Number of documents ({len(documents)}) does not match number of ids ({len(ids)})"
-            )
+            raise ValueError(f"Number of documents ({len(documents)}) does not match number of ids ({len(ids)})")
         if metadatas and len(metadatas) != len(ids):
-            raise ValueError(
-                f"Number of metadatas ({len(metadatas)}) does not match number of ids ({len(ids)})"
-            )
+            raise ValueError(f"Number of metadatas ({len(metadatas)}) does not match number of ids ({len(ids)})")
         if embeddings and len(embeddings) != len(ids):
-            raise ValueError(
-                f"Number of embeddings ({len(embeddings)}) does not match number of ids ({len(ids)})"
-            )
+            raise ValueError(f"Number of embeddings ({len(embeddings)}) does not match number of ids ({len(ids)})")
 
         # Get table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Update each item
         for i in range(len(ids)):
@@ -1288,26 +1503,20 @@ class BaseClient(BaseConnection, AdminAPI):
                 doc_val = documents[i]
                 if doc_val is not None:
                     doc_val_escaped = escape_string(doc_val)
-                    set_clauses.append(
-                        f"{CollectionFieldNames.DOCUMENT} = '{doc_val_escaped}'"
-                    )
+                    set_clauses.append(f"{CollectionFieldNames.DOCUMENT} = '{doc_val_escaped}'")
 
             if metadatas:
                 meta_val = metadatas[i]
                 if meta_val is not None:
                     meta_json = json.dumps(meta_val, ensure_ascii=False)
                     meta_json_escaped = escape_string(meta_json)
-                    set_clauses.append(
-                        f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'"
-                    )
+                    set_clauses.append(f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'")
 
             if embeddings:
                 vec_val = embeddings[i]
                 if vec_val is not None:
                     vec_str = "[" + ",".join(map(str, vec_val)) + "]"
-                    set_clauses.append(
-                        f"{CollectionFieldNames.EMBEDDING} = '{vec_str}'"
-                    )
+                    set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = '{vec_str}'")
 
             if not set_clauses:
                 continue
@@ -1318,19 +1527,17 @@ class BaseClient(BaseConnection, AdminAPI):
             logger.debug(f"Executing SQL: {sql}")
             self._execute(sql)
 
-        logger.info(
-            f"✅ Successfully updated {len(ids)} item(s) in collection '{collection_name}'"
-        )
+        logger.debug(f"✅ Successfully updated {len(ids)} item(s) in collection '{collection_name}'")
 
-    def _collection_upsert(
+    def _collection_upsert(  # noqa: C901
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        ids: Union[str, List[str]],
-        embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        metadatas: Optional[Union[Dict, List[Dict]]] = None,
-        documents: Optional[Union[str, List[str]]] = None,
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        ids: str | list[str],
+        embeddings: list[float] | list[list[float]] | None = None,
+        metadatas: dict | list[dict] | None = None,
+        documents: str | list[str] | None = None,
+        embedding_function: EmbeddingFunction[EmbeddingDocuments] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -1349,7 +1556,7 @@ class BaseClient(BaseConnection, AdminAPI):
                                and returns Embeddings (List[List[float]]).
             **kwargs: Additional parameters
         """
-        logger.info(f"Upserting data in collection '{collection_name}'")
+        logger.debug(f"Upserting data in collection '{collection_name}'")
 
         # Normalize inputs to lists
         if isinstance(ids, str):
@@ -1358,13 +1565,13 @@ class BaseClient(BaseConnection, AdminAPI):
             documents = [documents]
         if metadatas is not None and isinstance(metadatas, dict):
             metadatas = [metadatas]
-        if embeddings is not None:
-            if (
-                isinstance(embeddings, list)
-                and len(embeddings) > 0
-                and not isinstance(embeddings[0], list)
-            ):
-                embeddings = [embeddings]
+        if (
+            embeddings is not None
+            and isinstance(embeddings, list)
+            and len(embeddings) > 0
+            and not isinstance(embeddings[0], list)
+        ):
+            embeddings = [embeddings]
 
         # Handle vector generation logic:
         # 1. If embeddings are provided, use them directly without embedding
@@ -1381,19 +1588,13 @@ class BaseClient(BaseConnection, AdminAPI):
         elif documents:
             # embeddings not provided but documents are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info(
-                    f"Generating embeddings for {len(documents)} documents using embedding function"
-                )
+                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.info(
-                        f"✅ Successfully generated {len(embeddings)} embeddings"
-                    )
+                    logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
-                    logger.error(f"Failed to generate embeddings: {e}")
-                    raise ValueError(
-                        f"Failed to generate embeddings from documents: {e}"
-                    )
+                    logger.exception("Failed to generate embeddings")
+                    raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
             else:
                 raise ValueError(
                     "Documents provided but no embeddings and no embedding function. "
@@ -1417,20 +1618,17 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Validate lengths match
         if documents and len(documents) != len(ids):
-            raise ValueError(
-                f"Number of documents ({len(documents)}) does not match number of ids ({len(ids)})"
-            )
+            raise ValueError(f"Number of documents ({len(documents)}) does not match number of ids ({len(ids)})")
         if metadatas and len(metadatas) != len(ids):
-            raise ValueError(
-                f"Number of metadatas ({len(metadatas)}) does not match number of ids ({len(ids)})"
-            )
+            raise ValueError(f"Number of metadatas ({len(metadatas)}) does not match number of ids ({len(ids)})")
         if embeddings and len(embeddings) != len(ids):
-            raise ValueError(
-                f"Number of embeddings ({len(embeddings)}) does not match number of ids ({len(ids)})"
-            )
+            raise ValueError(f"Number of embeddings ({len(embeddings)}) does not match number of ids ({len(ids)})")
 
         # Get table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Upsert each item
         for i in range(len(ids)):
@@ -1455,21 +1653,9 @@ class BaseClient(BaseConnection, AdminAPI):
 
             if existing and len(existing.get("ids", [])) > 0:
                 # Update existing record - only update provided fields
-                existing_doc = (
-                    existing.get("documents", [None])[0]
-                    if existing.get("documents")
-                    else None
-                )
-                existing_meta = (
-                    existing.get("metadatas", [None])[0]
-                    if existing.get("metadatas")
-                    else None
-                )
-                existing_vec = (
-                    existing.get("embeddings", [None])[0]
-                    if existing.get("embeddings")
-                    else None
-                )
+                existing_doc = existing.get("documents", [None])[0] if existing.get("documents") else None
+                existing_meta = existing.get("metadatas", [None])[0] if existing.get("metadatas") else None
+                existing_vec = existing.get("embeddings", [None])[0] if existing.get("embeddings") else None
 
                 # Use provided values or keep existing values
                 final_document = doc_val if doc_val is not None else existing_doc
@@ -1482,33 +1668,23 @@ class BaseClient(BaseConnection, AdminAPI):
                 if doc_val is not None:
                     if final_document is not None:
                         doc_val_escaped = escape_string(final_document)
-                        set_clauses.append(
-                            f"{CollectionFieldNames.DOCUMENT} = '{doc_val_escaped}'"
-                        )
+                        set_clauses.append(f"{CollectionFieldNames.DOCUMENT} = '{doc_val_escaped}'")
                     else:
                         set_clauses.append(f"{CollectionFieldNames.DOCUMENT} = NULL")
 
                 if meta_val is not None:
-                    meta_json = (
-                        json.dumps(final_metadata, ensure_ascii=False)
-                        if final_metadata
-                        else "{}"
-                    )
+                    meta_json = json.dumps(final_metadata, ensure_ascii=False) if final_metadata else "{}"
                     meta_json_escaped = escape_string(meta_json)
-                    set_clauses.append(
-                        f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'"
-                    )
+                    set_clauses.append(f"{CollectionFieldNames.METADATA} = '{meta_json_escaped}'")
 
                 if vec_val is not None:
-                    vec_str = (
-                        _embedding_to_hexstring(final_vector)
-                        if final_vector
-                        else "NULL"
-                    )
+                    vec_str = _embedding_to_hexstring(final_vector) if final_vector else "NULL"
                     set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = {vec_str}")
 
                 if set_clauses:
-                    sql = f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
+                    sql = (
+                        f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
+                    )
                     logger.debug(f"Executing SQL: {sql}")
                     self._execute(sql)
             else:
@@ -1526,26 +1702,22 @@ class BaseClient(BaseConnection, AdminAPI):
                 else:
                     meta_sql = "NULL"
 
-                vec_sql = (
-                    "NULL" if vec_val is None else _embedding_to_hexstring(vec_val)
-                )
+                vec_sql = "NULL" if vec_val is None else _embedding_to_hexstring(vec_val)
 
                 sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING})
                          VALUES ({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})"""
                 logger.debug(f"Executing SQL: {sql}")
                 self._execute(sql)
 
-        logger.info(
-            f"✅ Successfully upserted {len(ids)} item(s) in collection '{collection_name}'"
-        )
+        logger.debug(f"✅ Successfully upserted {len(ids)} item(s) in collection '{collection_name}'")
 
     def _collection_delete(
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        ids: Optional[Union[str, List[str]]] = None,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
+        ids: str | list[str] | None = None,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         """
@@ -1563,20 +1735,18 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Validate that at least one filter is provided
         if not ids and not where and not where_document:
-            raise ValueError(
-                "At least one of ids, where, or where_document must be provided"
-            )
+            raise ValueError("At least one of ids, where, or where_document must be provided")
 
         # Normalize ids to list
         id_list = None
         if ids is not None:
-            if isinstance(ids, str):
-                id_list = [ids]
-            else:
-                id_list = ids
+            id_list = [ids] if isinstance(ids, str) else ids
 
         # Get table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Build WHERE clause
         where_clause, params = self._build_where_clause(where, where_document, id_list)
@@ -1598,8 +1768,8 @@ class BaseClient(BaseConnection, AdminAPI):
     # Note: _collection_query() and _collection_get() are implemented below with common SQL-based logic
 
     def _normalize_query_embeddings(
-        self, query_embeddings: Optional[Union[List[float], List[List[float]]]]
-    ) -> List[List[float]]:
+        self, query_embeddings: list[float] | list[list[float]] | None
+    ) -> list[list[float]]:
         """
         Normalize query embeddings to list of lists format
 
@@ -1618,9 +1788,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return query_embeddings
 
-    def _normalize_include_fields(
-        self, include: Optional[List[str]]
-    ) -> Dict[str, bool]:
+    def _normalize_include_fields(self, include: list[str] | None) -> dict[str, bool]:
         """
         Normalize include parameter to a dictionary
 
@@ -1646,10 +1814,10 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _embed_texts(
         self,
-        texts: Union[str, List[str]],
-        embedding_function: Optional[EmbeddingFunction[EmbeddingDocuments]] = None,
+        texts: str | list[str],
+        embedding_function: EmbeddingFunction[EmbeddingDocuments] | None = None,
         **kwargs,
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """
         Embed text(s) to vector(s)
 
@@ -1680,9 +1848,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # Use embedding function to generate embeddings
         return embedding_function(texts)
 
-    def _normalize_row(
-        self, row: Any, cursor_description: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    def _normalize_row(self, row: Any, cursor_description: Any | None = None) -> dict[str, Any]:
         """
         Normalize database row to dictionary format
 
@@ -1707,8 +1873,8 @@ class BaseClient(BaseConnection, AdminAPI):
         return dict(row) if hasattr(row, "_asdict") else row
 
     def _execute_query_with_cursor(
-        self, conn: Any, sql: str, params: List[Any], use_context_manager: bool = True
-    ) -> List[Dict[str, Any]]:
+        self, conn: Any, sql: str, params: list[Any], use_context_manager: bool = True
+    ) -> list[dict[str, Any]]:
         """
         Execute SQL query and return normalized rows
 
@@ -1747,7 +1913,7 @@ class BaseClient(BaseConnection, AdminAPI):
             finally:
                 cursor.close()
 
-    def _build_select_clause(self, include_fields: Dict[str, bool]) -> str:
+    def _build_select_clause(self, include_fields: dict[str, bool]) -> str:
         """
         Build SELECT clause based on include fields
 
@@ -1769,10 +1935,10 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _build_where_clause(
         self,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
-        id_list: Optional[List[str]] = None,
-    ) -> Tuple[str, List[Any]]:
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+        id_list: list[str] | None = None,
+    ) -> tuple[str, list[Any]]:
         """
         Build WHERE clause from filters
 
@@ -1794,24 +1960,22 @@ class BaseClient(BaseConnection, AdminAPI):
             for id_val in id_list:
                 if not isinstance(id_val, str):
                     id_val = str(id_val)
-                processed_ids.append(self._convert_id_to_sql(id_val))
+                id_sql, id_param = self._convert_id_to_sql_with_paramters(id_val)
+                processed_ids.append(id_sql)
+                params.append(id_param)
 
             where_clauses.append(f"_id IN ({','.join(processed_ids)})")
 
         # Add metadata filter
         if where:
-            meta_clause, meta_params = FilterBuilder.build_metadata_filter(
-                where, "metadata"
-            )
+            meta_clause, meta_params = FilterBuilder.build_metadata_filter(where, "metadata")
             if meta_clause:
                 where_clauses.append(meta_clause)
                 params.extend(meta_params)
 
         # Add document filter
         if where_document:
-            doc_clause, doc_params = FilterBuilder.build_document_filter(
-                where_document, "document"
-            )
+            doc_clause, doc_params = FilterBuilder.build_document_filter(where_document, "document")
             if doc_clause:
                 where_clauses.append(doc_clause)
                 params.extend(doc_params)
@@ -1858,6 +2022,12 @@ class BaseClient(BaseConnection, AdminAPI):
         # Use CAST to convert string to binary for varbinary(512) field
         return f"CAST('{id_val_escaped}' AS BINARY)"
 
+    def _convert_id_to_sql_with_paramters(self, id_val: str) -> (str, str):
+        """
+        Convert ID to SQL format for varbinary(512) _id field with parameters
+        """
+        return "CAST(%s AS BINARY)", (id_val)
+
     def _convert_id_from_bytes(self, record_id: Any) -> str:
         """
         Convert _id from bytes to string format
@@ -1886,9 +2056,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # For other formats, convert to string
         return str(record_id)
 
-    def _process_query_row(
-        self, row: Dict[str, Any], include_fields: Dict[str, bool]
-    ) -> Dict[str, Any]:
+    def _process_query_row(self, row: dict[str, Any], include_fields: dict[str, bool]) -> dict[str, Any]:
         """
         Process a row from query results
 
@@ -1917,9 +2085,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return result_item
 
-    def _process_get_row(
-        self, row: Dict[str, Any], include_fields: Dict[str, bool]
-    ) -> Dict[str, Any]:
+    def _process_get_row(self, row: dict[str, Any], include_fields: dict[str, bool]) -> dict[str, Any]:
         """
         Process a row from get results
 
@@ -1938,19 +2104,16 @@ class BaseClient(BaseConnection, AdminAPI):
         metadata = None
 
         # Include document if requested
-        if include_fields.get("documents") or include_fields.get("document"):
-            if "document" in row:
-                document = row["document"]
+        if (include_fields.get("documents") or include_fields.get("document")) and "document" in row:
+            document = row["document"]
 
         # Include metadata if requested
-        if include_fields.get("metadatas") or include_fields.get("metadata"):
-            if "metadata" in row and row["metadata"] is not None:
-                metadata = self._parse_row_value(row["metadata"])
+        if (include_fields.get("metadatas") or include_fields.get("metadata")) and row.get("metadata") is not None:
+            metadata = self._parse_row_value(row["metadata"])
 
         # Include embedding if requested
-        if include_fields.get("embeddings") or include_fields.get("embedding"):
-            if "embedding" in row and row["embedding"] is not None:
-                embedding = self._parse_row_value(row["embedding"])
+        if (include_fields.get("embeddings") or include_fields.get("embedding")) and row.get("embedding") is not None:
+            embedding = self._parse_row_value(row["embedding"])
 
         return {
             "id": record_id,
@@ -1995,21 +2158,21 @@ class BaseClient(BaseConnection, AdminAPI):
             return None
         finally:
             cursor.close()
-    
+
     # -------------------- DQL Operations (Common Implementation) --------------------
 
-    def _collection_query(
+    def _collection_query(  # noqa: C901
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        query_embeddings: Optional[Union[List[float], List[List[float]]]] = None,
-        query_texts: Optional[Union[str, List[str]]] = None,
+        query_embeddings: list[float] | list[list[float]] | None = None,
+        query_texts: str | list[str] | None = None,
         n_results: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
-        include: Optional[List[str]] = None,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+        include: list[str] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         [Internal] Query collection by vector similarity - Common SQL-based implementation
 
@@ -2038,13 +2201,14 @@ class BaseClient(BaseConnection, AdminAPI):
             - embeddings: Optional[List[List[List[float]]]] - List of embedding lists, one list per query
             - distances: Optional[List[List[float]]] - List of distance lists, one list per query
         """
-        logger.info(
-            f"Querying collection '{collection_name}' with n_results={n_results}"
-        )
+        logger.debug(f"Querying collection '{collection_name}' with n_results={n_results}")
         conn = self._ensure_connection()
 
         # Convert collection name to table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Handle vector generation logic:
         # 1. If query_embeddings are provided, use them directly without embedding
@@ -2061,10 +2225,8 @@ class BaseClient(BaseConnection, AdminAPI):
         elif query_texts is not None:
             # Query embeddings not provided but query_texts are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info("Embedding query texts...")
-                query_embeddings = self._embed_texts(
-                    query_texts, embedding_function=embedding_function
-                )
+                logger.debug("Embedding query texts...")
+                query_embeddings = self._embed_texts(query_texts, embedding_function=embedding_function)
             else:
                 raise ValueError(
                     "query_texts provided but no query_embeddings and no embedding_function. "
@@ -2083,9 +2245,6 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Normalize query embeddings to list of lists
         query_embeddings = self._normalize_query_embeddings(query_embeddings)
-
-        # Check if multiple embeddings provided
-        is_multiple_embeddings = len(query_embeddings) > 1
 
         # Normalize include fields
         include_fields = self._normalize_include_fields(include)
@@ -2110,9 +2269,7 @@ class BaseClient(BaseConnection, AdminAPI):
         distance_func = distance_function_map.get(distance, "l2_distance")
 
         if distance not in distance_function_map:
-            logger.warning(
-                f"Unknown distance metric '{distance}', defaulting to 'l2_distance'"
-            )
+            logger.warning(f"Unknown distance metric '{distance}', defaulting to 'l2_distance'")
 
         use_context_manager = self._use_context_manager_for_cursor()
 
@@ -2142,13 +2299,11 @@ class BaseClient(BaseConnection, AdminAPI):
             """
 
             # Execute query
-            query_params = params + [n_results]
+            query_params = [*params, n_results]
             logger.debug(f"Executing SQL: {sql}")
             logger.debug(f"Parameters: {query_params}")
 
-            rows = self._execute_query_with_cursor(
-                conn, sql, query_params, use_context_manager
-            )
+            rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
 
             # Collect results for this query vector
             query_ids = []
@@ -2193,23 +2348,23 @@ class BaseClient(BaseConnection, AdminAPI):
         if "embeddings" in include_fields:
             result["embeddings"] = all_embeddings
 
-        logger.info(
+        logger.debug(
             f"✅ Query completed for '{collection_name}' with {len(query_embeddings)} vectors, returning {len(all_ids)} result lists"
         )
         return result
 
-    def _collection_get(
+    def _collection_get(  # noqa: C901
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        ids: Optional[Union[str, List[str]]] = None,
-        where: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-        include: Optional[List[str]] = None,
+        ids: str | list[str] | None = None,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        include: list[str] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         [Internal] Get data from collection by IDs or filters - Common SQL-based implementation
 
@@ -2231,11 +2386,14 @@ class BaseClient(BaseConnection, AdminAPI):
             - metadatas: Optional[List[Dict]] - List of metadata dictionaries
             - embeddings: Optional[List[List[float]]] - List of embeddings
         """
-        logger.info(f"Getting data from collection '{collection_name}'")
+        logger.debug(f"Getting data from collection '{collection_name}'")
         conn = self._ensure_connection()
 
         # Convert collection name to table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Set defaults
         if limit is None:
@@ -2245,20 +2403,10 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Normalize ids to list
         id_list = None
-        is_single_id = False
         if ids is not None:
-            if isinstance(ids, str):
-                id_list = [ids]
-                is_single_id = True
-            else:
-                id_list = ids
-                is_single_id = len(id_list) == 1
+            id_list = [ids] if isinstance(ids, str) else ids
 
         # Note: get() now returns dict format (not QueryResult)
-        has_filters = where is not None or where_document is not None
-        is_multiple_ids = id_list is not None and len(id_list) > 1
-        should_return_multiple = is_multiple_ids and not has_filters
-
         # Normalize include fields (default includes documents and metadatas)
         include_fields = self._normalize_include_fields(include)
 
@@ -2279,13 +2427,11 @@ class BaseClient(BaseConnection, AdminAPI):
         """
 
         # Execute query
-        query_params = params + [limit, offset]
+        query_params = [*params, limit, offset]
         logger.debug(f"Executing SQL: {sql}")
         logger.debug(f"Parameters: {query_params}")
 
-        rows = self._execute_query_with_cursor(
-            conn, sql, query_params, use_context_manager
-        )
+        rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
 
         # Build result dictionary in chromadb format
         result_ids = []
@@ -2318,24 +2464,27 @@ class BaseClient(BaseConnection, AdminAPI):
         if "embeddings" in include_fields:
             result["embeddings"] = result_embeddings
 
-        logger.info(
-            f"✅ Get completed for '{collection_name}', found {len(result_ids)} results"
-        )
+        logger.debug(f"✅ Get completed for '{collection_name}', found {len(result_ids)} results")
         return result
 
     def _collection_hybrid_search(
         self,
-        collection_id: Optional[str],
+        collection_id: str | None,
         collection_name: str,
-        query: Optional[Dict[str, Any]] = None,
-        knn: Optional[Dict[str, Any]] = None,
-        rank: Optional[Dict[str, Any]] = None,
+        query: dict[str, Any] | None = None,
+        knn: dict[str, Any] | None = None,
+        rank: dict[str, Any] | None = None,
         n_results: int = 10,
+<<<<<<< HEAD
         include: Optional[List[str]] = None,
         return_fields: Optional[List[str]] = None,
         dimension: Optional[int] = None,
+=======
+        include: list[str] | None = None,
+        dimension: int | None = None,
+>>>>>>> origin/develop
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         [Internal] Hybrid search combining full-text search and vector similarity search - Common SQL-based implementation
 
@@ -2378,15 +2527,17 @@ class BaseClient(BaseConnection, AdminAPI):
             - embeddings: Optional[List[List[List[float]]]] - List of embedding lists (if included)
             - distances: Optional[List[List[float]]] - List of distance lists
         """
-        logger.info(
-            f"Hybrid search in collection '{collection_name}' with n_results={n_results}"
-        )
+        logger.debug(f"Hybrid search in collection '{collection_name}' with n_results={n_results}")
         conn = self._ensure_connection()
 
         # Build table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Build search_parm JSON
+<<<<<<< HEAD
         search_parm = self._build_search_parm(
             query,
             knn,
@@ -2396,6 +2547,9 @@ class BaseClient(BaseConnection, AdminAPI):
             dimension=dimension,
             **kwargs,
         )
+=======
+        search_parm = self._build_search_parm(query, knn, rank, n_results, dimension=dimension, **kwargs)
+>>>>>>> origin/develop
 
         # Convert search_parm to JSON string
         search_parm_json = json.dumps(search_parm, ensure_ascii=False)
@@ -2416,9 +2570,7 @@ class BaseClient(BaseConnection, AdminAPI):
         get_sql_query = f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"
         logger.debug(f"Getting SQL query: {get_sql_query}")
 
-        rows = self._execute_query_with_cursor(
-            conn, get_sql_query, [], use_context_manager
-        )
+        rows = self._execute_query_with_cursor(conn, get_sql_query, [], use_context_manager)
 
         if not rows or not rows[0].get("query_sql"):
             logger.warning("No SQL query returned from GET_SQL")
@@ -2439,23 +2591,25 @@ class BaseClient(BaseConnection, AdminAPI):
         logger.debug(f"Executing query SQL: {query_sql}")
 
         # Execute the returned SQL query
-        result_rows = self._execute_query_with_cursor(
-            conn, query_sql, [], use_context_manager
-        )
+        result_rows = self._execute_query_with_cursor(conn, query_sql, [], use_context_manager)
 
         # Transform SQL query results to standard format
         return self._transform_sql_result(result_rows, include)
 
-    def _build_search_parm(
+    def _build_search_parm(  # noqa: C901
         self,
-        query: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]],
-        knn: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]],
-        rank: Optional[Dict[str, Any]],
+        query: dict[str, Any] | list[dict[str, Any]] | None,
+        knn: dict[str, Any] | list[dict[str, Any]] | None,
+        rank: dict[str, Any] | None,
         n_results: int,
+<<<<<<< HEAD
         return_fields: Optional[List[str]] = None,
         dimension: Optional[int] = None,
+=======
+        dimension: int | None = None,
+>>>>>>> origin/develop
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Build search_parm JSON from query, knn, and rank parameters
 
@@ -2478,7 +2632,7 @@ class BaseClient(BaseConnection, AdminAPI):
         search_parm = {}
 
         # Build query part (full-text search or scalar query)
-        query_expr_list: List[Dict[str, Any]] = []
+        query_expr_list: list[dict[str, Any]] = []
         if query:
             query_items = query if isinstance(query, list) else [query]
             for query_item in query_items:
@@ -2486,18 +2640,14 @@ class BaseClient(BaseConnection, AdminAPI):
                 if query_expr:
                     query_expr_list.append(query_expr)
         if query_expr_list:
-            search_parm["query"] = (
-                query_expr_list if len(query_expr_list) > 1 else query_expr_list[0]
-            )
+            search_parm["query"] = query_expr_list if len(query_expr_list) > 1 else query_expr_list[0]
 
         # Build knn part (vector search)
-        knn_expr_list: List[Dict[str, Any]] = []
+        knn_expr_list: list[dict[str, Any]] = []
         if knn:
             knn_items = knn if isinstance(knn, list) else [knn]
             for knn_item in knn_items:
-                knn_expr = self._build_knn_expression(
-                    knn_item, dimension=dimension, **kwargs
-                )
+                knn_expr = self._build_knn_expression(knn_item, dimension=dimension, **kwargs)
                 if not knn_expr:
                     continue
                 if isinstance(knn_expr, list):
@@ -2505,9 +2655,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 else:
                     knn_expr_list.append(knn_expr)
         if knn_expr_list:
-            search_parm["knn"] = (
-                knn_expr_list if len(knn_expr_list) > 1 else knn_expr_list[0]
-            )
+            search_parm["knn"] = knn_expr_list if len(knn_expr_list) > 1 else knn_expr_list[0]
 
         if n_results is not None:
             search_parm["size"] = n_results
@@ -2521,9 +2669,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return search_parm
 
-    def _build_query_expression(
-        self, query: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _build_query_expression(self, query: dict[str, Any]) -> dict[str, Any] | None:
         """
         Build query expression from query dict
 
@@ -2544,9 +2690,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 if len(filter_conditions) == 1:
                     filter_cond = filter_conditions[0]
                     # Directly return supported single condition types
-                    if any(
-                        key in filter_cond for key in ("range", "term", "terms", "bool")
-                    ):
+                    if any(key in filter_cond for key in ("range", "term", "terms", "bool")):
                         return filter_cond
                 # Multiple filter conditions, wrap in bool filter
                 return {"bool": {"filter": filter_conditions}}
@@ -2568,9 +2712,9 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return None
 
-    def _build_document_query(
-        self, where_document: Dict[str, Any], boost: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
+    def _build_document_query(  # noqa: C901
+        self, where_document: dict[str, Any], boost: float | None = None
+    ) -> dict[str, Any] | None:
         """
         Build document query from where_document condition using query_string
 
@@ -2584,16 +2728,14 @@ class BaseClient(BaseConnection, AdminAPI):
         if not where_document:
             return None
 
-        def _with_boost(expr: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        def _with_boost(expr: dict[str, Any] | None) -> dict[str, Any] | None:
             if boost is None or not expr:
                 return expr
 
             def _apply_boost(target: Any) -> None:
                 if not isinstance(target, dict):
                     return
-                if "query_string" in target and isinstance(
-                    target["query_string"], dict
-                ):
+                if "query_string" in target and isinstance(target["query_string"], dict):
                     target["query_string"]["boost"] = boost
                     return
                 bool_clause = target.get("bool")
@@ -2614,26 +2756,22 @@ class BaseClient(BaseConnection, AdminAPI):
             # Use pymysql's escape_string for safe escaping of query content
             query_content = where_document["$contains"]
             escaped_query = escape_string(query_content)
-            return _with_boost(
-                {"query_string": {"fields": ["document"], "query": escaped_query}}
-            )
+            return _with_boost({"query_string": {"fields": ["document"], "query": escaped_query}})
 
         # Handle $not_contains - wrap query_string in must_not bool
         if "$not_contains" in where_document:
-            return _with_boost(
-                {
-                    "bool": {
-                        "must_not": [
-                            {
-                                "query_string": {
-                                    "fields": ["document"],
-                                    "query": where_document["$not_contains"],
-                                }
+            return _with_boost({
+                "bool": {
+                    "must_not": [
+                        {
+                            "query_string": {
+                                "fields": ["document"],
+                                "query": where_document["$not_contains"],
                             }
-                        ]
-                    }
+                        }
+                    ]
                 }
-            )
+            })
 
         # Handle $and with $contains
         if "$and" in where_document:
@@ -2646,14 +2784,12 @@ class BaseClient(BaseConnection, AdminAPI):
             if contains_queries:
                 # Combine multiple $contains with AND (escape each query)
                 escaped_queries = [escape_string(q) for q in contains_queries]
-                return _with_boost(
-                    {
-                        "query_string": {
-                            "fields": ["document"],
-                            "query": " ".join(escaped_queries),
-                        }
+                return _with_boost({
+                    "query_string": {
+                        "fields": ["document"],
+                        "query": " ".join(escaped_queries),
                     }
-                )
+                })
 
         # Handle $or with $contains
         if "$or" in where_document:
@@ -2666,26 +2802,20 @@ class BaseClient(BaseConnection, AdminAPI):
             if contains_queries:
                 # Combine multiple $contains with OR (escape each query)
                 escaped_queries = [escape_string(q) for q in contains_queries]
-                return _with_boost(
-                    {
-                        "query_string": {
-                            "fields": ["document"],
-                            "query": " OR ".join(escaped_queries),
-                        }
+                return _with_boost({
+                    "query_string": {
+                        "fields": ["document"],
+                        "query": " OR ".join(escaped_queries),
                     }
-                )
+                })
 
         # Default: if it's a string, treat as $contains
         if isinstance(where_document, str):
-            return _with_boost(
-                {"query_string": {"fields": ["document"], "query": where_document}}
-            )
+            return _with_boost({"query_string": {"fields": ["document"], "query": where_document}})
 
         return None
 
-    def _build_metadata_filter_for_search_parm(
-        self, where: Optional[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _build_metadata_filter_for_search_parm(self, where: dict[str, Any] | None) -> list[dict[str, Any]]:
         """
         Build metadata filter conditions for search_parm using JSON_EXTRACT format
 
@@ -2711,9 +2841,9 @@ class BaseClient(BaseConnection, AdminAPI):
             return CollectionFieldNames.ID
         return f"(JSON_EXTRACT(metadata, '$.{key}'))"
 
-    def _build_metadata_filter_conditions(
-        self, condition: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _build_metadata_filter_conditions(  # noqa: C901
+        self, condition: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """
         Recursively build metadata filter conditions from nested dictionary
 
@@ -2771,9 +2901,7 @@ class BaseClient(BaseConnection, AdminAPI):
                         term_value = op_value
                     elif op == "$ne":
                         # $ne should be in must_not
-                        result.append(
-                            {"bool": {"must_not": [{"term": {field_name: op_value}}]}}
-                        )
+                        result.append({"bool": {"must_not": [{"term": {field_name: op_value}}]}})
                     elif op == "$lt":
                         range_conditions["lt"] = op_value
                     elif op == "$lte":
@@ -2786,18 +2914,9 @@ class BaseClient(BaseConnection, AdminAPI):
                         # For $in, use terms query to match any value in list
                         if isinstance(op_value, (list, tuple)) and len(op_value) > 0:
                             result.append({"terms": {field_name: list(op_value)}})
-                    elif op == "$nin":
+                    elif op == "$nin" and isinstance(op_value, (list, tuple)) and len(op_value) > 0:
                         # For $nin, use must_not with terms query
-                        if isinstance(op_value, (list, tuple)) and len(op_value) > 0:
-                            result.append(
-                                {
-                                    "bool": {
-                                        "must_not": [
-                                            {"terms": {field_name: list(op_value)}}
-                                        ]
-                                    }
-                                }
-                            )
+                        result.append({"bool": {"must_not": [{"terms": {field_name: list(op_value)}}]}})
 
                 if range_conditions:
                     result.append({"range": {field_name: range_conditions}})
@@ -2809,9 +2928,9 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return result
 
-    def _build_knn_expression(
-        self, knn: Dict[str, Any], dimension: Optional[int] = None, **kwargs
-    ) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    def _build_knn_expression(  # noqa: C901
+        self, knn: dict[str, Any], dimension: int | None = None, **kwargs
+    ) -> dict[str, Any] | list[dict[str, Any]] | None:
         """
         Build knn expression from knn dict
 
@@ -2839,38 +2958,28 @@ class BaseClient(BaseConnection, AdminAPI):
 
         embedding_function = kwargs.get("embedding_function")
 
-        def _normalize_vectors(raw_embeddings: Any) -> List[List[float]]:
+        def _normalize_vectors(raw_embeddings: Any) -> list[list[float]]:
             if raw_embeddings is None:
                 return []
-            if (
-                isinstance(raw_embeddings, list)
-                and raw_embeddings
-                and isinstance(raw_embeddings[0], list)
-            ):
+            if isinstance(raw_embeddings, list) and raw_embeddings and isinstance(raw_embeddings[0], list):
                 return raw_embeddings  # type: ignore[return-value]
             if isinstance(raw_embeddings, list):
                 return [raw_embeddings]  # type: ignore[list-item]
             return []
 
-        vectors: List[List[float]] = []
+        vectors: list[list[float]] = []
         if query_embeddings is not None:
             vectors = _normalize_vectors(query_embeddings)
         elif query_texts is not None:
             if embedding_function is not None:
                 try:
-                    texts = (
-                        query_texts if isinstance(query_texts, list) else [query_texts]
-                    )
-                    embeddings = self._embed_texts(
-                        texts, embedding_function=embedding_function
-                    )
+                    texts = query_texts if isinstance(query_texts, list) else [query_texts]
+                    embeddings = self._embed_texts(texts, embedding_function=embedding_function)
                     if embeddings and len(embeddings) > 0:
                         vectors = embeddings
                 except Exception as e:
-                    logger.error(f"Failed to generate embeddings from query_texts: {e}")
-                    raise ValueError(
-                        f"Failed to generate embeddings from query_texts: {e}"
-                    )
+                    logger.exception("Failed to generate embeddings from query_texts")
+                    raise ValueError(f"Failed to generate embeddings from query_texts: {e}") from e
             else:
                 raise ValueError(
                     "knn.query_texts provided but no knn.query_embeddings and no embedding_function. "
@@ -2892,12 +3001,10 @@ class BaseClient(BaseConnection, AdminAPI):
         if dimension is not None:
             for vec in vectors:
                 if len(vec) != dimension:
-                    raise ValueError(
-                        f"Embedding dimension mismatch: expected {dimension}, got {len(vec)}"
-                    )
+                    raise ValueError(f"Embedding dimension mismatch: expected {dimension}, got {len(vec)}")
 
         # Build knn expressions (one per vector)
-        knn_exprs: List[Dict[str, Any]] = []
+        knn_exprs: list[dict[str, Any]] = []
         filter_conditions = self._build_metadata_filter_for_search_parm(where)
         for vector in vectors:
             expr = {"field": "embedding", "k": n_results, "query_vector": vector}
@@ -2912,7 +3019,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return knn_exprs if len(knn_exprs) > 1 else knn_exprs[0]
 
-    def _build_source_fields(self, include: Optional[List[str]]) -> List[str]:
+    def _build_source_fields(self, include: list[str] | None) -> list[str]:
         """Build _source fields list from include parameter"""
         if not include:
             return ["document", "metadata", "embedding"]
@@ -2931,9 +3038,9 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return source_fields if source_fields else ["document", "metadata", "embedding"]
 
-    def _transform_sql_result(
-        self, result_rows: List[Dict[str, Any]], include: Optional[List[str]]
-    ) -> Dict[str, Any]:
+    def _transform_sql_result(  # noqa: C901
+        self, result_rows: list[dict[str, Any]], include: list[str] | None
+    ) -> dict[str, Any]:
         """
         Transform SQL query results to standard format (query-compatible format)
 
@@ -2968,12 +3075,8 @@ class BaseClient(BaseConnection, AdminAPI):
                     row_id = row.get(key)
                     break
             if row_id is None:
-                for key in row.keys():
-                    if (
-                        isinstance(key, str)
-                        and key.lower().endswith("id")
-                        and row.get(key) is not None
-                    ):
+                for key in row:
+                    if isinstance(key, str) and key.lower().endswith("id") and row.get(key) is not None:
                         row_id = row.get(key)
                         break
             row_id = self._convert_id_from_bytes(row_id)
@@ -2997,10 +3100,8 @@ class BaseClient(BaseConnection, AdminAPI):
                 metadata = row.get("metadata") or row.get("METADATA")
                 # Parse JSON string if needed
                 if isinstance(metadata, str):
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError, TypeError):
                         metadata = json.loads(metadata)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
                 metadatas.append(metadata or {})
             else:
                 metadatas.append(None)
@@ -3017,10 +3118,8 @@ class BaseClient(BaseConnection, AdminAPI):
                 embedding = row.get("embedding") or row.get("EMBEDDING")
                 # Parse JSON string or list if needed
                 if isinstance(embedding, str):
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError, TypeError):
                         embedding = json.loads(embedding)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
                 embeddings.append(embedding)
             else:
                 embeddings.append(None)
@@ -3039,9 +3138,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return result
 
-    def _transform_search_result(
-        self, search_result: Dict[str, Any], include: Optional[List[str]]
-    ) -> Dict[str, Any]:
+    def _transform_search_result(self, search_result: dict[str, Any], include: list[str] | None) -> dict[str, Any]:
         """Transform OceanBase search result to standard format"""
         # OceanBase SEARCH function returns results in a specific format
         # This needs to be adapted based on actual return format
@@ -3087,9 +3184,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
     # -------------------- Collection Info --------------------
 
-    def _collection_count(
-        self, collection_id: Optional[str], collection_name: str
-    ) -> int:
+    def _collection_count(self, collection_id: str | None, collection_name: str) -> int:
         """
         [Internal] Get the number of items in collection - Common SQL-based implementation
 
@@ -3104,7 +3199,10 @@ class BaseClient(BaseConnection, AdminAPI):
         conn = self._ensure_connection()
 
         # Convert collection name to table name
-        table_name = CollectionNames.table_name(collection_name)
+        if collection_id:
+            table_name = CollectionNames.table_name_v2(collection_id)
+        else:
+            table_name = CollectionNames.table_name(collection_name)
 
         # Execute COUNT query
         sql = f"SELECT COUNT(*) as cnt FROM `{table_name}`"
@@ -3125,5 +3223,5 @@ class BaseClient(BaseConnection, AdminAPI):
             else:
                 count = int(row) if row else 0
 
-        logger.info(f"✅ Collection '{collection_name}' has {count} items")
+        logger.debug(f"✅ Collection '{collection_name}' has {count} items")
         return count

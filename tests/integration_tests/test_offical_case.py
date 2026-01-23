@@ -10,10 +10,8 @@ The scenario mirrors `pyseekdb/examples/official_example.py` and covers:
 """
 
 import time
+
 import pytest
-
-import pyseekdb
-
 
 PRODUCT_DOCUMENTS = [
     "Laptop Pro with 16GB RAM, 512GB SSD, and high-speed processor",

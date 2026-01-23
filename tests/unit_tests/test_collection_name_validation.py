@@ -2,9 +2,10 @@
 Unit tests for collection name validation.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Ensure local src/ is on sys.path so we import the in-repo pyseekdb,
 # not an already-installed version in the virtualenv.
@@ -12,8 +13,7 @@ project_root = Path(__file__).parent.parent.parent
 src_root = project_root / "src"
 sys.path.insert(0, str(src_root))
 
-from pyseekdb.client.client_base import _validate_collection_name  # type: ignore
-from pyseekdb.client.meta_info import CollectionNames
+from pyseekdb.client.client_base import _validate_collection_name  # noqa: E402
 
 
 class TestCollectionNameValidation:
@@ -24,7 +24,7 @@ class TestCollectionNameValidation:
         """
         Return maximum allowed collection name length from client_base.
         """
-        from pyseekdb.client.client_base import _MAX_COLLECTION_NAME_LENGTH  # type: ignore
+        from pyseekdb.client.client_base import _MAX_COLLECTION_NAME_LENGTH
 
         return _MAX_COLLECTION_NAME_LENGTH
 
@@ -71,9 +71,7 @@ class TestCollectionNameValidation:
             "名字",
         ]
         for name in invalid_names:
-            with pytest.raises(
-                ValueError, match="Only letters, digits, and underscore"
-            ):
+            with pytest.raises(ValueError, match="Only letters, digits, and underscore"):
                 _validate_collection_name(name)
 
 
