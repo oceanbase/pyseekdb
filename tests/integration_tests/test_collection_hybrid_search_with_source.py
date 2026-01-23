@@ -12,6 +12,7 @@ import uuid
 from typing import List
 
 import pytest
+from pymysql.converters import escape_string
 
 from pyseekdb import HNSWConfiguration, HybridSearch
 from pyseekdb.client.meta_info import CollectionNames
@@ -37,8 +38,11 @@ class TestCollectionHybridSearchSourceRealDB:
         extended = base * ((dimension // len(base)) + 1)
         return extended[:dimension]
 
-    def _insert_test_data(self, client, collection_name: str, dimension: int):
-        table_name = CollectionNames.table_name(collection_name)
+    def _insert_test_data(self, client, collection, dimension: int):
+        if getattr(collection, "id", None):
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(collection.name)
         test_data = [
             (
                 "Machine learning is a subset of artificial intelligence",
@@ -76,6 +80,19 @@ class TestCollectionHybridSearchSourceRealDB:
 
         return inserted_ids
 
+    def _get_sql_query(self, client, table_name: str, search_parm: dict) -> str:
+        search_parm_json = json.dumps(search_parm, ensure_ascii=False)
+        client._server._execute(f"SET @search_parm = '{escape_string(search_parm_json)}'")
+        get_sql_query = (
+            f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"
+        )
+        rows = client._server._execute(get_sql_query)
+        assert rows and rows[0].get("query_sql")
+        query_sql = rows[0]["query_sql"]
+        if isinstance(query_sql, str):
+            return query_sql.strip().strip("'\"")
+        return str(query_sql)
+
     def test_source_excludes_embedding_knn_only(self, server_client):
         """
         When return_fields omits `embedding`, returned embeddings should be None
@@ -85,7 +102,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -107,6 +124,141 @@ class TestCollectionHybridSearchSourceRealDB:
         assert all(d is not None for d in results["documents"][0])
         assert all(isinstance(d, str) for d in results["documents"][0])
 
+    def test_get_sql_infers_source_from_include_excludes_embedding_columns(self, server_client):
+        """
+        Verify the optimization: when return_fields is omitted and include does not request embeddings,
+        GET_SQL should generate a query that does not return the embedding column.
+
+        This test executes GET_SQL's returned SQL and inspects result row keys (more robust than SQL parsing).
+        """
+        collection_name = self._unique_collection_name("hs_get_sql_no_vec")
+        collection, dimension = self._create_test_collection(
+            server_client, collection_name
+        )
+        self._insert_test_data(server_client, collection, dimension=dimension)
+        time.sleep(1)
+
+        query_vector = self._generate_query_vector(dimension)
+        knn = {"query_embeddings": query_vector, "n_results": 2}
+
+        inferred = server_client._server._build_source_fields(include=None)
+        search_parm = server_client._server._build_search_parm(
+            query=None,
+            knn=knn,
+            rank=None,
+            n_results=2,
+            return_fields=inferred,
+            dimension=dimension,
+        )
+        if collection.id:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(collection.name)
+        query_sql = self._get_sql_query(server_client, table_name, search_parm)
+        rows = server_client._server._execute(query_sql)
+        assert rows
+        keys = {str(k).lower() for k in rows[0].keys()}
+        assert "embedding" not in keys
+
+    def test_get_sql_infers_source_from_include_includes_embedding_columns(self, server_client):
+        """
+        When include requests embeddings (and return_fields is omitted), inferred _source should allow
+        embedding to be returned by the generated SQL.
+        """
+        collection_name = self._unique_collection_name("hs_get_sql_vec")
+        collection, dimension = self._create_test_collection(
+            server_client, collection_name
+        )
+        self._insert_test_data(server_client, collection, dimension=dimension)
+        time.sleep(1)
+
+        query_vector = self._generate_query_vector(dimension)
+        knn = {"query_embeddings": query_vector, "n_results": 2}
+
+        inferred = server_client._server._build_source_fields(include=["embeddings"])
+        search_parm = server_client._server._build_search_parm(
+            query=None,
+            knn=knn,
+            rank=None,
+            n_results=2,
+            return_fields=inferred,
+            dimension=dimension,
+        )
+        if collection.id:
+            table_name = CollectionNames.table_name_v2(collection.id)
+        else:
+            table_name = CollectionNames.table_name(collection.name)
+        query_sql = self._get_sql_query(server_client, table_name, search_parm)
+        rows = server_client._server._execute(query_sql)
+        assert rows
+        keys = {str(k).lower() for k in rows[0].keys()}
+        assert "embedding" in keys
+
+    def test_return_fields_none_infers_source_from_include_result_shape(self, server_client):
+        """
+        When return_fields is None, hybrid_search infers a minimal _source allowlist from include.
+
+        This test focuses on result shape correctness across common include patterns.
+        """
+        collection_name = self._unique_collection_name("hs_rf_none_matrix")
+        collection, dimension = self._create_test_collection(
+            server_client, collection_name
+        )
+        self._insert_test_data(server_client, collection, dimension=dimension)
+        time.sleep(1)
+
+        query_vector = self._generate_query_vector(dimension)
+        knn = {"query_embeddings": query_vector, "n_results": 2}
+
+        default_include = collection.hybrid_search(
+            knn=knn,
+            n_results=2,
+        )
+        assert default_include is not None
+        assert set(default_include.keys()) == {"ids", "distances", "documents", "metadatas"}
+        assert all(isinstance(d, str) for d in default_include["documents"][0])
+        assert all(isinstance(m, dict) and m for m in default_include["metadatas"][0])
+        assert "embeddings" not in default_include
+
+        docs_only = collection.hybrid_search(
+            knn=knn,
+            n_results=2,
+            include=["documents"],
+        )
+        assert docs_only is not None
+        assert set(docs_only.keys()) == {"ids", "distances", "documents"}
+        assert all(isinstance(d, str) for d in docs_only["documents"][0])
+
+        metadatas_only = collection.hybrid_search(
+            knn=knn,
+            n_results=2,
+            include=["metadatas"],
+        )
+        assert metadatas_only is not None
+        assert set(metadatas_only.keys()) == {"ids", "distances", "metadatas"}
+        assert all(isinstance(m, dict) and m for m in metadatas_only["metadatas"][0])
+
+        embeddings_only = collection.hybrid_search(
+            knn=knn,
+            n_results=2,
+            include=["embeddings"],
+        )
+        assert embeddings_only is not None
+        assert set(embeddings_only.keys()) == {"ids", "distances", "embeddings"}
+        first_embedding = embeddings_only["embeddings"][0][0]
+        assert isinstance(first_embedding, list)
+        assert len(first_embedding) == dimension
+
+        docs_and_embeddings = collection.hybrid_search(
+            knn=knn,
+            n_results=2,
+            include=["documents", "embeddings"],
+        )
+        assert docs_and_embeddings is not None
+        assert set(docs_and_embeddings.keys()) == {"ids", "distances", "documents", "embeddings"}
+        assert all(isinstance(d, str) for d in docs_and_embeddings["documents"][0])
+        assert all(isinstance(e, list) and len(e) == dimension for e in docs_and_embeddings["embeddings"][0])
+
     def test_source_excludes_document_query_only(self, server_client):
         """
         When return_fields omits `document`, returned documents should be None
@@ -116,7 +268,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         results = collection.hybrid_search(
@@ -142,7 +294,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -176,7 +328,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -323,7 +475,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -349,7 +501,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -382,7 +534,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -411,7 +563,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -440,7 +592,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)
@@ -466,7 +618,7 @@ class TestCollectionHybridSearchSourceRealDB:
         collection, dimension = self._create_test_collection(
             server_client, collection_name
         )
-        self._insert_test_data(server_client, collection_name, dimension=dimension)
+        self._insert_test_data(server_client, collection, dimension=dimension)
         time.sleep(1)
 
         query_vector = self._generate_query_vector(dimension)

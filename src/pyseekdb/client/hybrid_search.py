@@ -439,7 +439,8 @@ class HybridSearch:
         Notes:
         - Only list (allowlist) form is supported; no includes/excludes mapping.
         - This maps to OceanBase GET_SQL search_params `_source`.
-        - The SDK does not auto-complete any fields.
+        - If omitted, the SDK may infer a minimal allowlist from `include` to avoid fetching large
+          unused columns (e.g. `embedding`).
         """
         if fields is None:
             self._return_fields = None

@@ -117,6 +117,98 @@ class TestBuildSearchParmReturnFieldsUnit:
         assert result["_source"] == ["document", "metadata"]
 
 
+class TestBuildSourceFieldsUnit:
+    def test_build_source_fields_defaults_to_documents_and_metadatas(self) -> None:
+        dummy = _DummyClient()
+        assert BaseClient._build_source_fields(  # type: ignore[misc]
+            dummy, include=None
+        ) == ["_id", "document", "metadata"]
+
+    def test_build_source_fields_empty_include_is_id_only(self) -> None:
+        dummy = _DummyClient()
+        assert BaseClient._build_source_fields(  # type: ignore[misc]
+            dummy, include=[]
+        ) == ["_id"]
+
+    def test_build_source_fields_includes_embedding_only_when_requested(self) -> None:
+        dummy = _DummyClient()
+        assert BaseClient._build_source_fields(  # type: ignore[misc]
+            dummy, include=["embeddings"]
+        ) == ["_id", "embedding"]
+
+
+class _HybridSearchInferenceClient:
+    """Minimal object used as `self` when calling BaseClient._collection_hybrid_search."""
+
+    def __init__(self) -> None:
+        self.captured_return_fields = None
+
+    def _ensure_connection(self):  # type: ignore[no-untyped-def]
+        return None
+
+    def _use_context_manager_for_cursor(self) -> bool:
+        return False
+
+    def _build_source_fields(self, include):  # type: ignore[no-untyped-def]
+        return BaseClient._build_source_fields(self, include)  # type: ignore[misc]
+
+    def _build_search_parm(  # type: ignore[no-untyped-def]
+        self, query, knn, rank, n_results, return_fields=None, dimension=None, **kwargs
+    ):
+        self.captured_return_fields = return_fields
+        return BaseClient._build_search_parm(  # type: ignore[misc]
+            self,
+            query=query,
+            knn=knn,
+            rank=rank,
+            n_results=n_results,
+            return_fields=return_fields,
+            dimension=dimension,
+            **kwargs,
+        )
+
+    def _execute_query_with_cursor(self, conn, sql, params, use_context_manager=True):  # type: ignore[no-untyped-def]
+        if isinstance(sql, str) and sql.strip().upper().startswith("SELECT DBMS_HYBRID_SEARCH.GET_SQL"):
+            return [{"query_sql": "SELECT 1"}]
+        return []
+
+    def _transform_sql_result(self, result_rows, include):  # type: ignore[no-untyped-def]
+        return {"captured_return_fields": self.captured_return_fields}
+
+
+class TestHybridSearchReturnFieldsInferenceUnit:
+    def test_hybrid_search_infers_return_fields_when_omitted(self) -> None:
+        client = _HybridSearchInferenceClient()
+        result = BaseClient._collection_hybrid_search(  # type: ignore[misc]
+            client,
+            collection_id=None,
+            collection_name="test",
+            query=None,
+            knn=None,
+            rank=None,
+            n_results=2,
+            include=None,
+            return_fields=None,
+            dimension=None,
+        )
+        assert result["captured_return_fields"] == ["_id", "document", "metadata"]
+
+    def test_hybrid_search_does_not_override_explicit_return_fields(self) -> None:
+        client = _HybridSearchInferenceClient()
+        result = BaseClient._collection_hybrid_search(  # type: ignore[misc]
+            client,
+            collection_id=None,
+            collection_name="test",
+            query=None,
+            knn=None,
+            rank=None,
+            n_results=2,
+            include=None,
+            return_fields=["document"],
+            dimension=None,
+        )
+        assert result["captured_return_fields"] == ["document"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

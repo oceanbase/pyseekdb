@@ -812,7 +812,7 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
 - `rank` (dict, optional): ranking config; RRF tested via `{"rrf": {...}}` or `{}`. Omit to use single-route ordering.
 - `n_results` (int): final fused result count (default 10).
 - `include` (List[str], optional): fields to return. `ids`/`distances` are always returned; `documents`/`metadatas` are returned by default when `include` is `None`; add `"embeddings"` to fetch vectors.
-- `return_fields` (List[str], optional): OceanBase GET_SQL column allowlist, mapped to search_params `_source`.
+- `return_fields` (List[str], optional): OceanBase GET_SQL column allowlist, mapped to search_params `_source`. If omitted, the SDK infers a minimal allowlist from `include` to avoid fetching large unused columns (e.g. `embedding`).
 - `search` (`HybridSearch`, optional): fluent builder; overrides `query`/`knn`/`rank`/`include`/`n_results`.
 
 **Return format**

@@ -8,7 +8,7 @@ Design Pattern:
 4. User-facing interface is completely consistent
 """
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from .hybrid_search import HybridSearch
 
@@ -460,7 +460,8 @@ class Collection:
             search: HybridSearch builder instance (optional). If provided, takes precedence
                 over query/knn/rank/include/n_results arguments.
             return_fields: Optional list of returned column names (field allowlist) for OceanBase
-                GET_SQL search_params `_source`. The SDK does not auto-complete any fields. When using
+                GET_SQL search_params `_source`. When omitted, the SDK infers a minimal allowlist from
+                `include` to avoid fetching large unused columns (e.g. `embedding`). When using
                 HybridSearch builder, you can also set it via `HybridSearch.return_fields([...])`.
             **kwargs: Additional parameters.
 
