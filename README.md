@@ -812,6 +812,7 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
 - `rank` (dict, optional): ranking config; RRF tested via `{"rrf": {...}}` or `{}`. Omit to use single-route ordering.
 - `n_results` (int): final fused result count (default 10).
 - `include` (List[str], optional): fields to return. `ids`/`distances` are always returned; `documents`/`metadatas` are returned by default when `include` is `None`; add `"embeddings"` to fetch vectors.
+- `return_fields` (List[str], optional): OceanBase GET_SQL column allowlist, mapped to search_params `_source`.
 - `search` (`HybridSearch`, optional): fluent builder; overrides `query`/`knn`/`rank`/`include`/`n_results`.
 
 **Return format**
@@ -835,6 +836,7 @@ results = collection.hybrid_search(
     rank={"rrf": {"rank_window_size": 60, "rank_constant": 60}},
     n_results=5,
     include=["documents", "metadatas", "embeddings"],
+    return_fields=["_id", "document", "metadata", "embedding"],
 )
 
 # Vector-only search using explicit embeddings (dimension is validated)
@@ -842,6 +844,7 @@ results = collection.hybrid_search(
     knn={"query_embeddings": [[0.1, 0.2, 0.3]], "n_results": 8},
     n_results=5,
     include=["documents", "metadatas"],
+    return_fields=["_id", "document", "metadata"],
 )
 
 # Pass a HybridSearch builder (takes precedence over other args)
@@ -860,6 +863,7 @@ search = (
     .query(DOCUMENT.contains("machine learning"), K("category") == "AI", boost=0.6)
     .knn(TEXT("AI research"), K("year") >= 2020, n_results=10, boost=0.8)
     .limit(5)
+    .return_fields(["_id", "document", "metadata", "embedding"])
     .select(DOCUMENTS, METADATAS, EMBEDDINGS)
     .rank({"rrf": {}})
 )

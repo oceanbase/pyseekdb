@@ -435,7 +435,7 @@ class Collection:
         n_results: int = 10,
         include: Optional[List[str]] = None,
         search: Optional[HybridSearch] = None,
-        _source: Optional[List[str]] = None,
+        return_fields: Optional[List[str]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -458,9 +458,9 @@ class Collection:
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
             search: HybridSearch builder instance (optional). If provided, takes precedence
                 over query/knn/rank/include/n_results arguments.
-            _source: Optional list of returned column names (field allowlist) for OceanBase
-                GET_SQL search_params. The SDK does not auto-complete any fields. When using
-                HybridSearch builder, you can also set it via `HybridSearch.source([...])`.
+            return_fields: Optional list of returned column names (field allowlist) for OceanBase
+                GET_SQL search_params `_source`. The SDK does not auto-complete any fields. When using
+                HybridSearch builder, you can also set it via `HybridSearch.return_fields([...])`.
             **kwargs: Additional parameters.
 
         Returns:
@@ -494,6 +494,9 @@ class Collection:
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
         """
+        if "_source" in kwargs:
+            raise TypeError("Use return_fields= instead of _source=.")
+
         # Allow passing builder as first positional argument
         if isinstance(query, HybridSearch):
             search = query
@@ -508,10 +511,13 @@ class Collection:
                 n_results = params["n_results"]
             if params.get("include") is not None:
                 include = params["include"]
-            if params.get("_source") is not None:
-                if _source is not None:
-                    raise ValueError("Do not mix HybridSearch.source() with _source=.")
-                _source = params["_source"]
+            builder_return_fields = params.get("return_fields")
+            if builder_return_fields is not None:
+                if return_fields is not None:
+                    raise ValueError(
+                        "Do not mix HybridSearch.return_fields() with return_fields=."
+                    )
+                return_fields = builder_return_fields
 
         # When no query/knn provided, return only ids/distances by default
         if include is None and not query and not knn:
@@ -525,7 +531,7 @@ class Collection:
             rank=rank,
             n_results=n_results,
             include=include,
-            _source=_source,
+            return_fields=return_fields,
             embedding_function=self._embedding_function,
             dimension=self._dimension,
             **kwargs,
