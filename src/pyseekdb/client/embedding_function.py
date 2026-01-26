@@ -637,6 +637,7 @@ class EmbeddingFunctionRegistry:
                 OllamaEmbeddingFunction,
                 OpenAIEmbeddingFunction,
                 QwenEmbeddingFunction,
+                MorphEmbeddingFunction,
                 SentenceTransformerEmbeddingFunction,
                 SiliconflowEmbeddingFunction,
                 TencentHunyuanEmbeddingFunction,
@@ -646,6 +647,7 @@ class EmbeddingFunctionRegistry:
             cls._registry["sentence_transformer"] = SentenceTransformerEmbeddingFunction
             cls._registry["openai"] = OpenAIEmbeddingFunction
             cls._registry["qwen"] = QwenEmbeddingFunction
+            cls._registry["morph"] = MorphEmbeddingFunction
             cls._registry["siliconflow"] = SiliconflowEmbeddingFunction
             cls._registry["tencent_hunyuan"] = TencentHunyuanEmbeddingFunction
             cls._registry["ollama"] = OllamaEmbeddingFunction
