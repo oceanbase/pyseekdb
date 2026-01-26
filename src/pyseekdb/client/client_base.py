@@ -493,7 +493,7 @@ class BaseClient(BaseConnection, AdminAPI):
                           If explicitly set to None, will try to calculate dimension from embedding_function.
                           If embedding_function is also None, will raise an error.
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext analyzer configuration (FulltextIndexConfig with analyzer='ik', 'space', 'ngram', 'ngram2', or 'beng').
+                          Configuration can include fulltext index configuration.
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -513,47 +513,55 @@ class BaseClient(BaseConnection, AdminAPI):
             TypeError: If configuration is not None, Configuration, or HNSWConfiguration
 
         Examples:
+        .. code-block:: python
             # Using default configuration and default embedding function (defaults to IK parser)
-            >>> collection = client.create_collection('my_collection')
+            collection = client.create_collection('my_collection')
 
+        .. code-block:: python
             # Using custom embedding function (dimension will be calculated automatically)
-            >>> from pyseekdb import DefaultEmbeddingFunction
-            >>> ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
-            >>> config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
-            >>> collection = client.create_collection(
-            ...     'my_collection',
-            ...     configuration=config,
-            ...     embedding_function=ef
-            ... )
+            from pyseekdb import DefaultEmbeddingFunction
+            ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
+            config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
+            collection = client.create_collection(
+                'my_collection',
+                configuration=config,
+                embedding_function=ef
+            )
 
+        .. code-block:: python
             # Using Configuration wrapper with IK parser (default)
-            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextIndexConfig
-            >>> config = Configuration(
-            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextIndexConfig(analyzer='ik')
-            ... )
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+            from pyseekdb import Configuration, HNSWConfiguration, FulltextIndexConfig
+            config = Configuration(
+                hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+                fulltext_config=FulltextIndexConfig(analyzer='ik')
+            )
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
+        .. code-block:: python
             # Using Space parser
-            >>> config = Configuration(
-            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextIndexConfig(analyzer='space')
-            ... )
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+            config = Configuration(
+                hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+                fulltext_config=FulltextIndexConfig(analyzer='space')
+            )
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
+        .. code-block:: python
             # Using Ngram parser with parameters
-            >>> config = Configuration(
-            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextIndexConfig(analyzer='ngram', properties={'size': 2})
-            ... )
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+            config = Configuration(
+                hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+                fulltext_config=FulltextIndexConfig(analyzer='ngram', properties={'size': 2})
+            )
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
+        .. code-block:: python
             # Explicitly set configuration=None, use embedding function to determine dimension
-            >>> collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
+            collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
 
+        .. code-block:: python
             # Explicitly disable embedding function (use configuration dimension)
-            >>> config = HNSWConfiguration(dimension=128, distance='cosine')
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
+            config = HNSWConfiguration(dimension=128, distance='cosine')
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
+
         """
         _validate_collection_name(name)
         if self.has_collection(name):
@@ -1054,7 +1062,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _list_collections_v1(self) -> list["Collection"]:
         """
-        List all collections (user-facing API) from table names that start with collection prefix
+        List all collections from table names that start with collection prefix
 
         Returns:
             List of Collection objects
@@ -1153,7 +1161,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _has_collection_v1(self, name: str) -> bool:
         """
-        Check if a collection exists (user-facing API)
+        Check if a collection exists
 
         Args:
             name: Collection name
@@ -1185,10 +1193,8 @@ class BaseClient(BaseConnection, AdminAPI):
 
         Args:
             name: Collection name
-            configuration: HNSW index configuration (HNSWConfiguration)
-                          If not provided, uses default configuration (dimension=384, distance='cosine').
-                          If explicitly set to None, will try to calculate dimension from embedding_function.
-                          If embedding_function is also None, will raise an error.
+            configuration: Configuration (HNSWConfiguration is accepted for backward compatibility)
+                          Please refer to create_collection for more details.
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
