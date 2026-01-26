@@ -11,7 +11,7 @@ import pytest
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration  # noqa: E402
+from pyseekdb import Configuration, FulltextIndexConfig, HNSWConfiguration  # noqa: E402
 
 
 class TestHNSWConfiguration:
@@ -42,31 +42,31 @@ class TestHNSWConfiguration:
             HNSWConfiguration(dimension=128, distance="invalid")
 
 
-class TestFulltextAnalyzerConfig:
-    """Test FulltextAnalyzerConfig class"""
+class TestFulltextIndexConfig:
+    """Test FulltextIndexConfig class"""
 
     def test_valid_parsers(self):
-        """Test creating FulltextAnalyzerConfig with valid parsers"""
+        """Test creating FulltextIndexConfig with valid parsers"""
         valid_parsers = ["ik", "space", "ngram", "ngram2", "beng"]
         for parser in valid_parsers:
-            config = FulltextAnalyzerConfig(analyzer=parser)
+            config = FulltextIndexConfig(analyzer=parser)
             assert config.analyzer == parser
             assert config.properties is None
 
     def test_default_parser(self):
         """Test default parser is 'ik'"""
-        config = FulltextAnalyzerConfig()
+        config = FulltextIndexConfig()
         assert config.analyzer == "ik"
 
     def test_parser_with_params(self):
         """Test parser with parameters"""
-        config = FulltextAnalyzerConfig(analyzer="ngram", properties={"size": 2})
+        config = FulltextIndexConfig(analyzer="ngram", properties={"size": 2})
         assert config.analyzer == "ngram"
         assert config.properties == {"size": 2}
 
     def test_parser_with_multiple_params(self):
         """Test parser with multiple parameters"""
-        config = FulltextAnalyzerConfig(analyzer="ngram", properties={"size": 3, "min_size": 1, "max_size": 5})
+        config = FulltextIndexConfig(analyzer="ngram", properties={"size": 3, "min_size": 1, "max_size": 5})
         assert config.analyzer == "ngram"
         assert config.properties["size"] == 3
         assert config.properties["min_size"] == 1
@@ -74,7 +74,7 @@ class TestFulltextAnalyzerConfig:
 
     def test_params_with_different_types(self):
         """Test params with different primitive types"""
-        config = FulltextAnalyzerConfig(
+        config = FulltextIndexConfig(
             analyzer="ik",
             properties={
                 "string_param": "value",
@@ -101,7 +101,7 @@ class TestConfiguration:
 
     def test_configuration_with_fulltext_only(self):
         """Test Configuration with only fulltext config"""
-        fulltext_config = FulltextAnalyzerConfig(analyzer="ik")
+        fulltext_config = FulltextIndexConfig(analyzer="ik")
         config = Configuration(fulltext_config=fulltext_config)
         assert config.hnsw is None
         assert config.fulltext_config == fulltext_config
@@ -109,7 +109,7 @@ class TestConfiguration:
     def test_configuration_with_both(self):
         """Test Configuration with both HNSW and fulltext config"""
         hnsw_config = HNSWConfiguration(dimension=128, distance="cosine")
-        fulltext_config = FulltextAnalyzerConfig(analyzer="space")
+        fulltext_config = FulltextIndexConfig(analyzer="space")
         config = Configuration(hnsw=hnsw_config, fulltext_config=fulltext_config)
         assert config.hnsw == hnsw_config
         assert config.fulltext_config == fulltext_config

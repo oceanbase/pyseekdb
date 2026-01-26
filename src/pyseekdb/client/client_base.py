@@ -23,7 +23,7 @@ from .configuration import (
     DEFAULT_VECTOR_DIMENSION,
     Configuration,
     ConfigurationParam,
-    FulltextAnalyzerConfig,
+    FulltextIndexConfig,
     HNSWConfiguration,
 )
 from .database import Database
@@ -73,7 +73,7 @@ def _extract_hnsw_config(config: ConfigurationParam) -> HNSWConfiguration | None
 
 def _extract_fulltext_config(
     config: ConfigurationParam,
-) -> FulltextAnalyzerConfig | None:
+) -> FulltextIndexConfig | None:
     if config is None:
         return None
     elif isinstance(config, HNSWConfiguration):
@@ -116,13 +116,13 @@ def _validate_collection_name(name: str) -> None:
 
 
 def _get_fulltext_index_sql(
-    fulltext_config: FulltextAnalyzerConfig | None = None,
+    fulltext_config: FulltextIndexConfig | None = None,
 ) -> str:
     """
     Generate FULLTEXT INDEX SQL clause from fulltext configuration.
 
     Args:
-        fulltext_config: FulltextAnalyzerConfig or None. If None, defaults to IK parser.
+        fulltext_config: FulltextIndexConfig or None. If None, defaults to IK parser.
 
     Returns:
         SQL clause string for FULLTEXT INDEX (e.g., "WITH PARSER ik" or "WITH PARSER ngram PARSER_PROPERTIES=(size=2)")
@@ -196,7 +196,7 @@ class ClientAPI(ABC):
             name: Collection name
             configuration: Index configuration (Configuration or HNSWConfiguration).
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext analyzer configuration (FulltextAnalyzerConfig).
+                          Configuration can include fulltext analyzer configuration (FulltextIndexConfig).
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -493,7 +493,7 @@ class BaseClient(BaseConnection, AdminAPI):
                           If explicitly set to None, will try to calculate dimension from embedding_function.
                           If embedding_function is also None, will raise an error.
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext analyzer configuration (FulltextAnalyzerConfig with analyzer='ik', 'space', 'ngram', 'ngram2', or 'beng').
+                          Configuration can include fulltext analyzer configuration (FulltextIndexConfig with analyzer='ik', 'space', 'ngram', 'ngram2', or 'beng').
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -527,24 +527,24 @@ class BaseClient(BaseConnection, AdminAPI):
             ... )
 
             # Using Configuration wrapper with IK parser (default)
-            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextAnalyzerConfig
+            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextIndexConfig
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='ik')
+            ...     fulltext_config=FulltextIndexConfig(analyzer='ik')
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Using Space parser
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='space')
+            ...     fulltext_config=FulltextIndexConfig(analyzer='space')
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
             # Using Ngram parser with parameters
             >>> config = Configuration(
             ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='ngram', properties={'size': 2})
+            ...     fulltext_config=FulltextIndexConfig(analyzer='ngram', properties={'size': 2})
             ... )
             >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
