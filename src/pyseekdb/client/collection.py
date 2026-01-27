@@ -135,9 +135,7 @@ class Collection:
 
         """
         self._client._collection_fork(collection=self, forked_name=forked_name)
-        collection = self._client.get_collection(forked_name)
-        if collection.embedding_function is None:
-            collection.embedding_function = self._embedding_function
+        collection = self._client.get_collection(forked_name, embedding_function=self._embedding_function)
         return collection
 
     # ==================== DML Operations ====================
