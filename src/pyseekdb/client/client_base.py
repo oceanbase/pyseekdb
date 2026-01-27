@@ -1327,14 +1327,6 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError(f"Failed to fork collection: {ex}") from ex
         logger.debug(f"✅ Successfully forked collection '{collection.name}' to '{forked_name}'")
 
-    def _get_collection_table_name(self, collection_id: str | None, collection_name: str) -> str:
-        """
-        Get collection table name
-        """
-        if collection_id:
-            return CollectionNames.table_name_v2(collection_id)
-        return CollectionNames.table_name(collection_name)
-
     # ==================== Collection Internal Operations (Called by Collection) ====================
     # These methods are called by Collection objects, different clients implement different logic
 
