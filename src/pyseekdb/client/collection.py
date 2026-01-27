@@ -98,6 +98,10 @@ class Collection:
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
 
+    def fork(self, forked_name: str) -> "Collection":
+        self._client._collection_fork(collection=self, forked_name=forked_name)
+        return self._client.get_collection(forked_name)
+
     # ==================== DML Operations ====================
     # All methods delegate to client's internal implementation
 
@@ -191,7 +195,6 @@ class Collection:
             **kwargs,
         )
 
-    # 修改为upsert语法
     def upsert(
         self,
         ids: str | list[str],
