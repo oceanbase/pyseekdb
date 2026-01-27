@@ -327,7 +327,7 @@ class TestCollectionFork:
         # Verify data in forked collection
         forked_data = forked_collection.get(ids=test_ids)
         assert len(forked_data["ids"]) == 3
-        assert set(forked_data["documents"]) == set("V1 Document 1", "V1 Document 2", "V1 Document 3")
+        assert set(forked_data["documents"]) == {"V1 Document 1", "V1 Document 2", "V1 Document 3"}
         assert {metadata["tag"] for metadata in forked_data["metadatas"]} == {"V1-A", "V1-B", "V1-C"}
 
         # Verify original v1 collection is unchanged

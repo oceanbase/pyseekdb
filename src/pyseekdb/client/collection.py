@@ -100,7 +100,10 @@ class Collection:
 
     def fork(self, forked_name: str) -> "Collection":
         self._client._collection_fork(collection=self, forked_name=forked_name)
-        return self._client.get_collection(forked_name)
+        collection = self._client.get_collection(forked_name)
+        if collection.embedding_function is None:
+            collection.embedding_function = self._embedding_function
+        return collection
 
     # ==================== DML Operations ====================
     # All methods delegate to client's internal implementation

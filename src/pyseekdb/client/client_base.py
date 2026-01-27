@@ -105,7 +105,7 @@ def _validate_collection_name(name: str) -> None:
             f"Invalid collection name: '{name}'. Collection name must be a string, got {type(name).__name__}"
         )
     if not name:
-        raise ValueError("Invalid collection name: '{name}'. Collection name must not be empty")
+        raise ValueError(f"Invalid collection name: '{name}'. Collection name must not be empty")
     if len(name) > _MAX_COLLECTION_NAME_LENGTH:
         raise ValueError(
             f"Invalid collection name: '{name}'. Collection name too long: {len(name)} characters; maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}."
@@ -259,6 +259,8 @@ class _CollectionMeta:
             collection_id = row[0] if len(row) > 0 else ""
             collection_name = row[1] if len(row) > 1 else ""
             settings = row[2] if len(row) > 2 else ""
+        else:
+            raise TypeError(f"Unsupported sdk_collections row type: {type(row).__name__}")
         return _CollectionMeta(collection_id=collection_id, collection_name=collection_name, settings=settings)
 
 
@@ -1289,6 +1291,12 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError("Fork is not enabled for this database")
 
         _validate_collection_name(forked_name)
+
+        if self.has_collection(forked_name):
+            raise ValueError(f"Collection '{forked_name}' already exists")
+
+        # Ensure sdk_collections exists (especially for v1-only databases)
+        self._create_sdk_collections_if_not_exists()
 
         source_table_name = self._get_collection_table_name(collection.id, collection.name)
         collection_meta = self._resolve_collection_metadata_from_sdk_collections(collection.name)
