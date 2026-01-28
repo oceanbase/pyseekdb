@@ -9,15 +9,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 # Add project path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from pyseekdb.client.client_base import BaseClient  # noqa: E402
 from pyseekdb.client.collection import Collection  # noqa: E402
-from pyseekdb.client.hybrid_search import HybridSearch  # noqa: E402
 
 
 class _CapturingClient:
