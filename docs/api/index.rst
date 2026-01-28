@@ -14,6 +14,14 @@ Main Package
 Utility Modules
 ---------------
 
+Embedding Functions
+~~~~~~~~~~~~~~~~~~~
+
+The following embedding function classes are available in ``pyseekdb.utils.embedding_functions``:
+
 .. autosummary::
    :toctree: generated
+   :template: module.rst
    :recursive:
+
+   pyseekdb.utils.embedding_functions

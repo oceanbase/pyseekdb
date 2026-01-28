@@ -21,7 +21,7 @@ class DistanceMetric(str, Enum):
 
 
 @dataclass
-class FulltextAnalyzerConfig:
+class FulltextIndexConfig:
     """
     Fulltext analyzer configuration for fulltext indexing.
 
@@ -61,13 +61,13 @@ class Configuration:
 
     Args:
         hnsw: HNSWConfiguration or None
-        fulltext_config: FulltextAnalyzerConfig or None. If None, defaults to FulltextAnalyzerConfig(analyzer='ik')
+        fulltext_config: FulltextIndexConfig or None. If None, defaults to FulltextIndexConfig(analyzer='ik')
     """
 
     def __init__(
         self,
         hnsw: HNSWConfiguration | None = None,
-        fulltext_config: FulltextAnalyzerConfig | None = None,
+        fulltext_config: FulltextIndexConfig | None = None,
     ):
         self.hnsw = hnsw
         self.fulltext_config = fulltext_config

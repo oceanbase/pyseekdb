@@ -457,7 +457,7 @@ class TestCollectionV1Compatibility:
         assert not db_client.has_collection(collection_name)
 
         # Should raise error when trying to get deleted collection
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(ValueError, match="does not exist"):
             db_client.get_collection(collection_name)
 
     def test_v1_v2_collections_coexist(self, db_client):

@@ -9,10 +9,9 @@ import re
 import struct
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import Any
 
-if TYPE_CHECKING:
-    from .version import Version
 from pymysql.converters import escape_string
 
 from .admin_client import DEFAULT_TENANT, AdminAPI
@@ -23,7 +22,7 @@ from .configuration import (
     DEFAULT_VECTOR_DIMENSION,
     Configuration,
     ConfigurationParam,
-    FulltextAnalyzerConfig,
+    FulltextIndexConfig,
     HNSWConfiguration,
 )
 from .database import Database
@@ -38,6 +37,7 @@ from .embedding_function import (
 from .filters import FilterBuilder
 from .meta_info import CollectionFieldNames, CollectionNames
 from .sql_utils import is_query_sql
+from .version import Version
 
 # Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
 EmbeddingFunctionParam = EmbeddingFunction[EmbeddingDocuments] | None | Any
@@ -73,7 +73,7 @@ def _extract_hnsw_config(config: ConfigurationParam) -> HNSWConfiguration | None
 
 def _extract_fulltext_config(
     config: ConfigurationParam,
-) -> FulltextAnalyzerConfig | None:
+) -> FulltextIndexConfig | None:
     if config is None:
         return None
     elif isinstance(config, HNSWConfiguration):
@@ -101,28 +101,30 @@ def _validate_collection_name(name: str) -> None:
         ValueError: If name is empty, too long, or contains invalid characters.
     """
     if not isinstance(name, str):
-        raise TypeError(f"Collection name must be a string, got {type(name).__name__}")
+        raise TypeError(
+            f"Invalid collection name: '{name}'. Collection name must be a string, got {type(name).__name__}"
+        )
     if not name:
-        raise ValueError("Collection name must not be empty")
+        raise ValueError(f"Invalid collection name: '{name}'. Collection name must not be empty")
     if len(name) > _MAX_COLLECTION_NAME_LENGTH:
         raise ValueError(
-            f"Collection name too long: {len(name)} characters; maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}."
+            f"Invalid collection name: '{name}'. Collection name too long: {len(name)} characters; maximum allowed is {_MAX_COLLECTION_NAME_LENGTH}."
         )
     if _COLLECTION_NAME_PATTERN.match(name) is None:
         raise ValueError(
-            "Collection name contains invalid characters. "
+            f"Invalid collection name: '{name}'. Collection name contains invalid characters. "
             "Only letters, digits, and underscore are allowed: [a-zA-Z0-9_]"
         )
 
 
 def _get_fulltext_index_sql(
-    fulltext_config: FulltextAnalyzerConfig | None = None,
+    fulltext_config: FulltextIndexConfig | None = None,
 ) -> str:
     """
     Generate FULLTEXT INDEX SQL clause from fulltext configuration.
 
     Args:
-        fulltext_config: FulltextAnalyzerConfig or None. If None, defaults to IK parser.
+        fulltext_config: FulltextIndexConfig or None. If None, defaults to IK parser.
 
     Returns:
         SQL clause string for FULLTEXT INDEX (e.g., "WITH PARSER ik" or "WITH PARSER ngram PARSER_PROPERTIES=(size=2)")
@@ -196,7 +198,7 @@ class ClientAPI(ABC):
             name: Collection name
             configuration: Index configuration (Configuration or HNSWConfiguration).
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext analyzer configuration (FulltextAnalyzerConfig).
+                          Configuration can include fulltext analyzer configuration (FulltextIndexConfig).
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -233,6 +235,33 @@ class ClientAPI(ABC):
     def has_collection(self, name: str) -> bool:
         """Check if collection exists"""
         pass
+
+
+@dataclass
+class _CollectionMeta:
+    """
+    Collection metadata in sdk_collections table.
+    """
+
+    collection_id: str
+    collection_name: str
+    settings: str | None
+
+    @staticmethod
+    def from_row(row: Any) -> "_CollectionMeta":
+        if isinstance(row, dict):
+            # Server client returns dict, get the first value
+            collection_id = row["COLLECTION_ID"]
+            collection_name = row["COLLECTION_NAME"]
+            settings = row["SETTINGS"]
+        elif isinstance(row, (tuple, list)):
+            # Embedded client returns tuple, first element is collection id
+            collection_id = row[0] if len(row) > 0 else ""
+            collection_name = row[1] if len(row) > 1 else ""
+            settings = row[2] if len(row) > 2 else ""
+        else:
+            raise TypeError(f"Unsupported sdk_collections row type: {type(row).__name__}")
+        return _CollectionMeta(collection_id=collection_id, collection_name=collection_name, settings=settings)
 
 
 class BaseClient(BaseConnection, AdminAPI):
@@ -493,7 +522,7 @@ class BaseClient(BaseConnection, AdminAPI):
                           If explicitly set to None, will try to calculate dimension from embedding_function.
                           If embedding_function is also None, will raise an error.
                           For backward compatibility, HNSWConfiguration is still accepted.
-                          Configuration can include fulltext analyzer configuration (FulltextAnalyzerConfig with analyzer='ik', 'space', 'ngram', 'ngram2', or 'beng').
+                          Configuration can include fulltext index configuration.
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -513,47 +542,55 @@ class BaseClient(BaseConnection, AdminAPI):
             TypeError: If configuration is not None, Configuration, or HNSWConfiguration
 
         Examples:
+        .. code-block:: python
             # Using default configuration and default embedding function (defaults to IK parser)
-            >>> collection = client.create_collection('my_collection')
+            collection = client.create_collection('my_collection')
 
+        .. code-block:: python
             # Using custom embedding function (dimension will be calculated automatically)
-            >>> from pyseekdb import DefaultEmbeddingFunction
-            >>> ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
-            >>> config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
-            >>> collection = client.create_collection(
-            ...     'my_collection',
-            ...     configuration=config,
-            ...     embedding_function=ef
-            ... )
+            from pyseekdb import DefaultEmbeddingFunction
+            ef = DefaultEmbeddingFunction(model_name='all-MiniLM-L6-v2')
+            config = HNSWConfiguration(dimension=384, distance='cosine')  # Must match EF dimension
+            collection = client.create_collection(
+                'my_collection',
+                configuration=config,
+                embedding_function=ef
+            )
 
+        .. code-block:: python
             # Using Configuration wrapper with IK parser (default)
-            >>> from pyseekdb import Configuration, HNSWConfiguration, FulltextAnalyzerConfig
-            >>> config = Configuration(
-            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='ik')
-            ... )
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+            from pyseekdb import Configuration, HNSWConfiguration, FulltextIndexConfig
+            config = Configuration(
+                hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+                fulltext_config=FulltextIndexConfig(analyzer='ik')
+            )
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
+        .. code-block:: python
             # Using Space parser
-            >>> config = Configuration(
-            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='space')
-            ... )
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+            config = Configuration(
+                hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+                fulltext_config=FulltextIndexConfig(analyzer='space')
+            )
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
+        .. code-block:: python
             # Using Ngram parser with parameters
-            >>> config = Configuration(
-            ...     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-            ...     fulltext_config=FulltextAnalyzerConfig(analyzer='ngram', properties={'size': 2})
-            ... )
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
+            config = Configuration(
+                hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
+                fulltext_config=FulltextIndexConfig(analyzer='ngram', properties={'size': 2})
+            )
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=ef)
 
+        .. code-block:: python
             # Explicitly set configuration=None, use embedding function to determine dimension
-            >>> collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
+            collection = client.create_collection('my_collection', configuration=None, embedding_function=ef)
 
+        .. code-block:: python
             # Explicitly disable embedding function (use configuration dimension)
-            >>> config = HNSWConfiguration(dimension=128, distance='cosine')
-            >>> collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
+            config = HNSWConfiguration(dimension=128, distance='cosine')
+            collection = client.create_collection('my_collection', configuration=config, embedding_function=None)
+
         """
         _validate_collection_name(name)
         if self.has_collection(name):
@@ -649,7 +686,7 @@ class BaseClient(BaseConnection, AdminAPI):
             # No embedding function, use configuration dimension
             dimension = hnsw_config.dimension
 
-        logger.info(f"actual dimension: {dimension}, hnsw_config: {hnsw_config}")
+        logger.debug(f"actual dimension: {dimension}, hnsw_config: {hnsw_config}")
         # Extract distance from configuration
         distance = hnsw_config.distance
 
@@ -724,22 +761,7 @@ class BaseClient(BaseConnection, AdminAPI):
             self._execute(delete_sql)
             insert_sql = f"INSERT INTO `{CollectionNames.sdk_collections_table_name()}` (COLLECTION_NAME, SETTINGS) VALUES ('{collection_name_in_table}', '{settings_str}')"
             self._execute(insert_sql)
-            query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
-            rows = self._execute(query_sql)
-            if not rows or len(rows) == 0:
-                raise ValueError(  # noqa: TRY301
-                    "Failed to create collection metadata: cannot find collection name in sdk_collections table"
-                )
-            row = rows[0]
-            # Extract collection id
-            if isinstance(row, dict):
-                # Server client returns dict, get the first value
-                collection_id = next(iter(row.values()), "")
-            elif isinstance(row, (tuple, list)):
-                # Embedded client returns tuple, first element is collection id
-                collection_id = row[0] if len(row) > 0 else ""
-            else:
-                collection_id = str(row)
+            collection_id = self._get_collection_id(collection_name)
             results["collection_id"] = collection_id
             results["table_name"] = CollectionNames.table_name_v2(collection_id)
             return results  # noqa: TRY300
@@ -761,7 +783,29 @@ class BaseClient(BaseConnection, AdminAPI):
             collection = self._get_collection_v2(name, embedding_function)
         return collection
 
+    def _resolve_collection_metadata_from_sdk_collections(self, collection_name: str) -> _CollectionMeta | None:
+        """
+        Resolve collection metadata infromation from sdk_collections table
+        """
+        try:
+            query_sql = f"SELECT COLLECTION_ID, COLLECTION_NAME, SETTINGS FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name}'"
+            rows = self._execute(query_sql)
+            if rows:
+                return _CollectionMeta.from_row(rows[0])
+
+            # not a v2 collection
+            show_tables_sql = f"SHOW TABLES LIKE '{CollectionNames.table_name(collection_name)}'"
+            result = self._execute(show_tables_sql)
+            if result:
+                return _CollectionMeta(collection_id=None, collection_name=collection_name, settings=None)
+        except Exception as e:
+            raise ValueError(f"Failed to resolve collection metadata from sdk_collections table: {e}") from e
+        return None
+
     def _resolve_collection_metadata_from_table(self, table_name: str, collection_name: str) -> dict[str, Any]:  # noqa: C901
+        """
+        Resolve collection metadata infromation from collection table (not sdk_collections table)
+        """
         metadata = {
             "dimension": None,
             "distance": None,
@@ -887,33 +931,20 @@ class BaseClient(BaseConnection, AdminAPI):
             return embedding_function
 
     def _get_collection_v2(self, name: str, embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED) -> "Collection":
-        try:
-            name_in_table = escape_string(name)
-            query_sql = f"SELECT COLLECTION_ID, COLLECTION_NAME, SETTINGS FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{name_in_table}'"
-            rows = self._execute(query_sql)
-            if not rows or len(rows) == 0:
-                raise ValueError(f"Collection '{name}' not found")  # noqa: TRY301
-            row = rows[0]
-            if isinstance(row, dict):
-                # Server client returns dict, get the first value
-                collection_id = row["COLLECTION_ID"]
-                collection_name = row["COLLECTION_NAME"]
-                settings = row["SETTINGS"]
-            elif isinstance(row, (tuple, list)):
-                # Embedded client returns tuple, first element is collection id
-                collection_id = row[0] if len(row) > 0 else ""
-                collection_name = row[1] if len(row) > 1 else ""
-                settings = row[2] if len(row) > 2 else ""
+        collection_meta = self._resolve_collection_metadata_from_sdk_collections(name)
+        if not collection_meta or not collection_meta.collection_id:
+            raise ValueError(f"Collection '{name}' does not exist")
 
-            embedding_function_persistence = self._resolve_embedding_function(settings)
+        try:
+            embedding_function_persistence = self._resolve_embedding_function(collection_meta.settings)
             embedding_function = self._validate_embedding_function(embedding_function, embedding_function_persistence)
             metadata = self._resolve_collection_metadata_from_table(
-                CollectionNames.table_name_v2(collection_id), collection_name
+                CollectionNames.table_name_v2(collection_meta.collection_id), name
             )
             return Collection(
                 client=self,
-                name=collection_name,
-                collection_id=collection_id,
+                name=name,
+                collection_id=collection_meta.collection_id,
                 embedding_function=embedding_function,
                 dimension=metadata["dimension"],
                 distance=metadata["distance"],
@@ -1054,7 +1085,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _list_collections_v1(self) -> list["Collection"]:
         """
-        List all collections (user-facing API) from table names that start with collection prefix
+        List all collections from table names that start with collection prefix
 
         Returns:
             List of Collection objects
@@ -1153,7 +1184,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _has_collection_v1(self, name: str) -> bool:
         """
-        Check if a collection exists (user-facing API)
+        Check if a collection exists
 
         Args:
             name: Collection name
@@ -1185,10 +1216,8 @@ class BaseClient(BaseConnection, AdminAPI):
 
         Args:
             name: Collection name
-            configuration: HNSW index configuration (HNSWConfiguration)
-                          If not provided, uses default configuration (dimension=384, distance='cosine').
-                          If explicitly set to None, will try to calculate dimension from embedding_function.
-                          If embedding_function is also None, will raise an error.
+            configuration: Configuration (HNSWConfiguration is accepted for backward compatibility)
+                          Please refer to create_collection for more details.
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
@@ -1222,6 +1251,81 @@ class BaseClient(BaseConnection, AdminAPI):
             embedding_function=embedding_function,
             **kwargs,
         )
+
+    def _get_collection_table_name(self, collection_id: str | None, collection_name: str) -> str:
+        """
+        Get collection table name
+        """
+        if collection_id:
+            return CollectionNames.table_name_v2(collection_id)
+        return CollectionNames.table_name(collection_name)
+
+    def _fork_enabled(self) -> bool:
+        db_type, version = self.detect_db_type_and_version()
+        version_110 = Version("1.1.0.0")
+        logger.debug(f"db_type: {db_type}, version: {version}")
+        return db_type.lower() == "seekdb" and version >= version_110
+
+    def _get_collection_id(self, collection_name: str) -> str:
+        collection_id_query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name}'"
+        collection_id_query_result = self._execute(collection_id_query_sql)
+        if not collection_id_query_result or len(collection_id_query_result) == 0:
+            raise ValueError(f"Collection not found: '{collection_name}'")
+        if isinstance(collection_id_query_result[0], dict):
+            collection_id = collection_id_query_result[0]["COLLECTION_ID"]
+        elif isinstance(collection_id_query_result[0], (tuple, list)):
+            collection_id = collection_id_query_result[0][0] if len(collection_id_query_result[0]) > 0 else ""
+        else:
+            collection_id = str(collection_id_query_result[0])
+        return collection_id
+
+    def _collection_fork(self, collection: Collection, forked_name: str) -> None:
+        """
+        Fork a collection
+
+        Args:
+            collection: Collection to fork
+            forked_name: Forked collection name
+        """
+        if not self._fork_enabled():
+            raise ValueError("Fork is not enabled for this database")
+
+        _validate_collection_name(forked_name)
+
+        if self.has_collection(forked_name):
+            raise ValueError(f"Collection '{forked_name}' already exists")
+
+        # Ensure sdk_collections exists (especially for v1-only databases)
+        self._create_sdk_collections_if_not_exists()
+
+        source_table_name = self._get_collection_table_name(collection.id, collection.name)
+        collection_meta = self._resolve_collection_metadata_from_sdk_collections(collection.name)
+        if not collection_meta:
+            raise ValueError(f"Collection '{collection.name}' does not exist")
+        forked_table_name = None
+        try:
+            settings_str = (
+                f"'{escape_string(collection_meta.settings)}'" if collection_meta.settings is not None else "NULL"
+            )
+            insert_sql = f"INSERT INTO `{CollectionNames.sdk_collections_table_name()}` (COLLECTION_NAME, SETTINGS) VALUES ('{forked_name}', {settings_str})"
+            self._execute(insert_sql)
+            collection_id = self._get_collection_id(forked_name)
+            forked_table_name = CollectionNames.table_name_v2(collection_id)
+
+            fork_table_sql = f"FORK TABLE `{source_table_name}` TO `{forked_table_name}`"
+            self._execute(fork_table_sql)
+        except Exception as ex:
+            try:
+                if forked_table_name:
+                    drop_table_sql = f"DROP TABLE IF EXISTS `{forked_table_name}`"
+                    self._execute(drop_table_sql)
+                delete_item_sql = f"DELETE FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{forked_name}'"
+                self._execute(delete_item_sql)
+            except Exception as ex2:
+                logger.warning(f"failed to clean data after failed to fork collection: {ex2}")
+
+            raise ValueError(f"Failed to fork collection: {ex}") from ex
+        logger.debug(f"✅ Successfully forked collection '{collection.name}' to '{forked_name}'")
 
     # ==================== Collection Internal Operations (Called by Collection) ====================
     # These methods are called by Collection objects, different clients implement different logic

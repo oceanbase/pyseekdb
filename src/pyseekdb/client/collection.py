@@ -98,6 +98,46 @@ class Collection:
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
 
+    def fork(self, forked_name: str) -> "Collection":
+        """
+        Fork (duplicate) this collection to create a new collection with the same data.
+
+        The forked collection is independent - modifications to one collection do not
+        affect the other. The original collection remains unchanged.
+
+        Args:
+            forked_name: Name for the new forked collection. Must be a valid collection name
+                        (letters, digits, and underscores only, not empty).
+
+        Returns:
+            Collection: The newly created forked collection.
+
+        Raises:
+            ValueError: If fork is not enabled for this database, if the collection name
+                       is invalid, or if a collection with the given name already exists.
+
+        Note:
+            - Fork is only available for seekdb database version 1.1.0.0 or higher.
+
+        Examples:
+        .. code-block:: python
+            # Fork a collection
+            original = client.get_collection("my_collection")
+            forked = original.fork("my_collection_backup")
+
+            # Verify both collections have the same data
+            assert original.count() == forked.count()
+
+            # Add data to forked collection (original is unaffected)
+            forked.add(ids="new_id", embeddings=[1.0, 2.0, 3.0], documents="New document")
+            assert original.count() == 3  # Original unchanged
+            assert forked.count() == 4    # Forked has new data
+
+        """
+        self._client._collection_fork(collection=self, forked_name=forked_name)
+        collection = self._client.get_collection(forked_name, embedding_function=self._embedding_function)
+        return collection
+
     # ==================== DML Operations ====================
     # All methods delegate to client's internal implementation
 
@@ -191,7 +231,6 @@ class Collection:
             **kwargs,
         )
 
-    # 修改为upsert语法
     def upsert(
         self,
         ids: str | list[str],

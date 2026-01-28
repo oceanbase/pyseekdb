@@ -2,12 +2,12 @@
 Unit tests for GoogleVertexEmbeddingFunction.
 
 Tests Google Vertex AI embedding function initialization, embedding generation, and configuration.
-Uses real API calls - requires CHROMA_GOOGLE_VERTEX_API_KEY environment variable to be set and google-cloud-aiplatform to be installed.
+Uses real API calls - requires GOOGLE_VERTEX_API_KEY environment variable to be set and google-cloud-aiplatform to be installed.
 
 To run this test manually:
     pytest tests/unit_tests/test_google_vertex_embedding_function.py -v -s
     # Or with environment variable:
-    CHROMA_GOOGLE_VERTEX_API_KEY=your-key pytest tests/unit_tests/test_google_vertex_embedding_function.py -v -s
+    GOOGLE_VERTEX_API_KEY=your-key pytest tests/unit_tests/test_google_vertex_embedding_function.py -v -s
 """
 
 import importlib.util
@@ -33,8 +33,8 @@ def is_vertexai_available() -> bool:
 
 # Skip this test by default - it requires external API access and API keys
 @pytest.mark.skipif(
-    not os.environ.get("CHROMA_GOOGLE_VERTEX_API_KEY") or not is_vertexai_available(),
-    reason="CHROMA_GOOGLE_VERTEX_API_KEY environment variable must be set and google-cloud-aiplatform must be installed",
+    not os.environ.get("GOOGLE_VERTEX_API_KEY") or not is_vertexai_available(),
+    reason="GOOGLE_VERTEX_API_KEY environment variable must be set and google-cloud-aiplatform must be installed",
 )
 class TestGoogleVertexEmbeddingFunction:
     """Test GoogleVertexEmbeddingFunction - skipped by default, requires manual execution"""
@@ -43,9 +43,7 @@ class TestGoogleVertexEmbeddingFunction:
         """Test if vertexai package is installed and required environment variables are set."""
         assert is_vertexai_available(), "google-cloud-aiplatform package is not installed"
 
-        assert os.environ.get("CHROMA_GOOGLE_VERTEX_API_KEY"), (
-            "CHROMA_GOOGLE_VERTEX_API_KEY environment variable is not set"
-        )
+        assert os.environ.get("GOOGLE_VERTEX_API_KEY"), "GOOGLE_VERTEX_API_KEY environment variable is not set"
 
     def test_initialization_with_defaults(self):
         """Test GoogleVertexEmbeddingFunction initialization with default values"""
@@ -60,7 +58,7 @@ class TestGoogleVertexEmbeddingFunction:
         assert ef.model_name == "textembedding-gecko"
         assert ef.project_id == "cloud-large-language-models"
         assert ef.region == "us-central1"
-        assert ef.api_key_env == "CHROMA_GOOGLE_VERTEX_API_KEY"
+        assert ef.api_key_env == "GOOGLE_VERTEX_API_KEY"
         print(f"   Model name: {ef.model_name}")
         print(f"   Project ID: {ef.project_id}")
         print(f"   Region: {ef.region}")
@@ -113,7 +111,7 @@ class TestGoogleVertexEmbeddingFunction:
 
         custom_key_env = "CUSTOM_GOOGLE_VERTEX_KEY"
         if not os.environ.get(custom_key_env):
-            os.environ[custom_key_env] = os.environ.get("CHROMA_GOOGLE_VERTEX_API_KEY", "your-custom-key")
+            os.environ[custom_key_env] = os.environ.get("GOOGLE_VERTEX_API_KEY", "your-custom-key")
 
         ef = GoogleVertexEmbeddingFunction(api_key_env=custom_key_env)
         assert ef.api_key_env == custom_key_env
@@ -129,12 +127,12 @@ class TestGoogleVertexEmbeddingFunction:
             model_name="textembedding-gecko@003",
             project_id="my-project",
             region="us-west1",
-            api_key_env="CHROMA_GOOGLE_VERTEX_API_KEY",
+            api_key_env="GOOGLE_VERTEX_API_KEY",
         )
         assert ef.model_name == "textembedding-gecko@003"
         assert ef.project_id == "my-project"
         assert ef.region == "us-west1"
-        assert ef.api_key_env == "CHROMA_GOOGLE_VERTEX_API_KEY"
+        assert ef.api_key_env == "GOOGLE_VERTEX_API_KEY"
         print("   All parameters set correctly")
 
     def test_initialization_missing_api_key(self):
@@ -142,14 +140,14 @@ class TestGoogleVertexEmbeddingFunction:
         print("\n✅ Testing GoogleVertexEmbeddingFunction initialization with missing API key")
 
         # Temporarily remove API key
-        original_key = os.environ.pop("CHROMA_GOOGLE_VERTEX_API_KEY", None)
+        original_key = os.environ.pop("GOOGLE_VERTEX_API_KEY", None)
         try:
             with pytest.raises(ValueError, match="environment variable is not set"):
                 GoogleVertexEmbeddingFunction()
         finally:
             # Restore API key
             if original_key:
-                os.environ["CHROMA_GOOGLE_VERTEX_API_KEY"] = original_key
+                os.environ["GOOGLE_VERTEX_API_KEY"] = original_key
 
     def test_initialization_without_vertexai(self):
         """Test that initialization fails when vertexai is not installed"""
@@ -242,7 +240,7 @@ class TestGoogleVertexEmbeddingFunction:
 
 
 @pytest.mark.skipif(
-    not is_vertexai_available() or not os.environ.get("CHROMA_GOOGLE_VERTEX_API_KEY"),
+    not is_vertexai_available() or not os.environ.get("GOOGLE_VERTEX_API_KEY"),
     reason="google-cloud-aiplatform is not available on this system",
 )
 class TestGoogleVertexEmbeddingFunctionPersistence:
@@ -254,7 +252,7 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
 
     def test_get_config_with_defaults(self):
         """Test that get_config() returns correct config with default values"""
-        with env_guard(CHROMA_GOOGLE_VERTEX_API_KEY="test-key"):
+        with env_guard(GOOGLE_VERTEX_API_KEY="test-key"):
             ef = GoogleVertexEmbeddingFunction()
             config = ef.get_config()
 
@@ -262,7 +260,7 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
             assert config["model_name"] == "textembedding-gecko"
             assert config["project_id"] == "cloud-large-language-models"
             assert config["region"] == "us-central1"
-            assert config["api_key_env"] == "CHROMA_GOOGLE_VERTEX_API_KEY"
+            assert config["api_key_env"] == "GOOGLE_VERTEX_API_KEY"
             # name should NOT be in config
             assert "name" not in config
 
@@ -285,20 +283,20 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
     def test_build_from_config_with_defaults(self):
         """Test that build_from_config() restores instance with default values"""
         config = {
-            "api_key_env": "CHROMA_GOOGLE_VERTEX_API_KEY",
+            "api_key_env": "GOOGLE_VERTEX_API_KEY",
             "model_name": "textembedding-gecko",
             "project_id": "cloud-large-language-models",
             "region": "us-central1",
         }
 
-        with env_guard(CHROMA_GOOGLE_VERTEX_API_KEY="test-key"):
+        with env_guard(GOOGLE_VERTEX_API_KEY="test-key"):
             restored_ef = GoogleVertexEmbeddingFunction.build_from_config(config)
 
             assert isinstance(restored_ef, GoogleVertexEmbeddingFunction)
             assert restored_ef.model_name == "textembedding-gecko"
             assert restored_ef.project_id == "cloud-large-language-models"
             assert restored_ef.region == "us-central1"
-            assert restored_ef.api_key_env == "CHROMA_GOOGLE_VERTEX_API_KEY"
+            assert restored_ef.api_key_env == "GOOGLE_VERTEX_API_KEY"
 
     def test_build_from_config_with_custom_values(self):
         """Test that build_from_config() restores instance with custom values"""
@@ -332,7 +330,7 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
     def test_build_from_config_missing_model_name(self):
         """Test that build_from_config() raises AssertionError when model_name is missing"""
         config = {
-            "api_key_env": "CHROMA_GOOGLE_VERTEX_API_KEY",
+            "api_key_env": "GOOGLE_VERTEX_API_KEY",
             "project_id": "cloud-large-language-models",
             "region": "us-central1",
         }
@@ -343,7 +341,7 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
     def test_build_from_config_missing_project_id(self):
         """Test that build_from_config() raises AssertionError when project_id is missing"""
         config = {
-            "api_key_env": "CHROMA_GOOGLE_VERTEX_API_KEY",
+            "api_key_env": "GOOGLE_VERTEX_API_KEY",
             "model_name": "textembedding-gecko",
             "region": "us-central1",
         }
@@ -354,7 +352,7 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
     def test_build_from_config_missing_region(self):
         """Test that build_from_config() raises AssertionError when region is missing"""
         config = {
-            "api_key_env": "CHROMA_GOOGLE_VERTEX_API_KEY",
+            "api_key_env": "GOOGLE_VERTEX_API_KEY",
             "model_name": "textembedding-gecko",
             "project_id": "cloud-large-language-models",
         }
@@ -364,7 +362,7 @@ class TestGoogleVertexEmbeddingFunctionPersistence:
 
     def test_persistence_roundtrip(self):
         """Test complete roundtrip: get_config -> build_from_config"""
-        with env_guard(CHROMA_GOOGLE_VERTEX_API_KEY="test-key"):
+        with env_guard(GOOGLE_VERTEX_API_KEY="test-key"):
             original_ef = GoogleVertexEmbeddingFunction(
                 model_name="textembedding-gecko@003",
                 project_id="my-project",

@@ -10,7 +10,7 @@ import uuid
 
 import pytest
 
-from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
+from pyseekdb import Configuration, FulltextIndexConfig, HNSWConfiguration
 
 
 class TestClientCreation:
@@ -46,7 +46,7 @@ class TestClientCreation:
         test_collection_name_config = f"test_collection_config_{int(time.time() * 1000)}"
         config_with_fulltext = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
-            fulltext_config=FulltextAnalyzerConfig(analyzer="ik"),
+            fulltext_config=FulltextIndexConfig(analyzer="ik"),
         )
         collection_config = db_client.create_collection(
             name=test_collection_name_config,
