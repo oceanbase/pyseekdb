@@ -9,7 +9,6 @@ import json
 import time
 import uuid
 
-import pytest
 from pymysql.converters import escape_string
 
 from pyseekdb import HNSWConfiguration, HybridSearch
@@ -80,9 +79,7 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
     def _get_sql_query(self, client, table_name: str, search_parm: dict) -> str:
         search_parm_json = json.dumps(search_parm, ensure_ascii=False)
         client._server._execute(f"SET @search_parm = '{escape_string(search_parm_json)}'")
-        get_sql_query = (
-            f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"  # noqa: S608
-        )
+        get_sql_query = f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"  # noqa: S608
         rows = client._server._execute(get_sql_query)
         assert rows and rows[0].get("query_sql")
         query_sql = rows[0]["query_sql"]

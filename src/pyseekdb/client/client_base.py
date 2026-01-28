@@ -3108,32 +3108,25 @@ class BaseClient(BaseConnection, AdminAPI):
         return knn_exprs if len(knn_exprs) > 1 else knn_exprs[0]
 
     def _build_source_fields(self, include: list[str] | None) -> list[str]:
-        """Infer OceanBase GET_SQL `_source` allowlist from include."""
+        """
+        Infer OceanBase GET_SQL `_source` allowlist from include.
+        """
         if include is None:
             include = ["documents", "metadatas"]
+        if not isinstance(include, list) or not all(isinstance(item, str) for item in include):
+            raise TypeError("include must be a List[str] or None")
 
-        field_mapping = {
-            "documents": "document",
-            "document": "document",
-            "metadatas": "metadata",
-            "metadata": "metadata",
-            "embeddings": "embedding",
-            "embedding": "embedding",
-        }
+        requested = {item.lower() for item in include}
+        allowed = {"documents": "document", "metadatas": "metadata", "embeddings": "embedding"}
+        unknown = sorted(requested - allowed.keys())
+        if unknown:
+            raise ValueError(f"include only supports {sorted(allowed.keys())}; got {unknown}")
 
-        selected = set()
-        for field in include:
-            if not isinstance(field, str):
-                continue
-            mapped = field_mapping.get(field.lower())
-            if mapped is not None:
-                selected.add(mapped)
-
-        ordered = ["_id"]
-        for name in ("document", "metadata", "embedding"):
-            if name in selected:
-                ordered.append(name)
-        return ordered
+        source = ["_id"]
+        for key in ("documents", "metadatas", "embeddings"):
+            if key in requested:
+                source.append(allowed[key])
+        return source
 
     def _transform_sql_result(  # noqa: C901
         self, result_rows: list[dict[str, Any]], include: list[str] | None

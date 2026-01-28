@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 # Add project path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -82,3 +84,12 @@ class TestBuildSourceFieldsUnit:
         dummy = _DummyClient()
         assert BaseClient._build_source_fields(dummy, include=["embeddings"]) == ["_id", "embedding"]
 
+    def test_build_source_fields_rejects_singular_aliases(self) -> None:
+        dummy = _DummyClient()
+        with pytest.raises(ValueError, match=r"include only supports"):
+            BaseClient._build_source_fields(dummy, include=["document"])
+
+    def test_build_source_fields_rejects_unknown_fields(self) -> None:
+        dummy = _DummyClient()
+        with pytest.raises(ValueError, match=r"include only supports"):
+            BaseClient._build_source_fields(dummy, include=["ids"])
