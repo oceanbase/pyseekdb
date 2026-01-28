@@ -2477,7 +2477,6 @@ class BaseClient(BaseConnection, AdminAPI):
         n_results: int = 10,
         include: list[str] | None = None,
         dimension: int | None = None,
-        return_fields: list[str] | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -2505,9 +2504,6 @@ class BaseClient(BaseConnection, AdminAPI):
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (optional)
-            return_fields: Optional list of returned column names (field allowlist) for OceanBase
-                GET_SQL search_params `_source`. If omitted, the SDK infers a minimal allowlist from
-                `include` to avoid fetching large unused columns (e.g. `embedding`).
             dimension: Collection vector dimension for validating query_embeddings (optional)
             **kwargs: Additional parameters, including:
                 embedding_function: EmbeddingFunction instance to convert query_texts in knn to embeddings.
@@ -2532,18 +2528,13 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             table_name = CollectionNames.table_name(collection_name)
 
-        # If return_fields is not provided, infer a minimal allowlist based on include.
-        # This avoids selecting large unused fields (e.g. embedding) in the generated SQL.
-        if return_fields is None:
-            return_fields = self._build_source_fields(include)
-
         # Build search_parm JSON
         search_parm = self._build_search_parm(
             query,
             knn,
             rank,
             n_results,
-            return_fields=return_fields,
+            include=include,
             dimension=dimension,
             **kwargs,
         )
@@ -2599,7 +2590,7 @@ class BaseClient(BaseConnection, AdminAPI):
         knn: dict[str, Any] | list[dict[str, Any]] | None,
         rank: dict[str, Any] | None,
         n_results: int,
-        return_fields: list[str] | None = None,
+        include: list[str] | None = None,
         dimension: int | None = None,
         **kwargs,
     ) -> dict[str, Any]:
@@ -2611,9 +2602,8 @@ class BaseClient(BaseConnection, AdminAPI):
             knn: Vector search configuration dict or list of dicts
             rank: Ranking configuration dict
             n_results: Final number of results to return
-            return_fields: Optional list of returned column names (field allowlist) for Seekdb
-                GET_SQL search_params `_source`. If omitted, hybrid_search infers a minimal allowlist
-                from include to avoid fetching large unused columns.
+            include: Fields requested by the SDK caller. Used to infer the minimal OceanBase GET_SQL
+                `_source` allowlist to avoid returning large unused columns (e.g. `embedding`).
             dimension: Collection dimension for validating query_embeddings (optional)
             **kwargs: Additional parameters, including:
                 embedding_function: EmbeddingFunction instance to convert query_texts in knn to embeddings.
@@ -2658,8 +2648,8 @@ class BaseClient(BaseConnection, AdminAPI):
         if rank:
             search_parm["rank"] = rank
 
-        if return_fields is not None:
-            search_parm["_source"] = return_fields
+        # Always infer a minimal `_source` allowlist from include to reduce response payload.
+        search_parm["_source"] = self._build_source_fields(include)
 
         return search_parm
 

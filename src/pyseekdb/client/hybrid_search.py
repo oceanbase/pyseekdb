@@ -219,22 +219,6 @@ def _combine_filters(base: dict[str, Any] | None, extras: list[dict[str, Any]]) 
     return {"$and": filters}
 
 
-def _normalize_return_fields(return_fields: list[str] | None) -> list[str] | None:
-    if return_fields is None:
-        return None
-    if not isinstance(return_fields, list) or not all(isinstance(item, str) for item in return_fields):
-        raise TypeError("return_fields must be a List[str] or None")
-    normalized: list[str] = []
-    for item in return_fields:
-        if item == "":
-            raise ValueError("return_fields items must not be empty strings")
-        if item not in normalized:
-            normalized.append(item)
-    if not normalized:
-        normalized = ["_id"]
-    return normalized
-
-
 class HybridSearch:
     """
     Fluent builder for collection.hybrid_search().
@@ -245,7 +229,6 @@ class HybridSearch:
             .query(DOCUMENT.contains("machine learning"), K("category") == "AI", n_results=10, boost=0.5)
             .knn(TEXT("AI research"), K("year") > 2020, n_results=10, boost=0.6)
             .limit(5)
-            .return_fields(["document", "metadata", "_keyword_score", "_semantic_score"])
             .select(IDS, DOCUMENTS, METADATAS, EMBEDDINGS, SCORES)
         )
     """
@@ -258,7 +241,6 @@ class HybridSearch:
         n_results: int | None = None,
         nresult: int | None = None,
         include: list[str] | None = None,
-        return_fields: list[str] | None = None,
         **kwargs,
     ):
         self._queries: list[dict[str, Any]] = []
@@ -266,12 +248,9 @@ class HybridSearch:
         self._rank = copy.deepcopy(rank) if rank else None
         self._n_results = n_results if n_results is not None else nresult
         self._include = copy.deepcopy(include) if include is not None else None
-        if "_source" in kwargs:
-            raise TypeError("Use return_fields= instead of _source=.")
         if kwargs:
             unexpected = ", ".join(sorted(kwargs))
             raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
-        self._return_fields = copy.deepcopy(_normalize_return_fields(return_fields))
 
         if query:
             self._append_query_payload(query)
@@ -433,19 +412,6 @@ class HybridSearch:
         self._n_results = n_results
         return self
 
-    def return_fields(self, fields: list[str] | None) -> HybridSearch:
-        """
-        Configure OceanBase GET_SQL return fields allowlist.
-
-        Notes:
-        - Only list (allowlist) form is supported; no includes/excludes mapping.
-        - This maps to OceanBase GET_SQL search_params `_source`.
-        - If omitted, the SDK may infer a minimal allowlist from `include` to avoid fetching large
-          unused columns (e.g. `embedding`).
-        """
-        self._return_fields = copy.deepcopy(_normalize_return_fields(fields))
-        return self
-
     def select(self, *fields: Any) -> HybridSearch:
         include: list[str] = []
         for field in fields:
@@ -480,7 +446,6 @@ class HybridSearch:
             "rank": copy.deepcopy(self._rank) if self._rank else None,
             "n_results": self._n_results,
             "include": copy.deepcopy(self._include) if self._include is not None else None,
-            "return_fields": copy.deepcopy(self._return_fields) if self._return_fields is not None else None,
         }
 
     @staticmethod

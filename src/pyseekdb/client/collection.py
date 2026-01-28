@@ -10,7 +10,7 @@ Design Pattern:
 
 from typing import TYPE_CHECKING, Any, Optional
 
-from .hybrid_search import HybridSearch, _normalize_return_fields
+from .hybrid_search import HybridSearch
 
 if TYPE_CHECKING:
     from .embedding_function import Documents as EmbeddingDocuments
@@ -436,7 +436,6 @@ class Collection:
         n_results: int = 10,
         include: list[str] | None = None,
         search: HybridSearch | None = None,
-        return_fields: list[str] | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -459,10 +458,6 @@ class Collection:
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
             search: HybridSearch builder instance (optional). If provided, takes precedence
                 over query/knn/rank/include/n_results arguments.
-            return_fields: Optional list of returned column names (field allowlist) for OceanBase
-                GET_SQL search_params `_source`. When omitted, the SDK infers a minimal allowlist from
-                `include` to avoid fetching large unused columns (e.g. `embedding`). When using
-                HybridSearch builder, you can also set it via `HybridSearch.return_fields([...])`.
             **kwargs: Additional parameters.
 
         Returns:
@@ -496,20 +491,14 @@ class Collection:
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
         """
-        if "_source" in kwargs:
-            raise TypeError("Use return_fields= instead of _source=.")
-
-        return_fields = _normalize_return_fields(return_fields)
-
         # Allow passing builder as first positional argument
-        query, knn, rank, n_results, include, return_fields = self._apply_hybrid_search_builder(
+        query, knn, rank, n_results, include = self._apply_hybrid_search_builder(
             query=query,
             knn=knn,
             rank=rank,
             n_results=n_results,
             include=include,
             search=search,
-            return_fields=return_fields,
         )
 
         # When no query/knn provided, return only ids/distances by default
@@ -524,7 +513,6 @@ class Collection:
             rank=rank,
             n_results=n_results,
             include=include,
-            return_fields=return_fields,
             embedding_function=self._embedding_function,
             dimension=self._dimension,
             **kwargs,
@@ -538,13 +526,11 @@ class Collection:
         n_results: int,
         include: list[str] | None,
         search: HybridSearch | None,
-        return_fields: list[str] | None,
     ) -> tuple[
         dict[str, Any] | None,
         dict[str, Any] | None,
         dict[str, Any] | None,
         int,
-        list[str] | None,
         list[str] | None,
     ]:
         if isinstance(query, HybridSearch):
@@ -552,7 +538,7 @@ class Collection:
             query = None
 
         if not isinstance(search, HybridSearch):
-            return query, knn, rank, n_results, include, return_fields
+            return query, knn, rank, n_results, include
 
         params = search.to_params(dimension=self._dimension)
         query = params.get("query")
@@ -562,13 +548,8 @@ class Collection:
             n_results = params["n_results"]
         if params.get("include") is not None:
             include = params["include"]
-        builder_return_fields = params.get("return_fields")
-        if builder_return_fields is not None:
-            if return_fields is not None:
-                raise ValueError("Do not mix HybridSearch.return_fields() with return_fields=.")
-            return_fields = builder_return_fields
 
-        return query, knn, rank, n_results, include, return_fields
+        return query, knn, rank, n_results, include
 
     # ==================== Collection Info ====================
 
