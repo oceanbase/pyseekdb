@@ -221,16 +221,8 @@ class TestCollectionHybridSearch:
         # Test: Combined full-text and vector search
         print("\n✅ Testing hybrid_search with both full-text and vector search")
         results = collection.hybrid_search(
-            query={
-                "where_document": {"$contains": "machine learning"},
-                "n_results": 10,
-                "boost": 0.4,
-            },
-            knn={
-                "query_embeddings": self._generate_query_vector(actual_dimension),
-                "n_results": 10,
-                "boost": 1.6,
-            },
+            query={"where_document": {"$contains": "machine learning"}, "n_results": 10},
+            knn={"query_embeddings": self._generate_query_vector(actual_dimension), "n_results": 10},
             rank={"rrf": {"rank_window_size": 60, "rank_constant": 60}},
             n_results=5,
             include=["documents", "metadatas", "embeddings"],

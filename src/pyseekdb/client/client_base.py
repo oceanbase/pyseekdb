@@ -2598,13 +2598,11 @@ class BaseClient(BaseConnection, AdminAPI):
             query: Full-text search configuration dict with:
                 - where_document: Document filter conditions (e.g., {"$contains": "text"})
                 - where: Metadata filter conditions (e.g., {"page": {"$gte": 5}})
-                - boost: Weight for text query when combining hybrid results (optional)
             knn: Vector search configuration dict with:
                 - query_texts: Query text(s) to be embedded (optional if query_embeddings provided)
                 - query_embeddings: Query vector(s) (optional if query_texts provided)
                 - where: Metadata filter conditions (optional)
                 - n_results: Number of results for vector search (optional)
-                - boost: Weight for vector search when combining hybrid results (optional)
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (optional)
