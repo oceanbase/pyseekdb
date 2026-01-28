@@ -506,8 +506,7 @@ class Collection:
                 query={
                     "where_document": {"$contains": "machine learning"},
                     "where": {"category": {"$eq": "science"}},
-                    "n_results": 10,
-                    "boost": 0.5
+                    "n_results": 10
                 },
                 knn={
                     "query_texts": ["AI research"],
