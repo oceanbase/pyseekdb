@@ -34,6 +34,33 @@ jobs:
       - name: Run checks
         run: make check
 
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: '3.11'
+
+      - name: Build package
+        run: uv build
+
+      - name: Verify build artifacts
+        run: |
+          ls -la dist/
+          # Verify both sdist and wheel are created
+          test -f dist/*.tar.gz || (echo "Source distribution not found" && exit 1)
+          test -f dist/*.whl || (echo "Wheel not found" && exit 1)
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
   unit-test:
     runs-on: ubuntu-latest
     steps:

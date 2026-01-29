@@ -18,7 +18,8 @@ To achieve the above design goals, this SDK follows the following design princip
 6. [DQL Operations](#5-dql-operations)
 7. [Embedding Functions](#6-embedding-functions)
 8. [RAG Demo](#rag-demo)
-9. [Testing](#testing)
+9. [Development](#development)
+10. [Testing](#testing)
 
 ## Installation
 
@@ -1156,31 +1157,100 @@ The demo supports three embedding modes:
 
 For detailed instructions, see [demo/rag/README.md](demo/rag/README.md).
 
+## Development
+
+This project uses [uv](https://docs.astral.sh/uv/) as the package manager with [pdm-backend](https://pdm-backend.fming.dev/) as the build backend.
+
+### Prerequisites
+
+Install uv:
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or via pip
+pip install uv
+```
+
+### Setup Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/oceanbase/pyseekdb.git
+cd pyseekdb
+
+# Install dependencies (creates virtual environment automatically)
+uv sync --all-groups
+
+# Activate the virtual environment (optional, uv run handles this)
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate     # Windows
+```
+
+### Common Commands
+
+```bash
+# Run a command in the virtual environment
+uv run <command>
+
+# Run tests
+uv run pytest tests/ -v
+
+# Run linting
+uv run ruff check .
+
+# Run formatting
+uv run ruff format .
+
+# Build the package
+uv build
+
+# Add a new dependency
+uv add <package>
+
+# Add a development dependency
+uv add --group dev <package>
+
+# Update dependencies
+uv sync --all-groups
+```
+
+### Build Artifacts
+
+After running `uv build`, the distribution files will be in the `dist/` directory:
+- `pyseekdb-<version>.tar.gz` - Source distribution
+- `pyseekdb-<version>-py3-none-any.whl` - Wheel distribution
+
 ## Testing
 
 ```bash
 # Run all tests (unit + integration)
-python3 -m pytest -v
+uv run pytest -v
 
 # Run tests with log output
-python3 -m pytest -v -s
+uv run pytest -v -s
 
 # Run unit tests only
-python3 -m pytest tests/unit_tests/ -v
+uv run pytest tests/unit_tests/ -v
 
 # Run integration tests only
-python3 -m pytest tests/integration_tests/ -v
+uv run pytest tests/integration_tests/ -v
 
 # Run integration tests for specific mode
-python3 -m pytest tests/integration_tests/ -v -k "embedded"   # embedded mode
-python3 -m pytest tests/integration_tests/ -v -k "server"     # server mode (requires seekdb server)
-python3 -m pytest tests/integration_tests/ -v -k "oceanbase"  # oceanbase mode (requires OceanBase)
+uv run pytest tests/integration_tests/ -v -k "embedded"   # embedded mode
+uv run pytest tests/integration_tests/ -v -k "server"     # server mode (requires seekdb server)
+uv run pytest tests/integration_tests/ -v -k "oceanbase"  # oceanbase mode (requires OceanBase)
 
 # Run specific test file
-python3 -m pytest tests/integration_tests/test_collection_query.py -v
+uv run pytest tests/integration_tests/test_collection_query.py -v
 
 # Run specific test function
-python3 -m pytest tests/integration_tests/test_collection_query.py::TestCollectionQuery::test_collection_query -v
+uv run pytest tests/integration_tests/test_collection_query.py::TestCollectionQuery::test_collection_query -v
 ```
 
 ## License
