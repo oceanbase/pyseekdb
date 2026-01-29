@@ -46,7 +46,7 @@ jobs:
           python-version: '3.11'
 
       - name: Build package
-        run: uv build
+        run: make build
 
       - name: Verify build artifacts
         run: |

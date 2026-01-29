@@ -1159,7 +1159,7 @@ For detailed instructions, see [demo/rag/README.md](demo/rag/README.md).
 
 ## Development
 
-This project uses [uv](https://docs.astral.sh/uv/) as the package manager with [pdm-backend](https://pdm-backend.fming.dev/) as the build backend.
+This project uses [uv](https://docs.astral.sh/uv/) as the package manager with [pdm-backend](https://pdm-backend.fming.dev/) as the build backend. All common development tasks are unified through the `Makefile`.
 
 ### Prerequisites
 
@@ -1183,66 +1183,41 @@ pip install uv
 git clone https://github.com/oceanbase/pyseekdb.git
 cd pyseekdb
 
-# Install dependencies (creates virtual environment automatically)
-uv sync --all-groups
-
-# Activate the virtual environment (optional, uv run handles this)
-source .venv/bin/activate  # Linux/macOS
-# or
-.venv\Scripts\activate     # Windows
+# Install dependencies and pre-commit hooks
+make install
 ```
 
-### Common Commands
+### Make Targets
+
+Run `make help` to see all available targets:
 
 ```bash
-# Run a command in the virtual environment
-uv run <command>
-
-# Run tests
-uv run pytest tests/ -v
-
-# Run linting
-uv run ruff check .
-
-# Run formatting
-uv run ruff format .
-
-# Build the package
-uv build
-
-# Add a new dependency
-uv add <package>
-
-# Add a development dependency
-uv add --group dev <package>
-
-# Update dependencies
-uv sync --all-groups
+make help              # Show all available targets
+make install           # Install dependencies and pre-commit hooks
+make check             # Run code quality tools (lint, format check)
+make test              # Run unit tests
+make test-integration-embedded  # Run embedded integration tests
+make build             # Build the package
+make docs              # Build documentation
+make clean             # Clean build artifacts
 ```
 
 ### Build Artifacts
 
-After running `uv build`, the distribution files will be in the `dist/` directory:
+After running `make build`, the distribution files will be in the `dist/` directory:
 - `pyseekdb-<version>.tar.gz` - Source distribution
 - `pyseekdb-<version>-py3-none-any.whl` - Wheel distribution
 
 ## Testing
 
 ```bash
-# Run all tests (unit + integration)
-uv run pytest -v
+# Run unit tests
+make test
 
-# Run tests with log output
-uv run pytest -v -s
+# Run embedded integration tests
+make test-integration-embedded
 
-# Run unit tests only
-uv run pytest tests/unit_tests/ -v
-
-# Run integration tests only
-uv run pytest tests/integration_tests/ -v
-
-# Run integration tests for specific mode
-uv run pytest tests/integration_tests/ -v -k "embedded"   # embedded mode
+# Run specific tests with uv run
 uv run pytest tests/integration_tests/ -v -k "server"     # server mode (requires seekdb server)
 uv run pytest tests/integration_tests/ -v -k "oceanbase"  # oceanbase mode (requires OceanBase)
 
