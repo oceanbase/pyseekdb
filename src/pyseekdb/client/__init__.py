@@ -33,18 +33,6 @@ from .embedding_function import (
     get_default_embedding_function,
     register_embedding_function,
 )
-from .hybrid_search import (
-    DOCUMENT,
-    DOCUMENTS,
-    EMBEDDINGS,
-    EMBEDDINGS_FIELD,
-    IDS,
-    METADATAS,
-    SCORES,
-    TEXT,
-    HybridSearch,
-    K,
-)
 from .version import Version
 
 logger = logging.getLogger(__name__)
@@ -123,14 +111,6 @@ def _create_server_client(
 
 
 __all__ = [
-    "DOCUMENT",
-    "DOCUMENTS",
-    "EMBEDDINGS",
-    "EMBEDDINGS_FIELD",
-    "IDS",
-    "METADATAS",
-    "SCORES",
-    "TEXT",
     "AdminAPI",
     "AdminClient",
     "BaseClient",
@@ -143,8 +123,6 @@ __all__ = [
     "EmbeddingFunction",
     "FulltextIndexConfig",
     "HNSWConfiguration",
-    "HybridSearch",
-    "K",
     "RemoteServerClient",
     "SeekdbEmbeddedClient",
     "Version",

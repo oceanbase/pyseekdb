@@ -85,18 +85,6 @@ from .client import (
     register_embedding_function,
 )
 from .client.collection import Collection
-from .client.hybrid_search import (
-    DOCUMENT,
-    DOCUMENTS,
-    EMBEDDINGS,
-    EMBEDDINGS_FIELD,
-    IDS,
-    METADATAS,
-    SCORES,
-    TEXT,
-    HybridSearch,
-    K,
-)
 
 try:
     __version__ = importlib.metadata.version("pyseekdb")
@@ -106,14 +94,6 @@ except importlib.metadata.PackageNotFoundError:
 __author__ = "OceanBase <open_oceanbase@oceanbase.com>"
 
 __all__ = [
-    "DOCUMENT",
-    "DOCUMENTS",
-    "EMBEDDINGS",
-    "EMBEDDINGS_FIELD",
-    "IDS",
-    "METADATAS",
-    "SCORES",
-    "TEXT",
     "AdminAPI",
     "AdminClient",
     "BaseClient",
@@ -127,8 +107,6 @@ __all__ = [
     "EmbeddingFunction",
     "FulltextIndexConfig",
     "HNSWConfiguration",
-    "HybridSearch",
-    "K",
     "RemoteServerClient",
     "SeekdbEmbeddedClient",
     "Version",

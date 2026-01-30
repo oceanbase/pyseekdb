@@ -10,8 +10,6 @@ Design Pattern:
 
 from typing import TYPE_CHECKING, Any, Optional
 
-from .hybrid_search import HybridSearch
-
 if TYPE_CHECKING:
     from .embedding_function import Documents as EmbeddingDocuments
     from .embedding_function import EmbeddingFunction
@@ -469,35 +467,30 @@ class Collection:
 
     def hybrid_search(
         self,
-        query: dict[str, Any] | HybridSearch | None = None,
+        query: dict[str, Any] | None = None,
         knn: dict[str, Any] | None = None,
         rank: dict[str, Any] | None = None,
         n_results: int = 10,
         include: list[str] | None = None,
-        search: HybridSearch | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
         Hybrid search combining full-text search and vector similarity search
 
         Args:
-            query: HybridSearch builder instance or full-text search configuration dict with:
+            query: Full-text search configuration dict with:
                 - where_document: Document filter conditions (e.g., {"$contains": "text"})
                 - where: Metadata filter conditions (e.g., {"page": {"$gte": 5}})
                 - n_results: Number of results for full-text search (optional)
-                - boost: Weight for text query when combining hybrid results (optional)
             knn: Vector search configuration dict with:
                 - query_texts: Query text(s) to be embedded (optional if query_embeddings provided)
                 - query_embeddings: Query vector(s) (optional if query_texts provided)
                 - where: Metadata filter conditions (optional)
                 - n_results: Number of results for vector search (optional)
-                - boost: Weight for vector search when combining hybrid results (optional)
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
-            search: HybridSearch builder instance (optional). If provided, takes precedence
-                over query/knn/rank/include/n_results arguments.
-            **kwargs: Additional parameters.
+            **kwargs: Additional parameters
 
         Returns:
             Dict with keys (query-compatible format):
@@ -513,14 +506,12 @@ class Collection:
                 query={
                     "where_document": {"$contains": "machine learning"},
                     "where": {"category": {"$eq": "science"}},
-                    "n_results": 10,
-                    "boost": 0.5
+                    "n_results": 10
                 },
                 knn={
                     "query_texts": ["AI research"],
                     "where": {"year": {"$gte": 2020}},
-                    "n_results": 10,
-                    "boost": 0.3
+                    "n_results": 10
                 },
                 rank={"rrf": {}},
                 n_results=5,
@@ -530,16 +521,6 @@ class Collection:
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
         """
-        # Allow passing builder as first positional argument
-        query, knn, rank, n_results, include = self._apply_hybrid_search_builder(
-            query=query,
-            knn=knn,
-            rank=rank,
-            n_results=n_results,
-            include=include,
-            search=search,
-        )
-
         # When no query/knn provided, return only ids/distances by default
         if include is None and not query and not knn:
             include = []
@@ -556,39 +537,6 @@ class Collection:
             dimension=self._dimension,
             **kwargs,
         )
-
-    def _apply_hybrid_search_builder(
-        self,
-        query: dict[str, Any] | HybridSearch | None,
-        knn: dict[str, Any] | None,
-        rank: dict[str, Any] | None,
-        n_results: int,
-        include: list[str] | None,
-        search: HybridSearch | None,
-    ) -> tuple[
-        dict[str, Any] | None,
-        dict[str, Any] | None,
-        dict[str, Any] | None,
-        int,
-        list[str] | None,
-    ]:
-        if isinstance(query, HybridSearch):
-            search = query
-            query = None
-
-        if not isinstance(search, HybridSearch):
-            return query, knn, rank, n_results, include
-
-        params = search.to_params(dimension=self._dimension)
-        query = params.get("query")
-        knn = params.get("knn")
-        rank = params.get("rank")
-        if params.get("n_results") is not None:
-            n_results = params["n_results"]
-        if params.get("include") is not None:
-            include = params["include"]
-
-        return query, knn, rank, n_results, include
 
     # ==================== Collection Info ====================
 

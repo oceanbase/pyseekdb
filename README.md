@@ -796,23 +796,20 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
 
 ### 5.3 Hybrid Search
 
-`collection.hybrid_search()` runs full-text/scalar queries and vector KNN search in parallel, then fuses the results (RRF is supported). You can pass raw dicts/lists or a `HybridSearch` builder (the builder can be given as the first argument or via `search=`; when present it overrides other parameters).
+`collection.hybrid_search()` runs full-text/scalar queries and vector KNN search in parallel, then fuses the results (RRF is supported).
 
 **Parameters（dict mode）**
 - `query` (dict or List[dict], optional): full-text/scalar routes
   - `where_document`: `$contains` / `$not_contains` plus `$and` / `$or` combinations of those clauses
   - `where`: metadata filters (see 5.4) including logical operators and `#id`
-  - `boost`: weight for this text route when results are fused
 - `knn` (dict or List[dict], optional): vector routes
   - `query_embeddings`: `List[float]` or `List[List[float]]`; validated against `collection.dimension` when present
   - `query_texts`: str or List[str]; auto-embedded with the collection's `embedding_function` (missing function raises `ValueError`)
   - `where`: metadata filters for this vector route
   - `n_results`: candidates per vector route (k, default 10)
-  - `boost`: weight for this vector route
 - `rank` (dict, optional): ranking config; RRF tested via `{"rrf": {...}}` or `{}`. Omit to use single-route ordering.
 - `n_results` (int): final fused result count (default 10).
 - `include` (List[str], optional): fields to return. `ids`/`distances` are always returned; `documents`/`metadatas` are returned by default when `include` is `None`; add `"embeddings"` to fetch vectors.
-- `search` (`HybridSearch`, optional): fluent builder; overrides `query`/`knn`/`rank`/`include`/`n_results`.
 
 **Return format**
 - Query-compatible dict: `ids`, `distances`, optionally `documents` / `metadatas` / `embeddings`. Hybrid search returns a single outer list (one fused result set).
@@ -823,14 +820,12 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
 results = collection.hybrid_search(
     query={
         "where_document": {"$contains": "machine learning"},
-        "where": {"category": {"$eq": "science"}},
-        "boost": 0.5,
+        "where": {"category": {"$eq": "science"}}
     },
     knn={
         "query_texts": ["AI research"],  # auto-embedded via collection.embedding_function
         "where": {"year": {"$gte": 2020}},
         "n_results": 10,  # k per vector route
-        "boost": 0.8,
     },
     rank={"rrf": {"rank_window_size": 60, "rank_constant": 60}},
     n_results=5,
@@ -843,78 +838,7 @@ results = collection.hybrid_search(
     n_results=5,
     include=["documents", "metadatas"],
 )
-
-# Pass a HybridSearch builder (takes precedence over other args)
-from pyseekdb import (
-    HybridSearch,
-    DOCUMENT,
-    TEXT,
-    EMBEDDINGS,
-    K,
-    DOCUMENTS,
-    METADATAS,
-)
-
-search = (
-    HybridSearch()
-    .query(DOCUMENT.contains("machine learning"), K("category") == "AI", boost=0.6)
-    .knn(TEXT("AI research"), K("year") >= 2020, n_results=10, boost=0.8)
-    .limit(5)
-    .select(DOCUMENTS, METADATAS, EMBEDDINGS)
-    .rank({"rrf": {}})
-)
-results = collection.hybrid_search(search)
 ```
-
-**HybridSearch builder tips**
-- Chain multiple `.query(...)` / `.knn(...)` calls to emit multiple routes; providing multiple `query_texts` / `query_embeddings` also expands KNN routes automatically.
-- `.limit(n)` sets the final fused `n_results`; `.select(...)` controls `include` (e.g., `DOCUMENTS`, `METADATAS`, `EMBEDDINGS`).
-- Handy builders for conditions: `DOCUMENT.contains(...)` / `DOCUMENT.not_contains(...)`, `TEXT("...")`, `EMBEDDINGS([...])`, `K("field")` with `==`, `!=`, `<`, `<=`, `>`, `>=`, `.in_`, `.nin`; combine document/metadata expressions with `&` and `|`.
-- Embeddings supplied through `EMBEDDINGS(...)` are dimension-checked when the collection defines a dimension.
-
-#### Building a HybridSearch (builder how-to)
-1) Import & create
-```python
-from pyseekdb import HybridSearch, DOCUMENT, TEXT, EMBEDDINGS, K, DOCUMENTS, METADATAS
-hs = HybridSearch()
-```
-2) Add full-text / scalar routes (can be called multiple times)
-```python
-hs = hs.query(
-    DOCUMENT.contains("machine learning") & DOCUMENT.not_contains("deprecated"),
-    K("category") == "AI",
-    K("year") >= 2020,
-    n_results=8,       # candidates per text route
-    boost=0.5          # weight for this text route
-)
-```
-3) Add vector routes (text or explicit embeddings; can be called multiple times)
-```python
-# Text-to-vec (requires collection.embedding_function)
-hs = hs.knn(TEXT(["AI research", "deep learning"]), K("score") >= 80, n_results=12, boost=1.0)
-
-# Direct embeddings (dimension-validated)
-hs = hs.knn(EMBEDDINGS([0.1, 0.2, 0.3]), K("tag").is_in(["ml", "python"]), n_results=6, boost=0.7)
-
-# Or pass a ready-to-use knn dict
-hs = hs.knn({"query_texts": ["semantic search"], "where": {"topic": {"$eq": "nlp"}}, "n_results": 10, "boost": 0.9})
-```
-4) Ranking and final wiring
-```python
-hs = hs.rank()  # defaults to rrf; or hs.rank("rrf", rank_window_size=60, rank_constant=60)
-hs = hs.limit(5)            # final fused result count
-hs = hs.select(DOCUMENTS, METADATAS, EMBEDDINGS)  # include embeddings explicitly when needed
-```
-5) Execute
-```python
-results = collection.hybrid_search(hs)
-```
-6) Key behaviors & gotchas
-- Multiple `.query(...)` / `.knn(...)` calls produce multiple routes; `TEXT([...])` or multiple embeddings also auto-expand into multiple routes.
-- `.rank()` defaults to `rrf`; only `rrf` is supported, with optional `rank_window_size` and `rank_constant` keyword args. Dict form is still accepted but should not mix with kwargs.
-- `query_texts` requires the collection’s `embedding_function`; otherwise use `query_embeddings`.
-- Dimension mismatches (when `collection.dimension` is known) raise `ValueError`.
-- `ids`/`distances` always return; `documents`/`metadatas` return by default when `include=None`; add `embeddings` via `.select(...)` or `include` to fetch vectors.
 
 ### 5.4 Filter Operators
 
