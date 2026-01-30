@@ -1,22 +1,16 @@
 """
 Unit tests for hybrid_search `_source` inference from include.
 
-Public API exposes only `include`. The SDK always infers a minimal OceanBase GET_SQL `_source`
+Public API exposes only `include`. The SDK infers a minimal OceanBase GET_SQL `_source`
 allowlist from `include` to reduce response payload size.
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 
 import pytest
 
-# Add project path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from pyseekdb.client.client_base import BaseClient  # noqa: E402
-from pyseekdb.client.collection import Collection  # noqa: E402
+from pyseekdb.client.client_base import BaseClient
+from pyseekdb.client.collection import Collection
 
 
 class _CapturingClient:
@@ -93,3 +87,4 @@ class TestBuildSourceFieldsUnit:
         dummy = _DummyClient()
         with pytest.raises(ValueError, match=r"include only supports"):
             BaseClient._build_source_fields(dummy, include=["ids"])
+

@@ -11,7 +11,7 @@ import uuid
 
 from pymysql.converters import escape_string
 
-from pyseekdb import HNSWConfiguration, HybridSearch
+from pyseekdb import HNSWConfiguration
 from pyseekdb.client.meta_info import CollectionNames
 
 
@@ -193,22 +193,5 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
         assert all(isinstance(d, str) for d in docs_and_embeddings["documents"][0])
         assert all(isinstance(e, list) and len(e) == dimension for e in docs_and_embeddings["embeddings"][0])
 
-    def test_search_builder_overrides_include_and_n_results(self, server_client):
-        """
-        When passing builder via search=, builder include and n_results override the call-site.
-        """
-        collection_name = self._unique_collection_name("hs_search_precedence")
-        collection, dimension = self._create_test_collection(server_client, collection_name)
-        self._insert_test_data(server_client, collection, dimension=dimension)
-        time.sleep(1)
-
-        query_vector = self._generate_query_vector(dimension)
-        hs = HybridSearch().knn(query_embeddings=query_vector, n_results=2).limit(1).select("embeddings")
-
-        results = collection.hybrid_search(search=hs, n_results=2, include=["documents", "metadatas"])
-        assert results is not None
-        assert set(results.keys()) == {"ids", "distances", "embeddings"}
-        assert len(results["ids"][0]) == 1
-        first = results["embeddings"][0][0]
-        assert isinstance(first, list)
-        assert len(first) == dimension
+    # NOTE: `HybridSearch` fluent builder was removed on `develop` (rollback enhanced hybrid search).
+    # Keep this file focused on verifying OceanBase GET_SQL `_source` inference and result shapes.
