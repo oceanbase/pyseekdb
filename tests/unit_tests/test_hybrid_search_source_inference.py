@@ -87,4 +87,3 @@ class TestBuildSourceFieldsUnit:
         dummy = _DummyClient()
         with pytest.raises(ValueError, match=r"include only supports"):
             BaseClient._build_source_fields(dummy, include=["ids"])
-
