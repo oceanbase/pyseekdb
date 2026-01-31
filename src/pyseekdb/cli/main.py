@@ -71,8 +71,8 @@ def _make_admin(args: argparse.Namespace) -> _AdminClientProxy:
 
 def _execute_sql(client: _ClientProxy, sql: str) -> Any:
     """Run raw SQL using the underlying server (for debug)."""
-    server = client._server  # noqa: SLF001
-    return server._execute(sql)  # noqa: SLF001
+    server = client._server
+    return server._execute(sql)
 
 
 def _print_table(rows: list[dict[str, Any]] | None, columns: list[str] | None = None) -> None:
@@ -127,7 +127,7 @@ def cmd_db_list(args: argparse.Namespace) -> int:
             _print_table(rows, ["name", "tenant"])
         return 0
     finally:
-        admin._server._cleanup()  # noqa: SLF001
+        admin._server._cleanup()
 
 
 def cmd_db_create(args: argparse.Namespace) -> int:
@@ -138,7 +138,7 @@ def cmd_db_create(args: argparse.Namespace) -> int:
         print(f"Created database: {args.name}")
         return 0
     finally:
-        admin._server._cleanup()  # noqa: SLF001
+        admin._server._cleanup()
 
 
 def cmd_db_delete(args: argparse.Namespace) -> int:
@@ -149,7 +149,7 @@ def cmd_db_delete(args: argparse.Namespace) -> int:
         print(f"Deleted database: {args.name}")
         return 0
     finally:
-        admin._server._cleanup()  # noqa: SLF001
+        admin._server._cleanup()
 
 
 def cmd_collections_list(args: argparse.Namespace) -> int:
@@ -171,7 +171,7 @@ def cmd_collections_list(args: argparse.Namespace) -> int:
             _print_table(rows, ["name", "dimension", "distance"])
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def cmd_collections_create(args: argparse.Namespace) -> int:
@@ -183,7 +183,7 @@ def cmd_collections_create(args: argparse.Namespace) -> int:
         print(f"Created collection: {args.name}")
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def cmd_collections_delete(args: argparse.Namespace) -> int:
@@ -194,7 +194,7 @@ def cmd_collections_delete(args: argparse.Namespace) -> int:
         print(f"Deleted collection: {args.name}")
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def cmd_collections_info(args: argparse.Namespace) -> int:
@@ -236,7 +236,7 @@ def cmd_collections_info(args: argparse.Namespace) -> int:
                         print(f"    metadata: {sample['metadatas'][i]}")
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def cmd_sql(args: argparse.Namespace) -> int:
@@ -262,10 +262,10 @@ def cmd_sql(args: argparse.Namespace) -> int:
                 _print_table(result)
             else:
                 cols = [f"col_{i}" for i in range(len(result[0]))]
-                _print_table([dict(zip(cols, r)) for r in result], cols)
+                _print_table([dict(zip(cols, r, strict=True)) for r in result], cols)
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def cmd_query(args: argparse.Namespace) -> int:
@@ -277,7 +277,9 @@ def cmd_query(args: argparse.Namespace) -> int:
             return 1
         coll = client.get_collection(args.collection)
         if args.text:
-            res = coll.query(query_texts=[args.text], n_results=args.n, include=args.include or ["documents", "metadatas"])
+            res = coll.query(
+                query_texts=[args.text], n_results=args.n, include=args.include or ["documents", "metadatas"]
+            )
         else:
             print("Specify --text for query by text (embedding not supported in CLI)", file=sys.stderr)
             return 1
@@ -296,7 +298,7 @@ def cmd_query(args: argparse.Namespace) -> int:
                     print(f"  metadata: {metas[i]}")
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def cmd_get(args: argparse.Namespace) -> int:
@@ -326,7 +328,7 @@ def cmd_get(args: argparse.Namespace) -> int:
                     print(f"  metadata: {res['metadatas'][i]}")
         return 0
     finally:
-        client._server._cleanup()  # noqa: SLF001
+        client._server._cleanup()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -379,7 +381,9 @@ def main(argv: list[str] | None = None) -> int:
     query_p = sub.add_parser("query", help="Query collection by text")
     _add_connection_args(query_p)
     query_p.add_argument("collection", help="Collection name")
-    query_p.add_argument("--text", "-t", required=True, help="Query text (will be embedded if collection has embedding)")
+    query_p.add_argument(
+        "--text", "-t", required=True, help="Query text (will be embedded if collection has embedding)"
+    )
     query_p.add_argument("--n", type=int, default=10, help="Number of results (default: 10)")
     query_p.add_argument("--include", nargs="+", default=None, help="Include fields: documents, metadatas, embeddings")
     query_p.set_defaults(func=cmd_query)
