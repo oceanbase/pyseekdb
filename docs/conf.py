@@ -61,24 +61,24 @@ exclude_patterns = ["_build"]
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 html_css_files = [
-    'custom.css',
+    "custom.css",
 ]
 
 # Sphinx-multiversion configuration
 # 配置要包含的分支和标签
-smv_tag_whitelist = r'^v\d+\.\d+\.\d+$'  # 匹配 v1.0.0 格式的标签
-smv_branch_whitelist = r'^(main|develop)$'  # 包含 main 和 develop 分支
-smv_remote_whitelist = r'^origin$'  # 只使用 origin 远程仓库
-smv_released_pattern = r'^refs/tags/.*$'  # 标记已发布的版本
+smv_tag_whitelist = r"^v\d+\.\d+\.\d+$"  # 匹配 v1.0.0 格式的标签
+smv_branch_whitelist = r"^(main|develop)$"  # 包含 main 和 develop 分支
+smv_remote_whitelist = r"^origin$"  # 只使用 origin 远程仓库
+smv_released_pattern = r"^refs/tags/.*$"  # 标记已发布的版本
 
 # 自定义模板路径
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # 版本横幅配置
 html_context = {
-    'display_github': True,
-    'github_user': 'oceanbase',
-    'github_repo': 'pyseekdb',
-    'github_version': 'develop',
-    'conf_py_path': '/docs/',
+    "display_github": True,
+    "github_user": "oceanbase",
+    "github_repo": "pyseekdb",
+    "github_version": "develop",
+    "conf_py_path": "/docs/",
 }
