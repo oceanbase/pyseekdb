@@ -7,8 +7,6 @@ allowlist from `include` to reduce response payload size.
 
 from typing import Any
 
-import pytest
-
 from pyseekdb.client.client_base import BaseClient
 from pyseekdb.client.collection import Collection
 
@@ -78,12 +76,14 @@ class TestBuildSourceFieldsUnit:
         dummy = _DummyClient()
         assert BaseClient._build_source_fields(dummy, include=["embeddings"]) == ["_id", "embedding"]
 
-    def test_build_source_fields_rejects_singular_aliases(self) -> None:
+    def test_build_source_fields_accepts_singular_aliases(self) -> None:
         dummy = _DummyClient()
-        with pytest.raises(ValueError, match=r"include only supports"):
-            BaseClient._build_source_fields(dummy, include=["document"])
+        assert BaseClient._build_source_fields(dummy, include=["document"]) == ["_id", "document"]
+        assert BaseClient._build_source_fields(dummy, include=["metadata"]) == ["_id", "metadata"]
+        assert BaseClient._build_source_fields(dummy, include=["embedding"]) == ["_id", "embedding"]
 
-    def test_build_source_fields_rejects_unknown_fields(self) -> None:
+    def test_build_source_fields_ignores_non_source_include_items(self) -> None:
         dummy = _DummyClient()
-        with pytest.raises(ValueError, match=r"include only supports"):
-            BaseClient._build_source_fields(dummy, include=["ids"])
+        assert BaseClient._build_source_fields(dummy, include=["ids"]) == ["_id"]
+        assert BaseClient._build_source_fields(dummy, include=["distances"]) == ["_id"]
+        assert BaseClient._build_source_fields(dummy, include=["documents", "ids", "distances"]) == ["_id", "document"]

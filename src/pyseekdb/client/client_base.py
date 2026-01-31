@@ -3110,20 +3110,21 @@ class BaseClient(BaseConnection, AdminAPI):
         Infer OceanBase GET_SQL `_source` allowlist from include.
         """
         if include is None:
-            include = ["documents", "metadatas"]
-        if not isinstance(include, list) or not all(isinstance(item, str) for item in include):
-            raise TypeError("include must be a List[str] or None")
-
-        requested = {item.lower() for item in include}
-        allowed = {"documents": "document", "metadatas": "metadata", "embeddings": "embedding"}
-        unknown = sorted(requested - allowed.keys())
-        if unknown:
-            raise ValueError(f"include only supports {sorted(allowed.keys())}; got {unknown}")
+            requested = {"documents", "metadatas"}
+        else:
+            if not isinstance(include, list) or not all(isinstance(item, str) for item in include):
+                raise TypeError("include must be a List[str] or None")
+            requested = {item.lower() for item in include}
 
         source = ["_id"]
-        for key in ("documents", "metadatas", "embeddings"):
-            if key in requested:
-                source.append(allowed[key])
+
+        if {"documents", "document"} & requested:
+            source.append("document")
+        if {"metadatas", "metadata"} & requested:
+            source.append("metadata")
+        if {"embeddings", "embedding"} & requested:
+            source.append("embedding")
+
         return source
 
     def _transform_sql_result(  # noqa: C901
