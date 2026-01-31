@@ -1,5 +1,5 @@
 """
-pyseekdb CLI - Debug and manage SeekDB collections/databases.
+pyseekdb CLI - Debug and manage seekdb collections/databases.
 
 Usage:
   pyseekdb [OPTIONS] db list|create|delete ...

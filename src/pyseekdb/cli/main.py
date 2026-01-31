@@ -334,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="pyseekdb",
-        description="SeekDB CLI: debug and manage collections/databases (see spec.md).",
+        description="seekdb CLI: debug and manage collections/databases (see spec.md).",
     )
     _add_connection_args(parser)
     sub = parser.add_subparsers(dest="command", required=True, help="command")
