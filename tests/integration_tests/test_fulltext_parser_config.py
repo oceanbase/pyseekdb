@@ -7,10 +7,10 @@ import time
 
 import pytest
 
-from pyseekdb import Configuration, FulltextAnalyzerConfig, HNSWConfiguration
+from pyseekdb import Configuration, FulltextIndexConfig, HNSWConfiguration
 
 
-class TestFulltextAnalyzerConfig:
+class TestFulltextIndexConfig:
     """Test fulltext parser configuration using parameterized db_client fixture"""
 
     def _test_fulltext_parser_config(self, client, parser_name: str, params: dict | None = None):
@@ -26,7 +26,7 @@ class TestFulltextAnalyzerConfig:
         test_dimension = 128
 
         # Create configuration with fulltext parser
-        fulltext_config = FulltextAnalyzerConfig(analyzer=parser_name, properties=params)
+        fulltext_config = FulltextIndexConfig(analyzer=parser_name, properties=params)
         config = Configuration(
             hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
             fulltext_config=fulltext_config,

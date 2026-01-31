@@ -635,6 +635,7 @@ class EmbeddingFunctionRegistry:
                 GoogleVertexEmbeddingFunction,
                 JinaEmbeddingFunction,
                 MistralEmbeddingFunction,
+                MorphEmbeddingFunction,
                 OllamaEmbeddingFunction,
                 OpenAIEmbeddingFunction,
                 QwenEmbeddingFunction,
@@ -648,6 +649,7 @@ class EmbeddingFunctionRegistry:
             cls._registry["openai"] = OpenAIEmbeddingFunction
             cls._registry["qwen"] = QwenEmbeddingFunction
             cls._registry["mistral"] = MistralEmbeddingFunction
+            cls._registry["morph"] = MorphEmbeddingFunction
             cls._registry["siliconflow"] = SiliconflowEmbeddingFunction
             cls._registry["tencent_hunyuan"] = TencentHunyuanEmbeddingFunction
             cls._registry["ollama"] = OllamaEmbeddingFunction

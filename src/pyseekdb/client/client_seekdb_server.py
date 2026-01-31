@@ -60,7 +60,7 @@ class RemoteServerClient(BaseClient):
         self.full_user = f"{user}@{tenant}"
         self._connection = None
 
-        logger.info(f"Initialize RemoteServerClient: {self.full_user}@{self.host}:{self.port}/{self.database}")
+        logger.debug(f"Initialize RemoteServerClient: {self.full_user}@{self.host}:{self.port}/{self.database}")
 
     # ==================== Connection Management ====================
 
@@ -87,7 +87,7 @@ class RemoteServerClient(BaseClient):
         if self._connection is not None:
             self._connection.close()
             self._connection = None
-            logger.info("Connection closed")
+            logger.info(f"Connection closed: {self.host}:{self.port}/{self.database}")
 
     def is_connected(self) -> bool:
         """Check connection status"""

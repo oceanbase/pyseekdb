@@ -10,8 +10,6 @@ Design Pattern:
 
 from typing import TYPE_CHECKING, Any, Optional
 
-from .hybrid_search import HybridSearch
-
 if TYPE_CHECKING:
     from .embedding_function import Documents as EmbeddingDocuments
     from .embedding_function import EmbeddingFunction
@@ -97,6 +95,46 @@ class Collection:
 
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
+
+    def fork(self, forked_name: str) -> "Collection":
+        """
+        Fork (duplicate) this collection to create a new collection with the same data.
+
+        The forked collection is independent - modifications to one collection do not
+        affect the other. The original collection remains unchanged.
+
+        Args:
+            forked_name: Name for the new forked collection. Must be a valid collection name
+                        (letters, digits, and underscores only, not empty).
+
+        Returns:
+            Collection: The newly created forked collection.
+
+        Raises:
+            ValueError: If fork is not enabled for this database, if the collection name
+                       is invalid, or if a collection with the given name already exists.
+
+        Note:
+            - Fork is only available for seekdb database version 1.1.0.0 or higher.
+
+        Examples:
+        .. code-block:: python
+            # Fork a collection
+            original = client.get_collection("my_collection")
+            forked = original.fork("my_collection_backup")
+
+            # Verify both collections have the same data
+            assert original.count() == forked.count()
+
+            # Add data to forked collection (original is unaffected)
+            forked.add(ids="new_id", embeddings=[1.0, 2.0, 3.0], documents="New document")
+            assert original.count() == 3  # Original unchanged
+            assert forked.count() == 4    # Forked has new data
+
+        """
+        self._client._collection_fork(collection=self, forked_name=forked_name)
+        collection = self._client.get_collection(forked_name, embedding_function=self._embedding_function)
+        return collection
 
     # ==================== DML Operations ====================
     # All methods delegate to client's internal implementation
@@ -191,7 +229,6 @@ class Collection:
             **kwargs,
         )
 
-    # 修改为upsert语法
     def upsert(
         self,
         ids: str | list[str],
@@ -430,34 +467,29 @@ class Collection:
 
     def hybrid_search(
         self,
-        query: dict[str, Any] | HybridSearch | None = None,
+        query: dict[str, Any] | None = None,
         knn: dict[str, Any] | None = None,
         rank: dict[str, Any] | None = None,
         n_results: int = 10,
         include: list[str] | None = None,
-        search: HybridSearch | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
         Hybrid search combining full-text search and vector similarity search
 
         Args:
-            query: HybridSearch builder instance or full-text search configuration dict with:
+            query: Full-text search configuration dict with:
                 - where_document: Document filter conditions (e.g., {"$contains": "text"})
                 - where: Metadata filter conditions (e.g., {"page": {"$gte": 5}})
                 - n_results: Number of results for full-text search (optional)
-                - boost: Weight for text query when combining hybrid results (optional)
             knn: Vector search configuration dict with:
                 - query_texts: Query text(s) to be embedded (optional if query_embeddings provided)
                 - query_embeddings: Query vector(s) (optional if query_texts provided)
                 - where: Metadata filter conditions (optional)
                 - n_results: Number of results for vector search (optional)
-                - boost: Weight for vector search when combining hybrid results (optional)
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
-            search: HybridSearch builder instance (optional). If provided, takes precedence
-                over query/knn/rank/include/n_results arguments.
             **kwargs: Additional parameters
 
         Returns:
@@ -474,14 +506,12 @@ class Collection:
                 query={
                     "where_document": {"$contains": "machine learning"},
                     "where": {"category": {"$eq": "science"}},
-                    "n_results": 10,
-                    "boost": 0.5
+                    "n_results": 10
                 },
                 knn={
                     "query_texts": ["AI research"],
                     "where": {"year": {"$gte": 2020}},
-                    "n_results": 10,
-                    "boost": 0.3
+                    "n_results": 10
                 },
                 rank={"rrf": {}},
                 n_results=5,
@@ -491,21 +521,6 @@ class Collection:
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
         """
-        # Allow passing builder as first positional argument
-        if isinstance(query, HybridSearch):
-            search = query
-            query = None
-
-        if isinstance(search, HybridSearch):
-            params = search.to_params(dimension=self._dimension)
-            query = params.get("query")
-            knn = params.get("knn")
-            rank = params.get("rank")
-            if params.get("n_results") is not None:
-                n_results = params["n_results"]
-            if params.get("include") is not None:
-                include = params["include"]
-
         # When no query/knn provided, return only ids/distances by default
         if include is None and not query and not knn:
             include = []

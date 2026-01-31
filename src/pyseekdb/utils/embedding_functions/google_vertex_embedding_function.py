@@ -42,14 +42,14 @@ class GoogleVertexEmbeddingFunction(EmbeddingFunction[Documents]):
         model_name: str = _DEFAULT_MODEL_NAME,
         project_id: str = "cloud-large-language-models",
         region: str = "us-central1",
-        api_key_env: str | None = "CHROMA_GOOGLE_VERTEX_API_KEY",
+        api_key_env: str | None = "GOOGLE_VERTEX_API_KEY",
     ):
         """
         Initialize the GoogleVertexEmbeddingFunction.
 
         Args:
             api_key_env (str, optional): Environment variable name that contains your API key for the Google Vertex AI API.
-                Defaults to "CHROMA_GOOGLE_VERTEX_API_KEY".
+                Defaults to "GOOGLE_VERTEX_API_KEY".
             model_name (str, optional): The name of the model to use for text embeddings.
                 Defaults to "textembedding-gecko".
             project_id (str, optional): The Google Cloud project ID.
