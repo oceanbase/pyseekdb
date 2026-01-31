@@ -213,7 +213,9 @@ def cmd_collections_info(args: argparse.Namespace) -> int:
             "count": coll.count(),
         }
         if args.output == "json":
-            _print_json(info)
+            sample = coll.peek(limit=args.sample) if args.sample and info["count"] > 0 else {}
+            payload = {"info": info, "sample": sample}
+            _print_json(payload)
         else:
             print(f"Name:     {info['name']}")
             print(f"Dimension: {info['dimension']}")
@@ -221,12 +223,9 @@ def cmd_collections_info(args: argparse.Namespace) -> int:
             print(f"Count:    {info['count']}")
             if info.get("metadata"):
                 print(f"Metadata: {info['metadata']}")
-        if args.sample and info["count"] > 0:
-            sample = coll.peek(limit=args.sample)
-            print("\nSample (peek):")
-            if args.output == "json":
-                _print_json(sample)
-            else:
+            if args.sample and info["count"] > 0:
+                sample = coll.peek(limit=args.sample)
+                print("\nSample (peek):")
                 for i in range(len(sample["ids"])):
                     print(f"  id={sample['ids'][i]}")
                     if sample.get("documents"):
