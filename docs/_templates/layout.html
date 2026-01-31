@@ -1,0 +1,18 @@
+{% extends "!layout.html" %}
+
+{# 在左侧导航栏的搜索框下方插入版本选择器 #}
+{% block sidebartitle %}
+  {{ super() }}
+  {% if versions %}
+  <div class="version-selector-dropdown">
+    <label for="version-select">版本:</label>
+    <select id="version-select" onchange="window.location.href=this.value">
+      {% for item in versions %}
+      <option value="{{ item.url }}" {% if item.name == current_version %}selected{% endif %}>
+        {{ item.name }}{% if item.name == current_version %} (当前){% elif item.is_released %} (稳定){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+{% endblock %}

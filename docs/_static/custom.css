@@ -1,0 +1,66 @@
+/* 版本选择器下拉框样式 - 放在左侧导航栏搜索框下方 */
+.version-selector-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    border-radius: 50px;
+}
+
+.version-selector-dropdown label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.version-selector-dropdown select {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #404040;
+    background-color: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.version-selector-dropdown select:hover {
+    border-color: #2980b9;
+}
+
+.version-selector-dropdown select:focus {
+    border-color: #2980b9;
+    box-shadow: 0 0 0 2px rgba(41, 128, 185, 0.1);
+}
+
+/* RTD 主题版本横幅样式 - 隐藏左下角的版本选择器 */
+.rst-versions {
+    display: none !important;
+}
+
+/* 版本警告横幅 */
+.version-warning {
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    color: #856404;
+}
+
+.version-warning strong {
+    font-weight: bold;
+}
+
+.version-warning a {
+    color: #856404;
+    text-decoration: underline;
+}
+
+.version-warning a:hover {
+    color: #533f03;
+}

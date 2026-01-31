@@ -34,9 +34,19 @@ test-integration-embedded: ## Run embedded integration tests
 	@$(UV) run pytest tests/integration_tests/ -v --log-cli-level=INFO -k embedded
 
 .PHONY: docs
-docs: ## Build documentation
+docs: ## Build documentation (single version)
 	@echo ">> Building documentation"
 	@$(UV) run sphinx-build -b html docs docs/_build/html
+
+.PHONY: docs-multiversion
+docs-multiversion: ## Build multi-version documentation
+	@echo ">> Building multi-version documentation"
+	@bash docs/build_multiversion.sh
+
+.PHONY: docs-serve
+docs-serve: ## Serve documentation with auto-reload
+	@echo ">> Starting documentation server"
+	@$(UV) run sphinx-autobuild docs docs/_build/html --host 127.0.0.1 --port 8000
 
 .PHONY: build
 build: ## Build package
