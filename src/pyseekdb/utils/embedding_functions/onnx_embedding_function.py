@@ -12,7 +12,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-import httpx
 import numpy as np
 import numpy.typing as npt
 
@@ -100,6 +99,8 @@ class OnnxEmbeddingFunction:
         """
         logger.info(f"Downloading from {url}")
         # Use Client to ensure correct handling of redirects
+        import httpx
+
         with httpx.Client(timeout=600.0, follow_redirects=True) as client, client.stream("GET", url) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
@@ -148,6 +149,7 @@ class OnnxEmbeddingFunction:
             os.makedirs(extracted_folder, exist_ok=True)
 
             logger.info(f"Downloading model from Hugging Face (endpoint: {hf_endpoint})")
+            import httpx
 
             # Download each file
             for hf_filename, local_filename in files_to_download.items():
