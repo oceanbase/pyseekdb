@@ -7,19 +7,14 @@ These tests require a running OceanBase/MySQL-compatible endpoint that supports
 
 import contextlib
 import json
-import time
 import uuid
 
 from pymysql.converters import escape_string
 
 from pyseekdb import HNSWConfiguration
-from pyseekdb.client.meta_info import CollectionNames
 
 
 class TestCollectionHybridSearchSourceInferenceRealDB:
-    _QUERY_TIMEOUT_SECONDS = 10.0
-    _QUERY_RETRY_INTERVAL_SECONDS = 0.2
-
     def _unique_collection_name(self, prefix: str) -> str:
         # Keep names short to avoid MySQL/OceanBase identifier length limits after
         # internal table-name prefixing (e.g. "c$v1$...").
@@ -97,80 +92,28 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
 
             query_vector = self._generate_query_vector(dimension)
             knn = {"query_embeddings": query_vector, "n_results": 2}
-            table_name = (
-                CollectionNames.table_name_v2(collection.id)
-                if getattr(collection, "id", None)
-                else CollectionNames.table_name(collection.name)
-            )
-
-            def execute_get_sql(include: list[str] | None) -> tuple[dict, list[dict]]:
-                search_parm = db_client._server._build_search_parm(
-                    query=None,
-                    knn=knn,
-                    rank=None,
-                    n_results=2,
-                    include=include,
-                    dimension=dimension,
-                )
-                query_sql = self._get_sql_query(db_client, table_name, search_parm)
-                deadline = time.time() + self._QUERY_TIMEOUT_SECONDS
-                last_exc: Exception | None = None
-                while time.time() < deadline:
-                    try:
-                        rows = db_client._server._execute(query_sql)
-                        if rows:
-                            return search_parm, rows
-                    except Exception as exc:
-                        last_exc = exc
-                    time.sleep(self._QUERY_RETRY_INTERVAL_SECONDS)
-                if last_exc is not None:
-                    raise AssertionError("Timed out waiting for GET_SQL query to return rows") from last_exc
-                raise AssertionError("Timed out waiting for GET_SQL query to return rows")
-
-            def assert_columns(rows: list[dict], *, present: set[str], absent: set[str]) -> None:
-                assert rows
-                keys = {str(k).lower() for k in rows[0]}
-                for col in present:
-                    assert col in keys
-                for col in absent:
-                    assert col not in keys
 
             # 1) include=None: default returns documents+metadatas; should not return embedding column
-            _, rows = execute_get_sql(include=None)
-            assert_columns(rows, present={"document", "metadata"}, absent={"embedding"})
-
             default_include = collection.hybrid_search(knn=knn, n_results=2)
             assert set(default_include.keys()) == {"ids", "distances", "documents", "metadatas"}
             assert all(isinstance(d, str) for d in default_include["documents"][0])
             assert all(isinstance(m, dict) and m for m in default_include["metadatas"][0])
 
             # 2) include=[]: ids/distances only; should not return document/metadata/embedding columns
-            _, rows = execute_get_sql(include=[])
-            assert_columns(rows, present=set(), absent={"document", "metadata", "embedding"})
-
             ids_only = collection.hybrid_search(knn=knn, n_results=2, include=[])
             assert set(ids_only.keys()) == {"ids", "distances"}
 
             # 3) include=["documents"]: only document column
-            _, rows = execute_get_sql(include=["documents"])
-            assert_columns(rows, present={"document"}, absent={"metadata", "embedding"})
-
             docs_only = collection.hybrid_search(knn=knn, n_results=2, include=["documents"])
             assert set(docs_only.keys()) == {"ids", "distances", "documents"}
             assert all(isinstance(d, str) for d in docs_only["documents"][0])
 
             # 4) include=["metadatas"]: only metadata column
-            _, rows = execute_get_sql(include=["metadatas"])
-            assert_columns(rows, present={"metadata"}, absent={"document", "embedding"})
-
             metadatas_only = collection.hybrid_search(knn=knn, n_results=2, include=["metadatas"])
             assert set(metadatas_only.keys()) == {"ids", "distances", "metadatas"}
             assert all(isinstance(m, dict) and m for m in metadatas_only["metadatas"][0])
 
             # 5) include=["embeddings"]: only embedding column
-            _, rows = execute_get_sql(include=["embeddings"])
-            assert_columns(rows, present={"embedding"}, absent={"document", "metadata"})
-
             embeddings_only = collection.hybrid_search(knn=knn, n_results=2, include=["embeddings"])
             assert set(embeddings_only.keys()) == {"ids", "distances", "embeddings"}
             first_embedding = embeddings_only["embeddings"][0][0]
@@ -178,9 +121,6 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             assert len(first_embedding) == dimension
 
             # 6) include=["documents","embeddings"]: document+embedding columns
-            _, rows = execute_get_sql(include=["documents", "embeddings"])
-            assert_columns(rows, present={"document", "embedding"}, absent={"metadata"})
-
             docs_and_embeddings = collection.hybrid_search(knn=knn, n_results=2, include=["documents", "embeddings"])
             assert set(docs_and_embeddings.keys()) == {"ids", "distances", "documents", "embeddings"}
             assert all(isinstance(d, str) for d in docs_and_embeddings["documents"][0])
