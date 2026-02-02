@@ -87,6 +87,7 @@ jobs:
           else
             log_level=INFO
           fi
+          set -o pipefail
           uv run pytest tests/unit_tests/ -v --log-cli-level=${log_level} | tee pytest.log
           tail -n 1 pytest.log | grep '=======' | grep 'passed' |grep -q 'failed' && exit 1 || exit 0
 
@@ -97,6 +98,7 @@ jobs:
           else
             log_level=INFO
           fi
+          set -o pipefail
           uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} -k "not server and not embedded and not oceanbase" | tee pytest.log
           tail -n 1 pytest.log | grep '=======' | grep 'passed' | grep -q 'failed' && exit 1 || exit 0
 
@@ -159,5 +161,6 @@ jobs:
           else
             log_level=INFO
           fi
+          set -o pipefail
           uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} -k "${{ matrix.test_mode }}" | tee pytest.log
           tail -n 1 pytest.log | grep '=======' | grep 'passed' | grep -q 'failed' && exit 1 || exit 0
