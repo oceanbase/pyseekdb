@@ -2,6 +2,7 @@
 Unit tests for DefaultEmbeddingFunction.
 """
 
+import sys
 from typing import Any
 
 import pytest
@@ -57,6 +58,22 @@ class TestDefaultEmbeddingFunctionPersistence:
 
         assert isinstance(restored_ef, DefaultEmbeddingFunction)
         assert restored_ef.model_name == original_ef.model_name
+
+
+def test_default_embedding_function_on_py314():
+    if sys.version_info < (3, 14):
+        pytest.skip("Python < 3.14")
+    embedding_function = DefaultEmbeddingFunction()
+    assert embedding_function.dimension == 384
+    assert len(embedding_function("hello")[0]) == 384
+
+
+def test_default_embedding_function_uses_onnx_on_pre314():
+    if sys.version_info >= (3, 14):
+        pytest.skip("Python >= 3.14")
+    embedding_function = DefaultEmbeddingFunction()
+    assert embedding_function.dimension == 384
+    assert len(embedding_function("hello")[0]) == 384
 
 
 if __name__ == "__main__":
