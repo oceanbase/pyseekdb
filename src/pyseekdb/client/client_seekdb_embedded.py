@@ -93,7 +93,7 @@ class SeekdbEmbeddedClient(BaseClient):
         if self._connection is not None:
             self._connection.close()
             self._connection = None
-            logger.info("Connection closed")
+            logger.info(f"Connection closed: path={self.path}, database={self.database}")
 
     def is_connected(self) -> bool:
         """Check connection status"""

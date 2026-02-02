@@ -1376,10 +1376,10 @@ class BaseClient(BaseConnection, AdminAPI):
         elif documents:
             # embeddings not provided but documents are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                logger.debug(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
+                    logger.debug(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
                     logger.exception("Failed to generate embeddings")
                     raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
@@ -1533,10 +1533,10 @@ class BaseClient(BaseConnection, AdminAPI):
         elif documents:
             # embeddings not provided but documents are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                logger.debug(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
+                    logger.debug(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
                     logger.exception("Failed to generate embeddings")
                     raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
@@ -1675,7 +1675,7 @@ class BaseClient(BaseConnection, AdminAPI):
         elif documents:
             # embeddings not provided but documents are provided, check for embedding_function
             if embedding_function is not None:
-                logger.info(f"Generating embeddings for {len(documents)} documents using embedding function")
+                logger.debug(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
                     logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
