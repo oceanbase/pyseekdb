@@ -63,6 +63,10 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.14']
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -70,7 +74,7 @@ jobs:
       - name: Set up environment
         uses: ./.github/actions/setup-python-env
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install depencies for unit tests
         run: |

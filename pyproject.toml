@@ -5,17 +5,18 @@ description = "A unified Python client for seekdb that supports embedded, server
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "OceanBase", email = "open_oceanbase@oceanbase.com" }]
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<4"
 classifiers = [
     "Development Status :: 4 - Beta",
 ]
 dependencies = [
     "pymysql>=1.1.1",
     "pylibseekdb; sys_platform == \"linux\"",
-    "onnxruntime>=1.19.0",
-    "tokenizers>=0.15.0",
-    "httpx",
-    "tqdm",
+    "onnxruntime>=1.19.0; python_version < \"3.14\"",
+    "tokenizers>=0.15.0; python_version < \"3.14\"",
+    "httpx; python_version < \"3.14\"",
+    "tqdm; python_version < \"3.14\"",
+    "sentence-transformers; python_version >= \"3.14\"",
     "tenacity",
     "numpy>=1.26",
 ]

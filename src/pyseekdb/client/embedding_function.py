@@ -6,6 +6,7 @@ for converting text documents to vector embeddings.
 """
 
 import logging
+import sys
 import warnings
 from abc import abstractmethod
 from typing import (
@@ -159,7 +160,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         if model_name != self._MODEL_NAME:
             raise ValueError(f"Currently only '{self._MODEL_NAME}' is supported, got '{model_name}'")
-        if preferred_providers:
+        if preferred_providers and sys.version_info < (3, 14):
             warnings.warn(
                 "preferred_providers is deprecated and will be removed in a future version. "
                 "Use the preferred_providers argument of OnnxEmbeddingFunction instead.",
@@ -167,13 +168,21 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                 stacklevel=2,
             )
         self.model_name = self._MODEL_NAME
-        from pyseekdb.utils.embedding_functions import OnnxEmbeddingFunction
+        if sys.version_info >= (3, 14):
+            from pyseekdb.utils.embedding_functions.sentence_transformer_embedding_function import (
+                SentenceTransformerEmbeddingFunction,
+            )
 
-        self._onnx = OnnxEmbeddingFunction(
-            model_name=self._MODEL_NAME,
-            hf_model_id=self._HF_MODEL_ID,
-            dimension=self._DIMENSION,
-        )
+            self._backend = SentenceTransformerEmbeddingFunction(model_name=self._MODEL_NAME)
+        else:
+            from pyseekdb.utils.embedding_functions import OnnxEmbeddingFunction
+
+            self._backend = OnnxEmbeddingFunction(
+                model_name=self._MODEL_NAME,
+                hf_model_id=self._HF_MODEL_ID,
+                dimension=self._DIMENSION,
+                preferred_providers=preferred_providers,
+            )
 
     @property
     def dimension(self) -> int:
@@ -181,7 +190,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         return self._DIMENSION
 
     def __call__(self, documents: Documents) -> Embeddings:
-        return self._onnx(documents)
+        return self._backend(documents)
 
     @staticmethod
     def name() -> str:
