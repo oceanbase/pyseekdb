@@ -10,15 +10,16 @@ from pathlib import Path
 
 import pytest
 
-# Add project path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# Add project path (repo root + src)
+repo_root = Path(__file__).resolve().parents[2]
+src_root = repo_root / "src"
+sys.path.insert(0, str(src_root))
 
 import pyseekdb  # noqa: E402
 
 # ==================== Environment Variable Configuration ====================
 # Embedded mode
-SEEKDB_PATH = os.environ.get("SEEKDB_PATH", os.path.join(project_root, "seekdb.db"))
+SEEKDB_PATH = os.environ.get("SEEKDB_PATH", os.path.join(repo_root, "seekdb.db"))
 SEEKDB_DATABASE = os.environ.get("SEEKDB_DATABASE", "test")
 
 # Server mode

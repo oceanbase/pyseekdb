@@ -17,8 +17,6 @@ from typing import (
     runtime_checkable,
 )
 
-from pyseekdb.utils.embedding_functions.onnx_embedding_function import OnnxEmbeddingFunction
-
 logger = logging.getLogger(__name__)
 
 # Type variable for input types
@@ -142,8 +140,8 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         >>> print(len(embeddings[0]))  # 384
     """
 
-    MODEL_NAME = "all-MiniLM-L6-v2"
-    HF_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"  # Hugging Face model ID
+    _MODEL_NAME = "all-MiniLM-L6-v2"
+    _HF_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"  # Hugging Face model ID
     _DIMENSION = 384  # all-MiniLM-L6-v2 produces 384-dimensional embeddings
 
     def __init__(
@@ -159,8 +157,8 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
             preferred_providers: list[str] | None = None,  # Deprecated. Will be removed in a future version.
                                 # The preferred ONNX runtime providers. Defaults to None (uses available providers).
         """
-        if model_name != self.MODEL_NAME:
-            raise ValueError(f"Currently only '{self.MODEL_NAME}' is supported, got '{model_name}'")
+        if model_name != self._MODEL_NAME:
+            raise ValueError(f"Currently only '{self._MODEL_NAME}' is supported, got '{model_name}'")
         if preferred_providers:
             warnings.warn(
                 "preferred_providers is deprecated and will be removed in a future version. "
@@ -168,10 +166,12 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
                 DeprecationWarning,
                 stacklevel=2,
             )
-        self.model_name = self.MODEL_NAME
+        self.model_name = self._MODEL_NAME
+        from pyseekdb.utils.embedding_functions import OnnxEmbeddingFunction
+
         self._onnx = OnnxEmbeddingFunction(
-            model_name=self.MODEL_NAME,
-            hf_model_id=self.HF_MODEL_ID,
+            model_name=self._MODEL_NAME,
+            hf_model_id=self._HF_MODEL_ID,
             dimension=self._DIMENSION,
         )
 
