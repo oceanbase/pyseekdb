@@ -83,7 +83,7 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             return query_sql.strip().strip("'\"")
         return str(query_sql)
 
-    def test_include_infers_source_result_shape_matrix(self, server_client):
+    def test_include_infers_source_result_shape_matrix(self, db_client):
         """
         Verify `_source` inference end-to-end:
         1) GET_SQL result columns match requested include (avoid returning large unused columns like embedding)
@@ -92,7 +92,7 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
         collection_name = self._unique_collection_name("hs_include_matrix")
         collection = None
         try:
-            collection, dimension = self._create_test_collection(server_client, collection_name)
+            collection, dimension = self._create_test_collection(db_client, collection_name)
             self._insert_test_data(collection, dimension=dimension)
 
             query_vector = self._generate_query_vector(dimension)
@@ -104,7 +104,7 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             )
 
             def execute_get_sql(include: list[str] | None) -> tuple[dict, list[dict]]:
-                search_parm = server_client._server._build_search_parm(
+                search_parm = db_client._server._build_search_parm(
                     query=None,
                     knn=knn,
                     rank=None,
@@ -112,12 +112,12 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
                     include=include,
                     dimension=dimension,
                 )
-                query_sql = self._get_sql_query(server_client, table_name, search_parm)
+                query_sql = self._get_sql_query(db_client, table_name, search_parm)
                 deadline = time.time() + self._QUERY_TIMEOUT_SECONDS
                 last_exc: Exception | None = None
                 while time.time() < deadline:
                     try:
-                        rows = server_client._server._execute(query_sql)
+                        rows = db_client._server._execute(query_sql)
                         if rows:
                             return search_parm, rows
                     except Exception as exc:
@@ -187,7 +187,7 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             assert all(isinstance(e, list) and len(e) == dimension for e in docs_and_embeddings["embeddings"][0])
         finally:
             with contextlib.suppress(Exception):
-                server_client.delete_collection(name=collection_name)
+                db_client.delete_collection(name=collection_name)
 
     # NOTE: `HybridSearch` fluent builder was removed on `develop` (rollback enhanced hybrid search).
     # Keep this file focused on verifying OceanBase GET_SQL `_source` inference and result shapes.

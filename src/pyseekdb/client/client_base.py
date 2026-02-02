@@ -1472,7 +1472,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         logger.debug(f"Executing SQL: {sql}")
         self._execute(sql)
-        logger.info(f"✅ Successfully added {num_items} item(s) to collection '{collection_name}'")
+        logger.debug(f"✅ Successfully added {num_items} item(s) to collection '{collection_name}'")
 
     def _collection_update(  # noqa: C901
         self,
@@ -1818,7 +1818,7 @@ class BaseClient(BaseConnection, AdminAPI):
             where_document: Filter condition on documents (optional)
             **kwargs: Additional parameters
         """
-        logger.info(f"Deleting data from collection '{collection_name}'")
+        logger.debug(f"Deleting data from collection '{collection_name}'")
 
         # Validate that at least one filter is provided
         if not ids and not where and not where_document:
@@ -1849,7 +1849,7 @@ class BaseClient(BaseConnection, AdminAPI):
         use_context_manager = self._use_context_manager_for_cursor()
         self._execute_query_with_cursor(conn, sql, params, use_context_manager)
 
-        logger.info(f"✅ Successfully deleted data from collection '{collection_name}'")
+        logger.debug(f"✅ Successfully deleted data from collection '{collection_name}'")
 
     # -------------------- DQL Operations --------------------
     # Note: _collection_query() and _collection_get() are implemented below with common SQL-based logic
@@ -3267,7 +3267,7 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             Item count
         """
-        logger.info(f"Counting items in collection '{collection_name}'")
+        logger.debug(f"Counting items in collection '{collection_name}'")
         conn = self._ensure_connection()
 
         # Convert collection name to table name

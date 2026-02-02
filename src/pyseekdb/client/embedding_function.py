@@ -160,7 +160,7 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
         """
         if model_name != self._MODEL_NAME:
             raise ValueError(f"Currently only '{self._MODEL_NAME}' is supported, got '{model_name}'")
-        if preferred_providers and sys.version_info < (3, 14):
+        if preferred_providers:
             warnings.warn(
                 "preferred_providers is deprecated and will be removed in a future version. "
                 "Use the preferred_providers argument of OnnxEmbeddingFunction instead.",
