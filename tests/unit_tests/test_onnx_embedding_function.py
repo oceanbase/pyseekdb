@@ -12,12 +12,7 @@ from pyseekdb.utils.embedding_functions.onnx_embedding_function import OnnxEmbed
 
 
 def is_onnx_available() -> bool:
-    """
-    Check if openai is available for testing.
-
-    Returns:
-        True if openai is available, False otherwise.
-    """
+    """Check if onnxruntime is available for testing."""
     return importlib.util.find_spec("onnxruntime") is not None
 
 
