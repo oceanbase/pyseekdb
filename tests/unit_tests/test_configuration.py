@@ -64,7 +64,7 @@ class TestHNSWConfiguration:
 
     def test_properties_invalid_type(self):
         """Test properties with invalid value types"""
-        with pytest.raises(ValueError, match="properties must be a dictionary of string, int, float, or bool"):
+        with pytest.raises(TypeError, match="properties must be a dictionary of string, int, float, or bool"):
             HNSWConfiguration(
                 dimension=128,
                 properties={

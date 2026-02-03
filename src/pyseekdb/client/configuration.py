@@ -61,9 +61,10 @@ class HNSWConfiguration:
             for value in self.properties.values():
                 if not isinstance(value, (str, int, float, bool)):
                     raise TypeError(f"properties must be a dictionary of string, int, float, or bool, got {value}")
-            if "distance" in {key.lower() for key in self.properties}:
-                warnings.warn("distance is a reserved keyword in properties, it will be ignored", stacklevel=2)
-                self.properties.pop("distance")
+            for key in self.properties:
+                if key.lower() == "distance":
+                    warnings.warn(f"{key} is a reserved keyword in properties, it will be ignored", stacklevel=2)
+                    self.properties.pop(key)
 
 
 class Configuration:
