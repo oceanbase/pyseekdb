@@ -10,7 +10,7 @@ from pyseekdb import (
     DefaultEmbeddingFunction,
     HNSWConfiguration,
     Configuration,
-    FulltextAnalyzerConfig
+    FulltextIndexConfig
 )
 
 # Create a client
@@ -34,7 +34,7 @@ collection = client.create_collection(
 # Using IK parser (default for Chinese text)
 config = Configuration(
     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-    fulltext_config=FulltextAnalyzerConfig(analyzer='ik')
+    fulltext_config=FulltextIndexConfig(analyzer='ik')
 )
 collection = client.create_collection(
     name="my_collection",
@@ -55,7 +55,7 @@ collection = client.create_collection(
 # Create a collection with Space parser (for space-separated languages)
 config = Configuration(
     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-    fulltext_config=FulltextAnalyzerConfig(analyzer='space')
+    fulltext_config=FulltextIndexConfig(analyzer='space')
 )
 collection = client.create_collection(
     name="my_collection",
@@ -66,7 +66,7 @@ collection = client.create_collection(
 # Create a collection with Ngram parser and custom parameters
 config = Configuration(
     hnsw=HNSWConfiguration(dimension=384, distance='cosine'),
-    fulltext_config=FulltextAnalyzerConfig(analyzer='ngram', properties={'ngram_token_size': 3})
+    fulltext_config=FulltextIndexConfig(analyzer='ngram', properties={'ngram_token_size': 3})
 )
 collection = client.create_collection(
     name="my_collection",
@@ -94,9 +94,9 @@ collection = client.get_or_create_collection(
 **Parameters:**
 - `name` (str): Collection name (required). Must be non-empty, use only letters/digits/underscore (`[a-zA-Z0-9_]`), and be at most 512 characters.
 - `configuration` (Configuration, HNSWConfiguration, or None, optional): Index configuration
-  - **Recommended:** `Configuration` - Wrapper class that can include both `HNSWConfiguration` and `FulltextAnalyzerConfig`
+  - **Recommended:** `Configuration` - Wrapper class that can include both `HNSWConfiguration` and `FulltextIndexConfig`
     - Use `Configuration(hnsw=HNSWConfiguration(...))` even when only vector index config is needed
-    - Allows easy addition of fulltext parser config later
+    - Allows easy addition of fulltext index config later
   - `HNSWConfiguration`: Vector index configuration with `dimension` and `distance` metric (backward compatibility)
   - If not provided, uses default (dimension=384, distance='cosine', analyzer='ik')
   - If set to `None`, dimension will be calculated from `embedding_function`
@@ -105,7 +105,7 @@ collection = client.get_or_create_collection(
   - If set to `None`, collection will not have an embedding function
   - If provided, the dimension will be automatically calculated and validated against `configuration.dimension`
 
-**Fulltext Parser Options:**
+**Fulltext Index Options:**
 - `'ik'` (default): IK parser for Chinese text segmentation
 - `'space'`: Space-separated tokenizer for languages like English
 - `'ngram'`: N-gram tokenizer
