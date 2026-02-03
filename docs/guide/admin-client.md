@@ -1,10 +1,8 @@
-# AdminClient
-
-## 2. AdminClient Connection and Database Management
+# 2. AdminClient Connection and Database Management
 
 The `AdminClient` class provides database management operations. It uses the same connection modes as `Client` but only exposes database management methods.
 
-### 2.1 Embedded/Server AdminClient
+## 2.1 Embedded/Server AdminClient
 
 ```python
 import pyseekdb
@@ -31,7 +29,7 @@ admin = pyseekdb.AdminClient(
 ```
 
 
-### 2.2 AdminClient Methods
+## 2.2 AdminClient Methods
 
 | Method                    | Description                                        |
 |---------------------------|----------------------------------------------------|
@@ -46,7 +44,7 @@ admin = pyseekdb.AdminClient(
 - `limit` (int, optional): Maximum number of results to return
 - `offset` (int, optional): Number of results to skip for pagination
 
-### 2.4 Database Object
+## 2.4 Database Object
 
 The `get_database()` and `list_databases()` methods return `Database` objects with the following properties:
 

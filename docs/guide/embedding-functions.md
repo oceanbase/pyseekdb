@@ -1,10 +1,8 @@
-# Embedding Functions
-
-## 6. Embedding Functions
+# 6. Embedding Functions
 
 Embedding functions convert text documents into vector embeddings for similarity search. pyseekdb supports both built-in and custom embedding functions.
 
-### 6.1 Default Embedding Function
+## 6.1 Default Embedding Function
 
 The `DefaultEmbeddingFunction` uses all-MiniLM-L6-v2' and is the default embedding function if none is specified.
 
@@ -25,14 +23,14 @@ embeddings = ef(["Hello world", "How are you?"])
 print(f"Generated {len(embeddings)} embeddings, each with {len(embeddings[0])} dimensions")
 ```
 
-### 6.2 Creating Custom Embedding Functions
+## 6.2 Creating Custom Embedding Functions
 
 You can create custom embedding functions by implementing the `EmbeddingFunction` protocol. The function must:
 
 1. Implement `__call__` method that accepts `Documents` (str or List[str]) and returns `Embeddings` (List[List[float]])
 2. Optionally implement a `dimension` property to return the vector dimension
 
-#### Example: Sentence-Transformer Custom Embedding Function
+### Example: Sentence-Transformer Custom Embedding Function
 
 ```python
 from typing import List, Union
@@ -126,7 +124,7 @@ collection = client.create_collection(
 )
 ```
 
-#### Example: OpenAI Embedding Function
+### Example: OpenAI Embedding Function
 
 ```python
 from typing import List, Union
@@ -211,7 +209,7 @@ collection = client.create_collection(
 )
 ```
 
-### 6.3 Embedding Function Requirements
+## 6.3 Embedding Function Requirements
 
 When creating a custom embedding function, ensure:
 
@@ -229,7 +227,7 @@ When creating a custom embedding function, ensure:
    - Empty input should return empty list
    - All embeddings in the output must have the same dimension
 
-### 6.4 Using Custom Embedding Functions
+## 6.4 Using Custom Embedding Functions
 
 Once you've created a custom embedding function, use it when creating or getting collections:
 

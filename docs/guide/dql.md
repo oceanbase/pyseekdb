@@ -1,10 +1,8 @@
-# DQL Operations
-
-## 5. DQL Operations
+# 5. DQL Operations
 
 DQL (Data Query Language) operations allow you to retrieve data from collections using various query methods.
 
-### 5.1 Query (Vector Similarity Search)
+## 5.1 Query (Vector Similarity Search)
 
 The `query()` method performs vector similarity search to find the most similar documents to the query vector(s).
 
@@ -129,7 +127,7 @@ results = collection.query(query_embeddings=[[0.1, 0.2], [0.3, 0.4]], n_results=
 
 **Note:** The `embedding_function` used is the one associated with the collection. You cannot override it per-query.
 
-### 5.2 Get (Retrieve by IDs or Filters)
+## 5.2 Get (Retrieve by IDs or Filters)
 
 The `get()` method retrieves documents from a collection without vector similarity search. It supports filtering by IDs, metadata, and document content.
 
@@ -232,7 +230,7 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
 
 **Note:** If no parameters provided, returns all data (up to limit).
 
-### 5.3 Hybrid Search
+## 5.3 Hybrid Search
 
 `collection.hybrid_search()` runs full-text/scalar queries and vector KNN search in parallel, then fuses the results (RRF is supported).
 
@@ -278,21 +276,21 @@ results = collection.hybrid_search(
 )
 ```
 
-### 5.4 Filter Operators
+## 5.4 Filter Operators
 
-#### Metadata Filters (`where` parameter)
+### Metadata Filters (`where` parameter)
 - `$eq` (or direct equality) / `$ne` / `$gt` / `$gte` / `$lt` / `$lte`
 - `$in` / `$nin` for membership checks
 - `$or` / `$and` for logical composition
 - `$not` for negation
 - `#id` to filter by primary key (e.g., `{"#id": {"$in": ["id1", "id2"]}}`)
 
-#### Document Filters (`where_document` parameter)
+### Document Filters (`where_document` parameter)
 - `$contains`: full-text match
 - `$not_contains`: exclude matches
 - `$or` / `$and` combining multiple `$contains` clauses
 
-### 5.5 Collection Information Methods
+## 5.5 Collection Information Methods
 
 ```python
 # Get item count

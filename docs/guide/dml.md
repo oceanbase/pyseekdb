@@ -1,10 +1,8 @@
-# DML Operations
-
-## 4. DML Operations
+# 4. DML Operations
 
 DML (Data Manipulation Language) operations allow you to insert, update, and delete data in collections.
 
-### 4.1 Add Data
+## 4.1 Add Data
 
 The `add()` method inserts new records into a collection. If a record with the same ID already exists, an error will be raised.
 
@@ -72,7 +70,7 @@ collection.add(
 
 **Note:** The `embedding_function` used is the one associated with the collection (set during `create_collection()` or `get_collection()`). You cannot override it per-operation.
 
-### 4.2 Update Data
+## 4.2 Update Data
 
 The `update()` method updates existing records in a collection. Records must exist, otherwise an error will be raised.
 
@@ -124,7 +122,7 @@ collection.update(
 
 **Note:** Metadata-only updates (no embeddings, no documents) are allowed. The `embedding_function` used is the one associated with the collection.
 
-### 4.3 Upsert Data
+## 4.3 Upsert Data
 
 The `upsert()` method inserts new records or updates existing ones. If a record with the given ID exists, it will be updated; otherwise, a new record will be inserted.
 
@@ -182,7 +180,7 @@ collection.upsert(
 
 **Note:** Metadata-only upserts (no embeddings, no documents) are allowed. The `embedding_function` used is the one associated with the collection.
 
-### 4.4 Delete Data
+## 4.4 Delete Data
 
 The `delete()` method removes records from a collection. You can delete by IDs, metadata filters, or document filters.
 

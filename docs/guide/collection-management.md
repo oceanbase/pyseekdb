@@ -1,10 +1,8 @@
-# Collection Management
-
-## 3. Collection (Table) Management
+# 3. Collection (Table) Management
 
 Collections are the primary data structures in pyseekdb, similar to tables in traditional databases. Each collection stores documents with vector embeddings, metadata, and full-text search capabilities.
 
-### 3.1 Creating a Collection
+## 3.1 Creating a Collection
 
 ```python
 import pyseekdb
@@ -118,7 +116,7 @@ For more information about parser, please refer to [create_index section tokeniz
 
 **Note:** When `embedding_function` is provided, the system will automatically calculate the vector dimension by calling the function. If `configuration.dimension` is also provided, it must match the embedding function's dimension, otherwise a `ValueError` will be raised.
 
-### 3.2 Getting a Collection
+## 3.2 Getting a Collection
 
 ```python
 # Get an existing collection (uses default embedding function if collection doesn't have one)
@@ -143,7 +141,7 @@ if client.has_collection("my_collection"):
   - If set to `None`, collection will not have an embedding function
   - **Important:** The embedding function set here will be used for all operations on this collection (add, upsert, update, query, hybrid_search) when documents/texts are provided without embeddings
 
-### 3.3 Listing Collections
+## 3.3 Listing Collections
 
 ```python
 # List all collections
@@ -156,14 +154,14 @@ collection_count = client.count_collection()
 print(f"Database has {collection_count} collections")
 ```
 
-### 3.4 Deleting a Collection
+## 3.4 Deleting a Collection
 
 ```python
 # Delete a collection
 client.delete_collection("my_collection")
 ```
 
-### 3.5 Collection Properties
+## 3.5 Collection Properties
 
 Each `Collection` object has the following properties:
 

@@ -1,10 +1,8 @@
-# Client Connection
-
-## 1. Client Connection
+# 1. Client Connection
 
 The `Client` class provides a unified interface for connecting to seekdb in different modes. It automatically selects the appropriate connection mode based on the parameters provided.
 
-### 1.1 Embedded seekdb Client
+## 1.1 Embedded seekdb Client
 
 Connect to a local embedded seekdb instance:
 
@@ -24,7 +22,7 @@ client = pyseekdb.Client(
 )
 ```
 
-### 1.2 Remote Server Client
+## 1.2 Remote Server Client
 
 Connect to a remote server (supports both seekdb Server and OceanBase Server):
 
@@ -68,7 +66,7 @@ client = pyseekdb.Client(
 )
 ```
 
-### 1.3 Client Methods and Properties
+## 1.3 Client Methods and Properties
 
 | Method / Property     | Description                                                    |
 |-----------------------|----------------------------------------------------------------|
