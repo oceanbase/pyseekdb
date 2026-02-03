@@ -2,6 +2,20 @@
 
 This tutorial will guide you through importing Markdown documents into seekdb, building a hybrid search knowledge base, and launching a RAG interface via Streamlit.
 
+## RAG Demo
+
+We provide a complete RAG (Retrieval-Augmented Generation) demo application that demonstrates how to build a hybrid search knowledge base using pyseekdb. The demo includes:
+
+- **Document Import**: Import Markdown files or directory into seekdb
+- **Vector Search**: Semantic search over imported documents
+- **RAG Interface**: Interactive Streamlit web interface for querying
+
+The demo supports three embedding modes:
+
+- **`default`**: Uses pyseekdb's built-in `DefaultEmbeddingFunction` (ONNX-based, 384 dimensions). No API key required, automatically downloads models on first use.
+- **`local`**: Uses sentence-transformers models (e.g., all-mpnet-base-v2, 768 dimensions). Requires installing sentence-transformers library.
+- **`api`**: Uses OpenAI-compatible Embedding API services (e.g., DashScope, OpenAI). Requires API key configuration.
+
 ## Prerequisites
 
 - Python 3.11 or higher installed

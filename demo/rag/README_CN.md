@@ -2,6 +2,20 @@
 
 本教程将引导您把 Markdown 文档导入 seekdb，构建混合检索知识库并通过 Streamlit 启动 RAG 界面。
 
+## RAG Demo
+
+我们提供一个完整的 RAG（Retrieval-Augmented Generation）demo，用于展示如何基于 pyseekdb 构建混合检索知识库。demo 包含：
+
+- **文档导入**：将 Markdown 文件或目录导入 seekdb
+- **向量检索**：对导入文档进行语义检索
+- **RAG 界面**：通过 Streamlit 提供交互式查询界面
+
+demo 支持三种 embedding 模式：
+
+- **`default`**：使用 pyseekdb 内置的 `DefaultEmbeddingFunction`（ONNX，384 维）。无需 API Key，首次使用自动下载模型。
+- **`local`**：使用 sentence-transformers 模型（如 all-mpnet-base-v2，768 维）。需要安装 sentence-transformers 依赖。
+- **`api`**：使用 OpenAI 兼容的 Embedding API（如 DashScope、OpenAI）。需要配置 API Key。
+
 ## 前提条件
 
 - 已安装 Python 3.11 或以上版本

@@ -1479,6 +1479,7 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
     { name = "sphinx" },
+    { name = "sphinx-multiversion" },
     { name = "sphinx-rtd-theme" },
 ]
 
@@ -1503,6 +1504,7 @@ dev = [
     { name = "pytest", specifier = ">=8.2.2" },
     { name = "ruff", specifier = ">=0.11.5" },
     { name = "sphinx", specifier = ">=8.2.3" },
+    { name = "sphinx-multiversion", specifier = ">=0.2.4" },
     { name = "sphinx-rtd-theme", specifier = ">=3.0.2" },
 ]
 
@@ -2146,6 +2148,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/38/ad/4360e50ed56cb483667b8e6dadf2d3fda62359593faabbe749a27c4eaca6/sphinx-8.2.3.tar.gz", hash = "sha256:398ad29dee7f63a75888314e9424d40f52ce5a6a87ae88e7071e80af296ec348", size = 8321876, upload-time = "2025-03-02T22:31:59.658Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/31/53/136e9eca6e0b9dc0e1962e2c908fbea2e5ac000c2a2fbd9a35797958c48b/sphinx-8.2.3-py3-none-any.whl", hash = "sha256:4405915165f13521d875a8c29c8970800a0141c14cc5416a38feca4ea5d9b9c3", size = 3589741, upload-time = "2025-03-02T22:31:56.836Z" },
+]
+
+[[package]]
+name = "sphinx-multiversion"
+version = "0.2.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sphinx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/10/25231164a97a9016bdc73a3530af8f4a6846bdc564af1460af2ff3e59a50/sphinx-multiversion-0.2.4.tar.gz", hash = "sha256:5cd1ca9ecb5eed63cb8d6ce5e9c438ca13af4fa98e7eb6f376be541dd4990bcb", size = 7024, upload-time = "2020-08-12T15:48:20.566Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/51/203bb30b3ce76373237288e92cb71fb66f80ee380473f36bfe8a9d299c5d/sphinx_multiversion-0.2.4-py2.py3-none-any.whl", hash = "sha256:5c38d5ce785a335d8c8d768b46509bd66bfb9c6252b93b700ca8c05317f207d6", size = 9597, upload-time = "2024-10-03T21:45:52.754Z" },
+    { url = "https://files.pythonhosted.org/packages/05/ad/4989e6be165805694e93d09bc57425aa1368273b7de4fe3083fe4310803a/sphinx_multiversion-0.2.4-py3-none-any.whl", hash = "sha256:dec29f2a5890ad68157a790112edc0eb63140e70f9df0a363743c6258fbeb478", size = 9642, upload-time = "2020-08-12T15:48:19.649Z" },
 ]
 
 [[package]]
