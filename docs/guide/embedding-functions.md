@@ -184,7 +184,7 @@ class OpenAIEmbeddingFunction(EmbeddingFunction[Documents]):
             return []
 
         # Call OpenAI API
-        response = openai.Embedding.create(
+        response = openai.embeddings.create(
             model=self.model_name,
             input=input,
             api_key=self.api_key
