@@ -43,6 +43,8 @@ class HNSWConfiguration:
     Args:
         dimension: Vector dimension (number of elements in each vector)
         distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
+        properties: Optional dictionary of properties for the HNSW index (key: string, value: primitive type)
+        Please refer to [HNSW configuration](https://en.oceanbase.com/docs/common-oceanbase-database-10000000003351043) for detailed information.
     """
 
     dimension: int
