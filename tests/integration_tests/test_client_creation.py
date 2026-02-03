@@ -45,7 +45,9 @@ class TestClientCreation:
         # Test: Verify Configuration class with fulltext parser works
         test_collection_name_config = f"test_collection_config_{int(time.time() * 1000)}"
         config_with_fulltext = Configuration(
-            hnsw=HNSWConfiguration(dimension=test_dimension, distance="cosine"),
+            hnsw=HNSWConfiguration(
+                dimension=test_dimension, distance="cosine", properties={"M": 16, "ef_construction": 400}
+            ),
             fulltext_config=FulltextIndexConfig(analyzer="ik"),
         )
         collection_config = db_client.create_collection(

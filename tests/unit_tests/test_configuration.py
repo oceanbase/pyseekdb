@@ -12,6 +12,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from pyseekdb import Configuration, FulltextIndexConfig, HNSWConfiguration  # noqa: E402
+from pyseekdb.client.client_base import _get_vector_index_sql  # noqa: E402
 
 
 class TestHNSWConfiguration:
@@ -40,6 +41,69 @@ class TestHNSWConfiguration:
         """Test that invalid distance raises ValueError"""
         with pytest.raises(ValueError, match="distance must be one of"):
             HNSWConfiguration(dimension=128, distance="invalid")
+
+    def test_properties_with_primitive_types(self):
+        """Test properties with primitive value types"""
+        config = HNSWConfiguration(
+            dimension=128,
+            properties={
+                "m": 16,
+                "ef_search": 200,
+                "ef_construction": 400,
+                "normalize": True,
+                "quantization": "pq",
+                "alpha": 0.75,
+            },
+        )
+        assert config.properties["m"] == 16
+        assert config.properties["ef_search"] == 200
+        assert config.properties["ef_construction"] == 400
+        assert config.properties["normalize"] is True
+        assert config.properties["quantization"] == "pq"
+        assert config.properties["alpha"] == 0.75
+
+    def test_properties_invalid_type(self):
+        """Test properties with invalid value types"""
+        with pytest.raises(ValueError, match="properties must be a dictionary of string, int, float, or bool"):
+            HNSWConfiguration(
+                dimension=128,
+                properties={
+                    "m": 16,
+                    "invalid": {"nested": "dict"},
+                },
+            )
+
+    def test_properties_reserved_distance(self):
+        """Test that distance is removed from properties with warning"""
+        with pytest.warns(UserWarning, match="distance is a reserved keyword"):
+            config = HNSWConfiguration(
+                dimension=128,
+                properties={
+                    "distance": "cosine",
+                    "M": 32,
+                },
+            )
+        assert "distance" not in {key.lower() for key in config.properties}
+        assert config.properties["M"] == 32
+
+    def test_vector_index_sql_with_properties(self):
+        """Test SQL generation includes properties"""
+        config = HNSWConfiguration(
+            dimension=128,
+            distance="cosine",
+            properties={
+                "M": 16,
+                "ef_search": 200,
+                "quantization": "pq",
+            },
+        )
+        sql = _get_vector_index_sql(config)
+        assert "DISTANCE=cosine" in sql
+        assert "TYPE=hnsw" in sql
+        assert "LIB=vsag" in sql
+        assert "M=16" in sql
+        assert "ef_search=200" in sql
+        assert "quantization='pq'" in sql
 
 
 class TestFulltextIndexConfig:

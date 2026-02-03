@@ -156,7 +156,16 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     """
     Generate VECTOR INDEX SQL clause from HNSWConfiguration.
     """
-    return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag)"
+    properties = hnsw_config.properties or {}
+    property_parts = []
+    for k, v in properties.items():
+        if isinstance(v, str):
+            property_parts.append(f"{k}='{v}'")
+        else:
+            property_parts.append(f"{k}={v}")
+    property_str = ", ".join(property_parts)
+    properties_str = f", {property_str}" if property_str else ""
+    return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag{properties_str})"
 
 
 def _embedding_to_hexstring(embedding: list[float]) -> str:
