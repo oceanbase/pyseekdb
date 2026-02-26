@@ -139,6 +139,41 @@ jobs:
           set -e
           exit "${code2}"
 
+      - name: Locate integration import side-effect culprit on Python 3.14
+        if: matrix.python-version == '3.14'
+        run: |
+          set -euo pipefail
+          base_a="tests/integration_tests/test_default_embedding_function.py"
+          base_b="tests/integration_tests/test_detect_db_type_and_version.py"
+          filter_expr="not server and not embedded and not oceanbase"
+
+          echo "Baseline run (only two selected-file modules)"
+          uv run pytest "${base_a}" "${base_b}" -v -k "${filter_expr}" --maxfail=1 >/dev/null
+
+          echo "Probing additional integration modules for import side effects..."
+          bad_files=()
+          for f in tests/integration_tests/test_*.py; do
+            if [ "${f}" = "${base_a}" ] || [ "${f}" = "${base_b}" ]; then
+              continue
+            fi
+            set +e
+            uv run pytest "${base_a}" "${base_b}" "${f}" -v -k "${filter_expr}" --maxfail=1 >/dev/null
+            code=$?
+            set -e
+            if [ "${code}" -ne 0 ]; then
+              echo "Potential culprit file: ${f} (exit code ${code})"
+              bad_files+=("${f}:${code}")
+            fi
+          done
+
+          if [ ${#bad_files[@]} -gt 0 ]; then
+            echo "Detected files that trigger failure when included in collection:"
+            printf '  - %s\n' "${bad_files[@]}"
+            exit 1
+          fi
+
+          echo "No single-file culprit found; issue may require multi-file interaction."
+
       - name: Run integration tests without any test mode
         run: |
           if [ "${{ env.RUNNER_DEBUG }}" = "true" ]; then
