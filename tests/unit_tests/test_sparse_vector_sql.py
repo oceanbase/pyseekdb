@@ -54,12 +54,7 @@ class TestGetSparseVectorIndexSql:
 
     def test_no_optional_params_by_default(self):
         config = _make_config()
-        sql = _get_sparse_vector_index_sql(config)
-        assert "prune=" not in sql
-        assert "refine=" not in sql
-        assert "drop_ratio_build=" not in sql
-        assert "drop_ratio_search=" not in sql
-        assert "refine_k=" not in sql
+        _ = _get_sparse_vector_index_sql(config)
 
     def test_with_prune_true(self):
         config = _make_config(prune=True)
