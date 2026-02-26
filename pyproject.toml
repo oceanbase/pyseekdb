@@ -18,7 +18,7 @@ dependencies = [
     "tqdm; python_version < \"3.14\"",
     "sentence-transformers; python_version >= \"3.14\"",
     "tenacity",
-    "numpy>=1.26",
+    "numpy>=1.26,!=2.4.0",
 ]
 
 [project.urls]
