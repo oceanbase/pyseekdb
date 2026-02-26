@@ -88,7 +88,6 @@ from .client import (
     NgramFulltextIndexConfig,
     RemoteServerClient,
     Schema,
-    SeekdbEmbeddedClient,
     SpaceFulltextIndexConfig,
     SparseEmbeddingFunction,
     SparseEmbeddingFunctionRegistry,

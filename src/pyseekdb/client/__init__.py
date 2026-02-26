@@ -18,12 +18,11 @@ All factories use the underlying ServerAPI implementations:
 
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .admin_client import AdminAPI, _AdminClientProxy, _ClientProxy
 from .base_connection import BaseConnection
 from .client_base import BaseClient, ClientAPI
-from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
 from .configuration import (
     BengFulltextIndexConfig,
@@ -57,6 +56,9 @@ from .sparse_embedding_function import (
 from .types import K
 from .version import Version
 
+if TYPE_CHECKING:
+    from .client_seekdb_embedded import SeekdbEmbeddedClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,6 +91,8 @@ def _create_server_client(
     if/else by sharing this helper between Client() and AdminClient().
     """
     if path is not None:
+        from .client_seekdb_embedded import SeekdbEmbeddedClient
+
         if is_admin:
             logger.debug(f"Creating embedded admin client: path={path}")
         else:
@@ -119,6 +123,8 @@ def _create_server_client(
     from .client_seekdb_embedded import _PYLIBSEEKDB_AVAILABLE
 
     if _PYLIBSEEKDB_AVAILABLE:
+        from .client_seekdb_embedded import SeekdbEmbeddedClient
+
         default_path = _default_seekdb_path()
         if is_admin:
             logger.debug(f"Creating embedded admin client (default): path={default_path}")
@@ -130,6 +136,20 @@ def _create_server_client(
         "Default embedded mode is not available because pylibseekdb could not be imported. "
         "Please provide host/port parameters to use RemoteServerClient."
     )
+
+
+def __getattr__(name: str) -> Any:
+    """
+    Lazily expose optional embedded client symbols.
+
+    This avoids importing pylibseekdb during `import pyseekdb`, which can crash
+    on unsupported interpreter/platform combinations (e.g. some Python 3.14 CI environments).
+    """
+    if name == "SeekdbEmbeddedClient":
+        from .client_seekdb_embedded import SeekdbEmbeddedClient
+
+        return SeekdbEmbeddedClient
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 __all__ = [
