@@ -294,6 +294,34 @@ class TestCollectionUpsertWithSparse:
         finally:
             _cleanup_collection(db_client, name)
 
+    def test_upsert_metadata_only_does_not_require_document(self, db_client):
+        """Upsert metadata-only should not regenerate sparse vectors from documents."""
+        name = _unique_name("upsert_meta_only")
+        try:
+            collection = _create_sparse_collection(db_client, name)
+            test_id = str(uuid.uuid4())
+
+            collection.add(
+                ids=test_id,
+                embeddings=[1.0, 2.0, 3.0],
+                documents="original document",
+                metadatas={"version": 1},
+            )
+
+            # Source key is document; metadata-only upsert must still work.
+            collection.upsert(
+                ids=test_id,
+                metadatas={"version": 2, "patched": True},
+            )
+
+            results = collection.get(ids=test_id)
+            assert len(results["ids"]) == 1
+            assert results["metadatas"][0]["version"] == 2
+            assert results["metadatas"][0]["patched"] is True
+            print("   Upsert metadata-only with sparse source=document: OK")
+        finally:
+            _cleanup_collection(db_client, name)
+
 
 class TestCollectionQueryWithSparse:
     """Test collection.query() with sparse vector index (query_key=K.SPARSE_EMBEDDING)."""
@@ -356,37 +384,52 @@ class TestCollectionQueryWithSparse:
             _cleanup_collection(db_client, name)
 
     def test_sparse_query_with_sparse_vector_directly(self, db_client):
-        """Query using a SparseVector directly via query_embeddings + query_key."""
+        """Direct sparse vector query should be rejected."""
         name = _unique_name("query_sparse_vec")
         try:
             collection, _ids, sparse_ef = self._setup_with_data(db_client, name)
             sv = sparse_ef(["machine learning"])[0]
-            results = collection.query(
-                query_embeddings=sv,
-                query_key=K.SPARSE_EMBEDDING,
-                n_results=3,
-            )
-            assert results is not None
-            assert "ids" in results
-            assert len(results["ids"][0]) > 0
-            print(f"   Sparse vector query returned {len(results['ids'][0])} results: OK")
+            with pytest.raises(ValueError, match="query_embeddings is not supported"):
+                collection.query(
+                    query_embeddings=sv,
+                    query_key=K.SPARSE_EMBEDDING,
+                    n_results=3,
+                )
+            print("   Direct sparse vector query rejected as expected: OK")
         finally:
             _cleanup_collection(db_client, name)
 
     def test_sparse_query_with_dict_directly(self, db_client):
-        """Query using a raw dict[int, float] via query_embeddings + query_key."""
+        """Direct sparse dict query should be rejected."""
         name = _unique_name("query_sparse_dict")
         try:
             collection, _ids, sparse_ef = self._setup_with_data(db_client, name)
             sv = sparse_ef(["machine learning"])[0]
+            with pytest.raises(ValueError, match="query_embeddings is not supported"):
+                collection.query(
+                    query_embeddings=sv.embeddings,
+                    query_key=K.SPARSE_EMBEDDING,
+                    n_results=3,
+                )
+            print("   Direct sparse dict query rejected as expected: OK")
+        finally:
+            _cleanup_collection(db_client, name)
+
+    def test_sparse_query_with_string_query_key(self, db_client):
+        """Query using string query_key '#sparse_embedding'."""
+        name = _unique_name("query_sparse_string_key")
+        try:
+            collection, _ids, _ = self._setup_with_data(db_client, name)
             results = collection.query(
-                query_embeddings=sv.embeddings,
-                query_key=K.SPARSE_EMBEDDING,
+                query_texts=["machine learning"],
+                query_key="#sparse_embedding",
                 n_results=3,
             )
             assert results is not None
+            assert "ids" in results
+            assert len(results["ids"]) == 1
             assert len(results["ids"][0]) > 0
-            print(f"   Sparse dict query returned {len(results['ids'][0])} results: OK")
+            print("   Sparse query with string query_key returned results: OK")
         finally:
             _cleanup_collection(db_client, name)
 

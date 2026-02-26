@@ -112,7 +112,8 @@ class SparseVectorIndexConfig:
     Note:
         - Each collection can have at most one sparse vector index.
         - Sparse vectors are stored in the ``sparse_embedding`` column.
-        - If ``source_key`` is not None and ``embedding_function`` is None, an error is raised.
+        - ``embedding_function`` is required and must support persistence.
+        - Sparse vectors are always generated from ``source_key`` by ``embedding_function``.
 
     Example:
         >>> # Auto-generate from document field
@@ -127,10 +128,10 @@ class SparseVectorIndexConfig:
         ...     source_key="title"
         ... )
         >>>
-        >>> # User provides sparse vectors directly
+        >>> # Generate from metadata field
         >>> config = SparseVectorIndexConfig(
-        ...     embedding_function=None,
-        ...     source_key=None
+        ...     embedding_function=BM25EmbeddingFunction(),
+        ...     source_key="title"
         ... )
     """
 
@@ -171,14 +172,28 @@ class SparseVectorIndexConfig:
             raise ValueError(
                 "embedding_function is None. Please provide an embedding_function to generate sparse vectors."
             )
+        if not SparseEmbeddingFunction.support_persistence(self.embedding_function):
+            raise ValueError(
+                "Sparse embedding function must support persistence. "
+                "Please implement name(), get_config(), and build_from_config()."
+            )
 
     def _validate_source_key(self) -> None:
-        if not self.source_key:
+        if self.source_key is None:
             self.source_key = K.DOCUMENT
-        if self.source_key is K.DOCUMENT or self.source_key == K.DOCUMENT.name:
             return
-        if self.source_key.startswith("#"):
+
+        key = self.source_key.name if hasattr(self.source_key, "name") else self.source_key
+        if key == K.DOCUMENT.name:
+            self.source_key = K.DOCUMENT
+            return
+
+        if not isinstance(key, str):
+            raise TypeError(f"source_key must be a string, FieldKey, or None, got {type(key).__name__}")
+
+        if key.startswith("#"):
             raise ValueError(f"source_key must not start with '#' except '#document', got '{self.source_key}'")
+        self.source_key = key
 
     def resolve_source_key(self) -> tuple[str, str | None]:
         """

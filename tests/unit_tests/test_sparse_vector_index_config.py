@@ -36,6 +36,26 @@ class _FakeSparseEF(SparseEmbeddingFunction):
         return _FakeSparseEF()
 
 
+class _NonPersistentSparseEF(SparseEmbeddingFunction):
+    """Implements protocol shape but does not support persistence."""
+
+    def __call__(self, documents: Documents) -> SparseVectors:
+        if isinstance(documents, str):
+            documents = [documents]
+        return [SparseVector.from_dict({0: 1.0})] * len(documents)
+
+    @staticmethod
+    def name() -> str:
+        return ""
+
+    def get_config(self) -> dict[str, Any]:
+        return {}
+
+    @staticmethod
+    def build_from_config(config: dict[str, Any]) -> "_NonPersistentSparseEF":
+        return _NonPersistentSparseEF()
+
+
 def _make_config(**overrides) -> SparseVectorIndexConfig:
     """Helper to create SparseVectorIndexConfig with a default embedding_function."""
     defaults = {"embedding_function": _FakeSparseEF()}
@@ -73,6 +93,10 @@ class TestSparseVectorIndexConfigDefaults:
         """SparseVectorIndexConfig requires an embedding_function."""
         with pytest.raises(ValueError, match="embedding_function is None"):
             SparseVectorIndexConfig(embedding_function=None)
+
+    def test_embedding_function_must_support_persistence(self):
+        with pytest.raises(ValueError, match="must support persistence"):
+            SparseVectorIndexConfig(embedding_function=_NonPersistentSparseEF())
 
 
 class TestSparseVectorIndexConfigValidation:
@@ -164,6 +188,13 @@ class TestSparseVectorIndexConfigResolveSourceKey:
         source_type, meta_key = config.resolve_source_key()
         assert source_type == "metadata"
         assert meta_key == "description"
+
+    def test_resolve_none_source_key_defaults_to_document(self):
+        config = SparseVectorIndexConfig(embedding_function=_FakeSparseEF(), source_key=None)
+        source_type, meta_key = config.resolve_source_key()
+        assert config.source_key is K.DOCUMENT
+        assert source_type == "document"
+        assert meta_key is None
 
 
 class TestSparseVectorIndexConfigOptionalParams:

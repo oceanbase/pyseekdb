@@ -345,7 +345,7 @@ class Collection:
         where: dict[str, Any] | None = None,
         where_document: dict[str, Any] | None = None,
         include: list[str] | None = None,
-        query_key: str | None = None,
+        query_key: Any | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -354,7 +354,8 @@ class Collection:
         Args:
             query_embeddings: Query vector(s) (optional if query_texts provided).
                 For dense vector queries: list[float] or list[list[float]].
-                For sparse vector queries: SparseVector or list[SparseVector] or dict[int, float].
+                For sparse vector queries, provide query_texts instead and let the
+                configured sparse embedding function generate sparse vectors.
             query_texts: Query text(s) to be embedded (optional if query_embeddings provided)
             n_results: Number of results to return (default: 10)
             where: Filter condition on metadata supporting:
@@ -367,7 +368,8 @@ class Collection:
             include: Fields to include in results, e.g., ["documents", "metadatas", "embeddings"] (optional)
                      By default, returns "documents" and "metadatas". Always includes "_id".
             query_key: Specify which index to query. Default is None (dense vector).
-                       Use ``K.SPARSE_EMBEDDING`` to query using sparse vector index.
+                       Use ``K.SPARSE_EMBEDDING`` (or ``"#sparse_embedding"``)
+                       to query using sparse vector index.
             **kwargs: Additional parameters
 
         Returns:

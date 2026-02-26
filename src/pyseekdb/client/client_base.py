@@ -1034,21 +1034,24 @@ class BaseClient(BaseConnection, AdminAPI):
         if not sparse_settings:
             return None
 
-        # Resolve sparse embedding function
+        # Resolve sparse embedding function (required)
         sparse_ef = None
         ef_info = sparse_settings.get("embedding_function")
-        if ef_info:
-            ef_name = ef_info.get("name", "")
-            if ef_name:
-                sparse_ef_class = SparseEmbeddingFunctionRegistry.get_class(ef_name)
-                if sparse_ef_class:
-                    sparse_ef = sparse_ef_class.build_from_config(ef_info.get("properties", {}))
-                else:
-                    logger.warning(f"Sparse embedding function class '{ef_name}' not found in registry")
+        if not ef_info:
+            raise ValueError("Sparse vector index settings missing required embedding_function configuration")
+
+        ef_name = ef_info.get("name", "")
+        if not ef_name:
+            raise ValueError("Sparse vector index settings missing embedding_function name")
+
+        sparse_ef_class = SparseEmbeddingFunctionRegistry.get_class(ef_name)
+        if sparse_ef_class is None:
+            raise ValueError(f"Sparse embedding function class '{ef_name}' not found in registry")
+        sparse_ef = sparse_ef_class.build_from_config(ef_info.get("properties", {}))
 
         # Resolve source_key
         source_key_str = sparse_settings.get("source_key")
-        source_key = None
+        source_key = FieldKey.DOCUMENT
         if source_key_str:
             if source_key_str == "#document" or source_key_str == FieldKey.DOCUMENT.name:
                 source_key = FieldKey.DOCUMENT
@@ -1057,7 +1060,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         return SparseVectorIndexConfig(
             embedding_function=sparse_ef,
-            source_key=source_key if source_key else FieldKey.DOCUMENT,
+            source_key=source_key,
         )
 
     def _validate_embedding_function(
@@ -2623,6 +2626,7 @@ class BaseClient(BaseConnection, AdminAPI):
         sparse_config = kwargs.get("sparse_vector_index_config")
         is_sparse_query = query_key is not None and (
             query_key is FieldKey.SPARSE_EMBEDDING
+            or query_key == FieldKey.SPARSE_EMBEDDING.name
             or (hasattr(query_key, "name") and query_key.name == "#sparse_embedding")
         )
 
@@ -2803,13 +2807,12 @@ class BaseClient(BaseConnection, AdminAPI):
         [Internal] Query collection by sparse vector similarity.
 
         Supports:
-        1. Direct sparse vector query via query_embeddings (SparseVector, dict, or list thereof)
-        2. Text-based sparse vector query via query_texts + sparse embedding function
+        1. Text-based sparse vector query via query_texts + sparse embedding function
 
         Args:
             conn: Database connection
             table_name: Table name
-            query_embeddings: Sparse vector(s) - SparseVector, dict[int, float], or list thereof
+            query_embeddings: Not supported for sparse query path. Use query_texts instead.
             query_texts: Query text(s) to be converted to sparse vectors
             n_results: Number of results
             where: Metadata filter
@@ -2824,36 +2827,15 @@ class BaseClient(BaseConnection, AdminAPI):
         sparse_query_vectors: list[SparseVector] = []
 
         if query_embeddings is not None:
-            # User provided sparse vectors directly
-            # Normalize to list of SparseVector
-            if isinstance(query_embeddings, SparseVector):
-                sparse_query_vectors = [query_embeddings]
-            elif isinstance(query_embeddings, dict):
-                sparse_query_vectors = [SparseVector.from_dict(query_embeddings)]
-            elif isinstance(query_embeddings, list):
-                for item in query_embeddings:
-                    if isinstance(item, SparseVector):
-                        sparse_query_vectors.append(item)
-                    elif isinstance(item, dict):
-                        sparse_query_vectors.append(SparseVector.from_dict(item))
-                    else:
-                        raise TypeError(
-                            f"For sparse vector queries, query_embeddings must contain "
-                            f"SparseVector or dict[int, float], got {type(item).__name__}"
-                        )
-            else:
-                raise TypeError(
-                    f"For sparse vector queries, query_embeddings must be "
-                    f"SparseVector, dict[int, float], or list thereof, got {type(query_embeddings).__name__}"
-                )
+            raise ValueError(
+                "For sparse vector queries, query_embeddings is not supported. "
+                "Please provide query_texts and use the configured sparse embedding function."
+            )
         elif query_texts is not None:
             # Generate sparse vectors from query texts using sparse embedding function
             if sparse_config is None or sparse_config.embedding_function is None:
                 raise ValueError(
-                    "query_texts provided for sparse vector query but no sparse embedding function is configured. "
-                    "Either:\n"
-                    "  1. Provide query_embeddings as SparseVector or dict[int, float] directly, or\n"
-                    "  2. Configure a sparse embedding function in SparseVectorIndexConfig."
+                    "query_texts provided for sparse vector query but no sparse embedding function is configured."
                 )
             sparse_ef = sparse_config.embedding_function
             # Normalize query_texts to list
@@ -2865,9 +2847,7 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             raise ValueError(
                 "Neither query_embeddings nor query_texts provided for sparse vector query. "
-                "Please provide either:\n"
-                "  1. query_embeddings as SparseVector or dict[int, float], or\n"
-                "  2. query_texts with a configured sparse embedding function."
+                "Please provide query_texts with a configured sparse embedding function."
             )
 
         if not sparse_query_vectors:
