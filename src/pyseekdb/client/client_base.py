@@ -202,12 +202,11 @@ def _get_sparse_vector_index_sql(sparse_config: SparseVectorIndexConfig) -> str:
     if sparse_config.refine_k is not None:
         parts.append(f"refine_k={sparse_config.refine_k}")
     if sparse_config.properties:
-        property_parts = []
         for k, v in sparse_config.properties.items():
             if isinstance(v, str):
-                property_parts.append(f"{k}='{v}'")
+                parts.append(f"{k}='{v}'")
             else:
-                property_parts.append(f"{k}={v}")
+                parts.append(f"{k}={v}")
     return f"WITH ({', '.join(parts)})"
 
 
@@ -806,9 +805,9 @@ class BaseClient(BaseConnection, AdminAPI):
             client=self,
             name=name,
             collection_id=collection_id,
-            dimension=schema.vector_index.hnsw.dimension,
+            dimension=dimension,
             embedding_function=schema.vector_index.embedding_function,
-            distance=schema.vector_index.hnsw.distance,
+            distance=hnsw_config.distance,
             sparse_vector_index_config=sparse_vector_index_config,
             **kwargs,
         )
@@ -1534,7 +1533,7 @@ class BaseClient(BaseConnection, AdminAPI):
         """
         sparse_ef = sparse_config.embedding_function
         if sparse_ef is None:
-            return [None] * num_items
+            raise ValueError("Sparse embedding function is not provided")
 
         source_type, metadata_key = sparse_config.resolve_source_key()
 
@@ -1574,7 +1573,7 @@ class BaseClient(BaseConnection, AdminAPI):
                     )
                 source_texts.append(text)
             else:
-                return [None] * num_items
+                raise ValueError(f"Invalid source type: {source_type}")
 
         # Generate sparse embeddings
         logger.debug(f"Generating sparse embeddings for {len(source_texts)} items")
@@ -1583,6 +1582,10 @@ class BaseClient(BaseConnection, AdminAPI):
         except Exception as e:
             raise ValueError(f"Failed to generate sparse embeddings: {e}") from e
         else:
+            if len(sparse_vectors) != num_items:
+                raise ValueError(
+                    f"Sparse embedding function returned {len(sparse_vectors)} vectors, expected {num_items}."
+                )
             logger.debug(f"✅ Successfully generated {len(sparse_vectors)} sparse embeddings")
             return sparse_vectors
 
@@ -2023,9 +2026,11 @@ class BaseClient(BaseConnection, AdminAPI):
         # Handle sparse embeddings generation
         sparse_config = kwargs.get("sparse_vector_index_config")
         sparse_embeddings = None
-        has_sparse = sparse_config is not None
-        if has_sparse and (documents or metadatas):
-            sparse_embeddings = self._generate_sparse_embeddings(sparse_config, documents, metadatas, len(ids))
+        if sparse_config is not None:
+            source_type, _ = sparse_config.resolve_source_key()
+            should_generate = (source_type == "document" and documents) or (source_type == "metadata" and metadatas)
+            if should_generate:
+                sparse_embeddings = self._generate_sparse_embeddings(sparse_config, documents, metadatas, len(ids))
 
         # Upsert each item
         for i in range(len(ids)):
@@ -2110,7 +2115,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 columns = f"{CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}"
                 values = f"{id_sql}, {doc_sql}, {meta_sql}, {vec_sql}"
 
-                if has_sparse and sparse_embeddings and sparse_embeddings[i] is not None:
+                if sparse_embeddings and sparse_embeddings[i] is not None:
                     sparse_sql = _sparse_vector_to_sql(sparse_embeddings[i])
                     columns += f", {CollectionFieldNames.SPARSE_EMBEDDING}"
                     values += f", {sparse_sql}"

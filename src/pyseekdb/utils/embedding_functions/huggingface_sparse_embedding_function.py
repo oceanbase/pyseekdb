@@ -79,9 +79,12 @@ class HuggingFaceSparseEmbeddingFunction(SparseEmbeddingFunction):
                 raise TypeError(f"Keyword argument '{key}' must be a primitive type, got {type(value).__name__}")
         self.kwargs = kwargs
 
-        if model_name not in self.models:
-            self.models[model_name] = SparseEncoder(model_name_or_path=model_name, device=device, **kwargs)
-        self._model = self.models[model_name]
+        # Create a hashable cache key including device and kwargs
+        kwargs_key = tuple(sorted((k, v) for k, v in kwargs.items() if isinstance(v, (str, int, float, bool))))
+        cache_key = (model_name, device, kwargs_key)
+        if cache_key not in self.models:
+            self.models[cache_key] = SparseEncoder(model_name_or_path=model_name, device=device, **kwargs)
+        self._model = self.models[cache_key]
 
     def __call__(self, documents: Documents) -> SparseVectors:
         """

@@ -1,9 +1,8 @@
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-from warnings import deprecated
 
-from pyseekdb.client.embedding_function import DefaultEmbeddingFunction, EmbeddingFunction
+from pyseekdb.client.embedding_function import EmbeddingFunction
 from pyseekdb.client.sparse_embedding_function import SparseEmbeddingFunction
 from pyseekdb.client.types import K
 
@@ -80,8 +79,6 @@ class VectorIndexConfig:
     def __post_init__(self):
         if self.hnsw is not None:
             self.hnsw.__post_init__()
-        if not self.embedding_function:
-            self.embedding_function = DefaultEmbeddingFunction()
 
 
 @dataclass
@@ -94,11 +91,9 @@ class SparseVectorIndexConfig:
 
     Args:
         embedding_function: Sparse embedding function (e.g., BM25EmbeddingFunction, SpladeEmbeddingFunction).
-            If None, users must provide sparse vectors directly when adding data.
         source_key: Source field key specifying which field to generate sparse vectors from.
             - ``K.DOCUMENT`` or ``"#document"``: use the document field (default)
             - A plain string like ``"title"``: use ``metadata["title"]``
-            - ``None``: users must provide sparse vectors directly
         lib: Vector index library (default: "vsag")
         distance: Distance metric (default: "inner_product"). Only inner_product is supported
             for sparse vectors.
@@ -128,14 +123,9 @@ class SparseVectorIndexConfig:
         ...     source_key="title"
         ... )
         >>>
-        >>> # Generate from metadata field
-        >>> config = SparseVectorIndexConfig(
-        ...     embedding_function=BM25EmbeddingFunction(),
-        ...     source_key="title"
-        ... )
     """
 
-    embedding_function: SparseEmbeddingFunction | None = None
+    embedding_function: SparseEmbeddingFunction
     source_key: str | K | None = K.DOCUMENT  # Default: generate from document field
     lib: str = "vsag"
     distance: str = DistanceMetric.INNER_PRODUCT.value
@@ -212,7 +202,7 @@ class SparseVectorIndexConfig:
         return ("metadata", self.source_key)
 
 
-@deprecated("Configuration is deprecated. Please use Schema instead.")
+@DeprecationWarning("Configuration is deprecated. Please use Schema instead.")
 class Configuration:
     """
     Configuration for collection creation

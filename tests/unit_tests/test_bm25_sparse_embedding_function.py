@@ -4,7 +4,7 @@ Unit tests for BM25SparseEmbeddingFunction.
 Tests tokenization, BM25 scoring, persistence (get_config / build_from_config),
 protocol compliance, and registry integration.
 
-Requires: snowballstemmer, mmh3
+Requires: snowballstemmer
 
 To run:
     pytest tests/unit_tests/test_bm25_sparse_embedding_function.py -v

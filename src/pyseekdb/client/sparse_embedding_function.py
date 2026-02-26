@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import (
@@ -68,7 +69,17 @@ class SparseVector:
         """
         if not isinstance(embeddings, dict):
             raise TypeError(f"embeddings must be a dict, got {type(embeddings).__name__}")
-        return SparseVector(embeddings=embeddings)
+        normalized: dict[int, float] = {}
+        for idx, weight in embeddings.items():
+            if not isinstance(idx, int):
+                raise TypeError(f"sparse index key must be int, got {type(idx).__name__}")
+            if not isinstance(weight, (int, float)):
+                raise TypeError(f"sparse value must be numeric, got {type(weight).__name__}")
+            w = float(weight)
+            if not math.isfinite(w):
+                raise ValueError(f"sparse value must be finite, got {weight}")
+            normalized[idx] = w
+        return SparseVector(embeddings=normalized)
 
     @staticmethod
     def from_indices(indices: list[int], values: list[float]) -> SparseVector:
