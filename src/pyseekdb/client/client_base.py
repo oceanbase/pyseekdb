@@ -175,7 +175,7 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
             property_parts.append(f"{k}={v}")
     property_str = ", ".join(property_parts)
     properties_str = f", {property_str}" if property_str else ""
-    return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag{properties_str})"
+    return f"WITH (DISTANCE={hnsw_config.distance}, TYPE={hnsw_config.type}, LIB={hnsw_config.lib}{properties_str})"
 
 
 def _get_sparse_vector_index_sql(sparse_config: SparseVectorIndexConfig) -> str:

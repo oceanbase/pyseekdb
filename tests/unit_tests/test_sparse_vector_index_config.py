@@ -73,11 +73,11 @@ class TestSparseVectorIndexConfigDefaults:
         assert config.lib == "vsag"
         assert config.distance == "inner_product"
         assert config.type == "sindi"
-        assert config.prune is None
-        assert config.refine is None
-        assert config.drop_ratio_build is None
-        assert config.drop_ratio_search is None
-        assert config.refine_k is None
+        assert config.prune is False
+        assert config.refine is False
+        assert config.drop_ratio_build == 0.0
+        assert config.drop_ratio_search == 0.0
+        assert config.refine_k == 4.0
         assert config.properties is None
 
     def test_with_embedding_function(self):

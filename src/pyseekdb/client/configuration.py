@@ -1,6 +1,7 @@
 import warnings
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from pyseekdb.client.embedding_function import EmbeddingFunction
 from pyseekdb.client.sparse_embedding_function import SparseEmbeddingFunction
@@ -11,6 +12,179 @@ from pyseekdb.client.types import K
 # So we use 384 as the default dimension to match
 DEFAULT_VECTOR_DIMENSION = 384  # Matches DefaultEmbeddingFunction dimension
 DEFAULT_DISTANCE_METRIC = "cosine"
+PrimitiveValue = str | int | float | bool
+
+
+def _ensure_primitive_properties(properties: dict[str, Any] | None, *, field_name: str = "properties") -> None:
+    if properties is None:
+        return
+    if not isinstance(properties, dict):
+        raise TypeError(f"{field_name} must be a dictionary")
+    for value in properties.values():
+        if not isinstance(value, (str, int, float, bool)):
+            raise TypeError(f"{field_name} must be a dictionary of string, int, float, or bool, got {value}")
+
+
+def _normalize_str_enum(value: str | Enum, *, field_name: str) -> str:
+    if isinstance(value, Enum):
+        value = value.value
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be a string, got {type(value).__name__}")
+    return value.lower()
+
+
+def _validate_int_range(value: Any, *, key: str, min_value: int, max_value: int) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{key} must be an integer, got {type(value).__name__}")
+    if value < min_value or value > max_value:
+        raise ValueError(f"{key} must be between {min_value} and {max_value}, got '{value}'")
+
+
+def _validate_float_range(value: Any, *, key: str, min_value: float, max_value: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{key} must be a number, got {type(value).__name__}")
+    numeric_value = float(value)
+    if numeric_value < min_value or numeric_value > max_value:
+        raise ValueError(f"{key} must be between {min_value} and {max_value}, got '{value}'")
+
+
+def _validate_space_or_beng_properties(properties: dict[str, PrimitiveValue]) -> None:
+    min_token_size = properties.get("min_token_size")
+    max_token_size = properties.get("max_token_size")
+    if min_token_size is not None:
+        _validate_int_range(min_token_size, key="min_token_size", min_value=1, max_value=16)
+    if max_token_size is not None:
+        _validate_int_range(max_token_size, key="max_token_size", min_value=10, max_value=84)
+    if min_token_size is not None and max_token_size is not None and max_token_size < min_token_size:
+        raise ValueError(
+            "max_token_size should not be less than min_token_size. "
+            f"max_token_size='{max_token_size}', min_token_size='{min_token_size}'"
+        )
+
+
+def _validate_ngram_properties(properties: dict[str, PrimitiveValue]) -> None:
+    if "ngram_token_size" in properties:
+        _validate_int_range(properties["ngram_token_size"], key="ngram_token_size", min_value=1, max_value=10)
+
+
+def _validate_ngram2_properties(properties: dict[str, PrimitiveValue]) -> None:
+    min_ngram_size = properties.get("min_ngram_size")
+    max_ngram_size = properties.get("max_ngram_size")
+    if min_ngram_size is not None:
+        _validate_int_range(min_ngram_size, key="min_ngram_size", min_value=1, max_value=16)
+    if max_ngram_size is not None:
+        _validate_int_range(max_ngram_size, key="max_ngram_size", min_value=1, max_value=16)
+    if min_ngram_size is not None and max_ngram_size is not None and max_ngram_size < min_ngram_size:
+        raise ValueError(
+            "max_ngram_size should not be less than min_ngram_size. "
+            f"max_ngram_size='{max_ngram_size}', min_ngram_size='{min_ngram_size}'"
+        )
+
+
+def _normalize_ik_mode(properties: dict[str, PrimitiveValue]) -> None:
+    if "ik_mode" not in properties:
+        return
+    ik_mode = properties["ik_mode"]
+    if isinstance(ik_mode, IKMode):
+        ik_mode = ik_mode.value
+    if not isinstance(ik_mode, str):
+        raise TypeError(f"ik_mode must be a string, got {type(ik_mode).__name__}")
+    ik_mode = ik_mode.lower()
+    if ik_mode not in {IKMode.SMART.value, IKMode.MAX_WORD.value}:
+        raise ValueError(f"ik_mode should be one of ['smart', 'max_word'], got '{ik_mode}'")
+    properties["ik_mode"] = ik_mode
+
+
+def _validate_fulltext_properties_by_analyzer(analyzer: str, properties: dict[str, PrimitiveValue]) -> None:
+    if analyzer in {FulltextAnalyzer.SPACE.value, FulltextAnalyzer.BENG.value}:
+        _validate_space_or_beng_properties(properties)
+    elif analyzer == FulltextAnalyzer.NGRAM.value:
+        _validate_ngram_properties(properties)
+    elif analyzer == FulltextAnalyzer.NGRAM2.value:
+        _validate_ngram2_properties(properties)
+    elif analyzer == FulltextAnalyzer.IK.value:
+        _normalize_ik_mode(properties)
+
+
+def _validate_hnsw_base_fields(config: "HNSWConfiguration") -> None:
+    if isinstance(config.dimension, bool) or not isinstance(config.dimension, int):
+        raise TypeError(f"dimension must be an integer, got {type(config.dimension).__name__}")
+    if config.dimension <= 0:
+        raise ValueError(f"dimension must be positive, got {config.dimension}")
+
+    config.distance = _normalize_str_enum(config.distance, field_name="distance")
+    valid_distances = [e.value for e in DistanceMetric]
+    if config.distance not in valid_distances:
+        raise ValueError(f"distance must be one of {valid_distances}, got {config.distance}")
+
+    config.type = _normalize_str_enum(config.type, field_name="type")
+    valid_types = [e.value for e in HNSWIndexType]
+    if config.type not in valid_types:
+        raise ValueError(f"type must be one of {valid_types}, got {config.type}")
+
+    config.lib = _normalize_str_enum(config.lib, field_name="lib")
+    valid_libs = [e.value for e in HNSWIndexLib]
+    if config.lib not in valid_libs:
+        raise ValueError(f"lib must be one of {valid_libs}, got {config.lib}")
+
+
+def _normalize_hnsw_properties(properties: dict[str, PrimitiveValue]) -> None:
+    reserved_keys = [key for key in properties if key.lower() in {"distance", "type", "lib"}]
+    for key in reserved_keys:
+        warnings.warn(f"{key} is a reserved keyword in properties, it will be ignored", stacklevel=2)
+        properties.pop(key)
+
+    if "M" in properties:
+        if "m" in properties:
+            raise ValueError("properties should not contain both 'M' and 'm'")
+        properties["m"] = properties.pop("M")
+
+
+def _validate_hnsw_property_ranges(properties: dict[str, PrimitiveValue]) -> None:
+    if "m" in properties:
+        _validate_int_range(properties["m"], key="m", min_value=5, max_value=128)
+    if "ef_construction" in properties:
+        _validate_int_range(properties["ef_construction"], key="ef_construction", min_value=5, max_value=1000)
+    if "ef_search" in properties:
+        _validate_int_range(properties["ef_search"], key="ef_search", min_value=1, max_value=1000)
+    if "extra_info_max_size" in properties:
+        _validate_int_range(properties["extra_info_max_size"], key="extra_info_max_size", min_value=0, max_value=16384)
+    if "refine_k" in properties:
+        _validate_float_range(properties["refine_k"], key="refine_k", min_value=1.0, max_value=1000.0)
+
+
+def _validate_hnsw_bq_properties(properties: dict[str, PrimitiveValue]) -> None:
+    if "refine_type" in properties:
+        refine_type = properties["refine_type"]
+        if isinstance(refine_type, BQRefineType):
+            refine_type = refine_type.value
+        if not isinstance(refine_type, str):
+            raise TypeError(f"refine_type must be a string, got {type(refine_type).__name__}")
+        refine_type = refine_type.lower()
+        if refine_type not in {BQRefineType.SQ8.value, BQRefineType.FP32.value}:
+            raise ValueError(f"refine_type must be one of ['sq8', 'fp32'], got '{refine_type}'")
+        properties["refine_type"] = refine_type
+
+    if "bq_bits_query" in properties:
+        bq_bits_query = properties["bq_bits_query"]
+        if isinstance(bq_bits_query, bool) or not isinstance(bq_bits_query, int):
+            raise TypeError(f"bq_bits_query must be an integer, got {type(bq_bits_query).__name__}")
+        if bq_bits_query not in {0, 4, 32}:
+            raise ValueError(f"bq_bits_query must be one of [0, 4, 32], got '{bq_bits_query}'")
+
+    if "bq_use_fht" in properties and not isinstance(properties["bq_use_fht"], bool):
+        raise TypeError(f"bq_use_fht must be a bool, got {type(properties['bq_use_fht']).__name__}")
+
+
+def _warn_if_hnsw_bq_only_keys_used_outside_bq(index_type: str, properties: dict[str, PrimitiveValue]) -> None:
+    bq_only_keys = {"refine_k", "refine_type", "bq_bits_query", "bq_use_fht"}
+    if index_type != HNSWIndexType.HNSW_BQ.value:
+        for key in bq_only_keys.intersection(properties):
+            warnings.warn(
+                f"'{key}' only takes effect when type='hnsw_bq'. It may be ignored by kernel for type='{index_type}'.",
+                UserWarning,
+                stacklevel=2,
+            )
 
 
 class DistanceMetric(str, Enum):
@@ -25,6 +199,34 @@ class DistanceMetric(str, Enum):
     INNER_PRODUCT = "inner_product"
 
 
+class HNSWIndexType(str, Enum):
+    HNSW = "hnsw"
+    HNSW_SQ = "hnsw_sq"
+    HNSW_BQ = "hnsw_bq"
+
+
+class HNSWIndexLib(str, Enum):
+    VSAG = "vsag"
+
+
+class FulltextAnalyzer(str, Enum):
+    SPACE = "space"
+    NGRAM = "ngram"
+    BENG = "beng"
+    IK = "ik"
+    NGRAM2 = "ngram2"
+
+
+class IKMode(str, Enum):
+    SMART = "smart"
+    MAX_WORD = "max_word"
+
+
+class BQRefineType(str, Enum):
+    SQ8 = "sq8"
+    FP32 = "fp32"
+
+
 @dataclass
 class FulltextIndexConfig:
     """
@@ -35,8 +237,27 @@ class FulltextIndexConfig:
         properties: Optional dictionary of parser-specific parameters (key: string, value: primitive type)
     """
 
-    analyzer: str = "ik"
-    properties: dict[str, str | int | float | bool] | None = None
+    analyzer: str | FulltextAnalyzer = FulltextAnalyzer.IK.value
+    properties: dict[str, PrimitiveValue] | None = None
+
+    def __post_init__(self):
+        self.analyzer = _normalize_str_enum(self.analyzer, field_name="analyzer")
+        _ensure_primitive_properties(self.properties)
+
+        valid_analyzers = {analyzer.value for analyzer in FulltextAnalyzer}
+        if self.analyzer not in valid_analyzers:
+            warnings.warn(
+                f"Unknown analyzer '{self.analyzer}'. "
+                "This may be a newer kernel analyzer. SDK will pass through properties as-is.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return
+
+        if not self.properties:
+            return
+
+        _validate_fulltext_properties_by_analyzer(self.analyzer, self.properties)
 
 
 @dataclass
@@ -51,24 +272,167 @@ class HNSWConfiguration:
         Please refer to [HNSW configuration](https://en.oceanbase.com/docs/common-oceanbase-database-10000000003351043) for detailed information.
     """
 
-    dimension: int
-    distance: str = DistanceMetric.L2.value
-    properties: dict[str, str | int | float | bool] | None = None
+    dimension: int = DEFAULT_VECTOR_DIMENSION
+    distance: str | DistanceMetric = DistanceMetric.L2.value
+    type: str | HNSWIndexType = HNSWIndexType.HNSW.value
+    lib: str | HNSWIndexLib = HNSWIndexLib.VSAG.value
+    properties: dict[str, PrimitiveValue] | None = None
 
     def __post_init__(self):
-        if self.dimension <= 0:
-            raise ValueError(f"dimension must be positive, got {self.dimension}")
-        valid_distances = [e.value for e in DistanceMetric]
-        if self.distance not in valid_distances:
-            raise ValueError(f"distance must be one of {valid_distances}, got {self.distance}")
-        if self.properties:
-            for value in self.properties.values():
-                if not isinstance(value, (str, int, float, bool)):
-                    raise TypeError(f"properties must be a dictionary of string, int, float, or bool, got {value}")
-            distance_keys = [key for key in self.properties if key.lower() == "distance"]
-            for key in distance_keys:
-                warnings.warn(f"{key} is a reserved keyword in properties, it will be ignored", stacklevel=2)
-                self.properties.pop(key)
+        _validate_hnsw_base_fields(self)
+
+        _ensure_primitive_properties(self.properties)
+        if not self.properties:
+            return
+
+        _normalize_hnsw_properties(self.properties)
+        _validate_hnsw_property_ranges(self.properties)
+        _validate_hnsw_bq_properties(self.properties)
+        _warn_if_hnsw_bq_only_keys_used_outside_bq(self.type, self.properties)
+
+
+@dataclass
+class BqHNSWConfiguration(HNSWConfiguration):
+    def __init__(
+        self,
+        dimension: int = DEFAULT_VECTOR_DIMENSION,
+        distance: str | DistanceMetric = DistanceMetric.L2.value,
+        *,
+        lib: str | HNSWIndexLib = HNSWIndexLib.VSAG.value,
+        m: int | None = None,
+        ef_construction: int | None = None,
+        ef_search: int | None = None,
+        extra_info_max_size: int | None = None,
+        refine_k: float | None = None,
+        refine_type: str | BQRefineType | None = None,
+        bq_bits_query: int | None = None,
+        bq_use_fht: bool | None = None,
+        properties: dict[str, PrimitiveValue] | None = None,
+    ):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if m is not None:
+            merged_properties["m"] = m
+        if ef_construction is not None:
+            merged_properties["ef_construction"] = ef_construction
+        if ef_search is not None:
+            merged_properties["ef_search"] = ef_search
+        if extra_info_max_size is not None:
+            merged_properties["extra_info_max_size"] = extra_info_max_size
+        if refine_k is not None:
+            merged_properties["refine_k"] = refine_k
+        if refine_type is not None:
+            merged_properties["refine_type"] = (
+                refine_type.value if isinstance(refine_type, BQRefineType) else refine_type
+            )
+        if bq_bits_query is not None:
+            merged_properties["bq_bits_query"] = bq_bits_query
+        if bq_use_fht is not None:
+            merged_properties["bq_use_fht"] = bq_use_fht
+        super().__init__(
+            dimension=dimension,
+            distance=distance,
+            type=HNSWIndexType.HNSW_BQ.value,
+            lib=lib,
+            properties=merged_properties or None,
+        )
+
+
+@dataclass
+class SqHNSWConfiguration(HNSWConfiguration):
+    def __init__(
+        self,
+        dimension: int = DEFAULT_VECTOR_DIMENSION,
+        distance: str | DistanceMetric = DistanceMetric.L2.value,
+        *,
+        lib: str | HNSWIndexLib = HNSWIndexLib.VSAG.value,
+        m: int | None = None,
+        ef_construction: int | None = None,
+        ef_search: int | None = None,
+        extra_info_max_size: int | None = None,
+        properties: dict[str, PrimitiveValue] | None = None,
+    ):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if m is not None:
+            merged_properties["m"] = m
+        if ef_construction is not None:
+            merged_properties["ef_construction"] = ef_construction
+        if ef_search is not None:
+            merged_properties["ef_search"] = ef_search
+        if extra_info_max_size is not None:
+            merged_properties["extra_info_max_size"] = extra_info_max_size
+        super().__init__(
+            dimension=dimension,
+            distance=distance,
+            type=HNSWIndexType.HNSW_SQ.value,
+            lib=lib,
+            properties=merged_properties or None,
+        )
+
+
+@dataclass
+class IKFulltextIndexConfig(FulltextIndexConfig):
+    def __init__(self, ik_mode: str | IKMode | None = None, properties: dict[str, PrimitiveValue] | None = None):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if ik_mode is not None:
+            merged_properties["ik_mode"] = ik_mode.value if isinstance(ik_mode, IKMode) else ik_mode
+        super().__init__(analyzer=FulltextAnalyzer.IK.value, properties=merged_properties or None)
+
+
+@dataclass
+class SpaceFulltextIndexConfig(FulltextIndexConfig):
+    def __init__(
+        self,
+        min_token_size: int | None = None,
+        max_token_size: int | None = None,
+        properties: dict[str, PrimitiveValue] | None = None,
+    ):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if min_token_size is not None:
+            merged_properties["min_token_size"] = min_token_size
+        if max_token_size is not None:
+            merged_properties["max_token_size"] = max_token_size
+        super().__init__(analyzer=FulltextAnalyzer.SPACE.value, properties=merged_properties or None)
+
+
+@dataclass
+class BengFulltextIndexConfig(FulltextIndexConfig):
+    def __init__(
+        self,
+        min_token_size: int | None = None,
+        max_token_size: int | None = None,
+        properties: dict[str, PrimitiveValue] | None = None,
+    ):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if min_token_size is not None:
+            merged_properties["min_token_size"] = min_token_size
+        if max_token_size is not None:
+            merged_properties["max_token_size"] = max_token_size
+        super().__init__(analyzer=FulltextAnalyzer.BENG.value, properties=merged_properties or None)
+
+
+@dataclass
+class NgramFulltextIndexConfig(FulltextIndexConfig):
+    def __init__(self, ngram_token_size: int | None = None, properties: dict[str, PrimitiveValue] | None = None):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if ngram_token_size is not None:
+            merged_properties["ngram_token_size"] = ngram_token_size
+        super().__init__(analyzer=FulltextAnalyzer.NGRAM.value, properties=merged_properties or None)
+
+
+@dataclass
+class Ngram2FulltextIndexConfig(FulltextIndexConfig):
+    def __init__(
+        self,
+        min_ngram_size: int | None = None,
+        max_ngram_size: int | None = None,
+        properties: dict[str, PrimitiveValue] | None = None,
+    ):
+        merged_properties: dict[str, PrimitiveValue] = dict(properties or {})
+        if min_ngram_size is not None:
+            merged_properties["min_ngram_size"] = min_ngram_size
+        if max_ngram_size is not None:
+            merged_properties["max_ngram_size"] = max_ngram_size
+        super().__init__(analyzer=FulltextAnalyzer.NGRAM2.value, properties=merged_properties or None)
 
 
 @dataclass
@@ -130,12 +494,12 @@ class SparseVectorIndexConfig:
     lib: str = "vsag"
     distance: str = DistanceMetric.INNER_PRODUCT.value
     type: str = "sindi"
-    prune: bool | None = None
-    refine: bool | None = None
-    drop_ratio_build: float | None = None
-    drop_ratio_search: float | None = None
-    refine_k: float | None = None
-    properties: dict[str, str | int | float | bool] | None = None
+    prune: bool = False
+    refine: bool = False
+    drop_ratio_build: float = 0.0
+    drop_ratio_search: float = 0.0
+    refine_k: float = 4.0
+    properties: dict[str, PrimitiveValue] | None = None
 
     def __post_init__(self):  # noqa: C901
         if self.distance != DistanceMetric.INNER_PRODUCT.value:
@@ -146,16 +510,17 @@ class SparseVectorIndexConfig:
             raise ValueError(f"Sparse vector index only supports 'vsag' library, got '{self.lib}'")
         if self.type.lower() != "sindi":
             raise ValueError(f"Sparse vector index only supports 'sindi' type, got '{self.type}'")
-        if self.drop_ratio_build is not None and (self.drop_ratio_build < 0.0 or self.drop_ratio_build > 0.9):
+        if not isinstance(self.prune, bool):
+            raise TypeError(f"prune must be a bool, got '{type(self.prune).__name__}'")
+        if not isinstance(self.refine, bool):
+            raise TypeError(f"refine must be a bool, got '{type(self.refine).__name__}'")
+        if self.drop_ratio_build < 0.0 or self.drop_ratio_build > 0.9:
             raise ValueError(f"drop_ratio_build must be between 0.0 and 0.9, got '{self.drop_ratio_build}'")
-        if self.drop_ratio_search is not None and (self.drop_ratio_search < 0.0 or self.drop_ratio_search > 0.9):
+        if self.drop_ratio_search < 0.0 or self.drop_ratio_search > 0.9:
             raise ValueError(f"drop_ratio_search must be between 0.0 and 0.9, got '{self.drop_ratio_search}'")
-        if self.refine_k is not None and (self.refine_k < 1.0 or self.refine_k > 1000.0):
+        if self.refine_k < 1.0 or self.refine_k > 1000.0:
             raise ValueError(f"refine_k must be between 1.0 and 1000.0, got '{self.refine_k}'")
-        if self.properties:
-            for _, value in self.properties.items():
-                if not isinstance(value, (str, int, float, bool)):
-                    raise TypeError(f"properties must be a dictionary of string, int, float, or bool, got {value}")
+        _ensure_primitive_properties(self.properties)
 
         self._validate_source_key()
         if self.embedding_function is None:
