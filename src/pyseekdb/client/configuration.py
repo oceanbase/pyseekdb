@@ -202,7 +202,6 @@ class SparseVectorIndexConfig:
         return ("metadata", self.source_key)
 
 
-@DeprecationWarning("Configuration is deprecated. Please use Schema instead.")
 class Configuration:
     """
     Configuration for collection creation
@@ -219,6 +218,7 @@ class Configuration:
     ):
         self.hnsw = hnsw
         self.fulltext_config = fulltext_config
+        warnings.warn("Configuration is deprecated. Please use Schema instead.", DeprecationWarning, stacklevel=2)
 
 
 # Type alias for configuration parameter that can be HNSWConfiguration, None, or sentinel
