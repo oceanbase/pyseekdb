@@ -63,6 +63,11 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONFAULTHANDLER: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +84,24 @@ jobs:
       - name: Install depencies for unit tests
         run: |
           uv run pip install openai sentence-transformers torch torchvision torchaudio boto3 litellm voyageai
+
+      - name: Sanity check embedding stack on Python 3.14
+        if: matrix.python-version == '3.14'
+        run: |
+          set -euo pipefail
+          uv run python -X faulthandler - <<'PY'
+          import torch
+          import sentence_transformers
+          from pyseekdb import DefaultEmbeddingFunction
+          from pyseekdb.client.embedding_function import dimension_of
+
+          print("torch version:", torch.__version__)
+          print("sentence_transformers version:", sentence_transformers.__version__)
+          ef = DefaultEmbeddingFunction()
+          print("default dimension:", ef.dimension)
+          print("dimension_of(default):", dimension_of(ef))
+          print("quick encode length:", len(ef(["sanity check"])[0]))
+          PY
 
       - name: Run unit tests
         run: |
