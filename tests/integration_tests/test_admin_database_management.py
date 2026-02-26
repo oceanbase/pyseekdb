@@ -7,8 +7,6 @@ import contextlib
 
 import pytest
 
-from pyseekdb.client.client_seekdb_embedded import SeekdbEmbeddedClient
-
 
 class TestAdminDatabaseManagement:
     """Test AdminClient database management operations using parameterized admin_client fixture"""
@@ -31,7 +29,9 @@ class TestAdminDatabaseManagement:
         assert hasattr(admin_client, "_server")
 
         # Determine expected tenant based on client type
-        if isinstance(admin_client._server, SeekdbEmbeddedClient):
+        server_mode = getattr(admin_client._server, "mode", "")
+        server_class_name = admin_client._server.__class__.__name__
+        if server_mode == "SeekdbEmbeddedClient" or server_class_name == "SeekdbEmbeddedClient":
             expected_tenant = None
             test_db_name = "test_embedded_db"
         elif admin_client._server.tenant == "sys":
