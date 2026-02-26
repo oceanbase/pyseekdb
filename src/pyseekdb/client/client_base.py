@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import struct
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ from .configuration import (
     ConfigurationParam,
     FulltextIndexConfig,
     HNSWConfiguration,
+    VectorIndexConfig,
 )
 from .database import Database
 from .embedding_function import (
@@ -36,7 +38,15 @@ from .embedding_function import (
 )
 from .filters import FilterBuilder
 from .meta_info import CollectionFieldNames, CollectionNames
+from .schema import Schema, SparseVectorIndexConfig
+from .sparse_embedding_function import (
+    SparseEmbeddingFunction,
+    SparseEmbeddingFunctionRegistry,
+    SparseVector,
+    _sparse_vector_to_sql,
+)
 from .sql_utils import is_query_sql
+from .types import K as FieldKey
 from .version import Version
 
 # Type alias for embedding_function parameter that can be EmbeddingFunction, None, or sentinel
@@ -168,6 +178,39 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     return f"WITH (DISTANCE={hnsw_config.distance}, TYPE=hnsw, LIB=vsag{properties_str})"
 
 
+def _get_sparse_vector_index_sql(sparse_config: SparseVectorIndexConfig) -> str:
+    """
+    Generate VECTOR INDEX SQL clause for sparse vector index from SparseVectorIndexConfig.
+
+    Example output:
+        WITH (DISTANCE=inner_product, TYPE=sindi, LIB=vsag)
+    """
+    parts = [
+        f"DISTANCE={sparse_config.distance}",
+        f"TYPE={sparse_config.type}",
+        f"LIB={sparse_config.lib}",
+    ]
+    # Add optional parameters only if they differ from defaults
+    if sparse_config.prune is not None:
+        parts.append(f"prune={str(sparse_config.prune).lower()}")
+    if sparse_config.refine is not None:
+        parts.append(f"refine={str(sparse_config.refine).lower()}")
+    if sparse_config.drop_ratio_build is not None:
+        parts.append(f"drop_ratio_build={sparse_config.drop_ratio_build}")
+    if sparse_config.drop_ratio_search is not None:
+        parts.append(f"drop_ratio_search={sparse_config.drop_ratio_search}")
+    if sparse_config.refine_k is not None:
+        parts.append(f"refine_k={sparse_config.refine_k}")
+    if sparse_config.properties:
+        property_parts = []
+        for k, v in sparse_config.properties.items():
+            if isinstance(v, str):
+                property_parts.append(f"{k}='{v}'")
+            else:
+                property_parts.append(f"{k}={v}")
+    return f"WITH ({', '.join(parts)})"
+
+
 def _embedding_to_hexstring(embedding: list[float]) -> str:
     """
     Convert embedding (list of floats) to a hex string.
@@ -196,6 +239,7 @@ class ClientAPI(ABC):
     def create_collection(
         self,
         name: str,
+        schema: Schema | None = None,
         configuration: ConfigurationParam = _NOT_PROVIDED,
         embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs,
@@ -205,14 +249,17 @@ class ClientAPI(ABC):
 
         Args:
             name: Collection name
+            schema: Schema configuration for fine-grained index control, including
+                   sparse vector index support. When provided, ``configuration`` and
+                   ``embedding_function`` parameters are ignored.
             configuration: Index configuration (Configuration or HNSWConfiguration).
                           For backward compatibility, HNSWConfiguration is still accepted.
                           Configuration can include fulltext analyzer configuration (FulltextIndexConfig).
+                          Ignored if ``schema`` is provided.
             embedding_function: Embedding function to convert documents to embeddings.
                                Defaults to DefaultEmbeddingFunction.
                                If explicitly set to None, collection will not have an embedding function.
-                               If provided, the dimension in configuration should match the
-                               embedding function's output dimension.
+                               Ignored if ``schema`` is provided.
             **kwargs: Additional parameters
         """
         pass
@@ -522,60 +569,11 @@ class BaseClient(BaseConnection, AdminAPI):
 
     # ==================== Collection Management (User-facing) ====================
 
-    def create_collection(  # noqa: C901
+    def _prepare_schema_parameters(  # noqa: C901
         self,
-        name: str,
         configuration: ConfigurationParam = _NOT_PROVIDED,
         embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
-        **kwargs,
-    ) -> "Collection":
-        """Create a new collection.
-
-        Args:
-            name: The name of the collection to create. Must contain only alphanumeric
-                characters or underscores.
-            configuration: Index configuration. Defaults to None (uses HNSW with
-                Cosine distance and dimension 384). Can be a ``Configuration`` or
-                ``HNSWConfiguration`` object. If set to None, the dimension will be
-                inferred from the embedding function.
-            embedding_function: The embedding function to use for this collection.
-                Defaults to ``DefaultEmbeddingFunction`` (all-MiniLM-L6-v2). If set to None,
-                no embedding function will be used (embeddings must be provided manually).
-            **kwargs: Additional parameters for collection creation.
-
-        Returns:
-            The created ``Collection`` object.
-
-        Raises:
-            ValueError: If the collection name is invalid, already exists, or if the
-                configuration/embedding function combination is invalid (e.g., dimension mismatch).
-            TypeError: If the configuration object is of an invalid type.
-
-        Examples:
-            Create a collection with default settings:
-
-            >>> client.create_collection("my_collection")
-
-            Create a collection with a custom embedding function:
-
-            >>> from pyseekdb import DefaultEmbeddingFunction
-            >>> ef = DefaultEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-            >>> collection = client.create_collection("my_docs", embedding_function=ef)
-
-            Create a collection with specific configuration:
-
-            >>> from pyseekdb import HNSWConfiguration
-            >>> config = HNSWConfiguration(dimension=128, distance="l2")
-            >>> collection = client.create_collection(
-            ...     "custom_config",
-            ...     configuration=config,
-            ...     embedding_function=None
-            ... )
-        """
-        _validate_collection_name(name)
-        if self.has_collection(name):
-            raise ValueError(f"Collection '{name}' already exists")
-
+    ) -> Schema:
         # Handle embedding function first
         # If not provided (sentinel), use default embedding function
         if embedding_function is _NOT_PROVIDED:
@@ -666,13 +664,116 @@ class BaseClient(BaseConnection, AdminAPI):
             # No embedding function, use configuration dimension
             dimension = hnsw_config.dimension
 
-        logger.debug(f"actual dimension: {dimension}, hnsw_config: {hnsw_config}")
-        # Extract distance from configuration
-        distance = hnsw_config.distance
+        hnsw_config.dimension = dimension
+        fulltext_config = _extract_fulltext_config(configuration)
+        vic = VectorIndexConfig(hnsw=hnsw_config)
+        vic.embedding_function = embedding_function
+        return Schema(
+            vector_index=vic,
+            fulltext_index=fulltext_config,
+        )
+
+    def create_collection(
+        self,
+        name: str,
+        schema: Schema | None = None,
+        configuration: ConfigurationParam = _NOT_PROVIDED,
+        embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
+        **kwargs,
+    ) -> "Collection":
+        """Create a new collection.
+
+        Args:
+            name: The name of the collection to create. Must contain only alphanumeric
+                characters or underscores.
+            schema: Schema configuration. Defaults to None (uses default schema). Can be a ``Schema`` object.
+            configuration: Index configuration. Defaults to None (uses HNSW with
+                Cosine distance and dimension 384). Can be a ``Configuration`` or
+                ``HNSWConfiguration`` object. If set to None, the dimension will be
+                inferred from the embedding function.
+            embedding_function: The embedding function to use for this collection.
+                Defaults to ``DefaultEmbeddingFunction`` (all-MiniLM-L6-v2). If set to None,
+                no embedding function will be used (embeddings must be provided manually).
+            **kwargs: Additional parameters for collection creation.
+
+        Returns:
+            The created ``Collection`` object.
+
+        Raises:
+            ValueError: If the collection name is invalid, already exists, or if the
+                configuration/embedding function combination is invalid (e.g., dimension mismatch).
+            TypeError: If the configuration object is of an invalid type.
+
+        Examples:
+            Create a collection with default settings:
+
+            >>> client.create_collection("my_collection")
+
+            Create a collection with a custom embedding function:
+
+            >>> from pyseekdb import DefaultEmbeddingFunction
+            >>> ef = DefaultEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+            >>> collection = client.create_collection("my_docs", embedding_function=ef)
+
+            Create a collection with specific configuration:
+
+            >>> from pyseekdb import HNSWConfiguration
+            >>> config = HNSWConfiguration(dimension=128, distance="l2")
+            >>> collection = client.create_collection(
+            ...     "custom_config",
+            ...     configuration=config,
+            ...     embedding_function=None
+            ... )
+        """
+        _validate_collection_name(name)
+        if self.has_collection(name):
+            raise ValueError(f"Collection '{name}' already exists")
+
+        # Resolve schema: either use the provided schema or build one from legacy params
+        if schema is not None:
+            if configuration is not _NOT_PROVIDED or embedding_function is not _NOT_PROVIDED:
+                warnings.warn(
+                    "schema and configuration/embedding_function are both provided, schema will be used",
+                    stacklevel=2,
+                )
+        else:
+            # Legacy path: convert configuration + embedding_function into a Schema
+            schema = self._prepare_schema_parameters(configuration, embedding_function)
+
+        logger.debug(f"schema: {schema}")
+
+        # Resolve HNSW configuration dimension if not set
+        hnsw_config = schema.vector_index.hnsw
+        dense_embedding_function = schema.vector_index.embedding_function
+        if hnsw_config is None:
+            # Determine dimension from embedding function
+            actual_dimension = self._get_embedding_function_dimension(dense_embedding_function)
+            hnsw_config = HNSWConfiguration(dimension=actual_dimension, distance=DEFAULT_DISTANCE_METRIC)
+        else:
+            # Validate dimension matches embedding function if available
+            if dense_embedding_function is not None:
+                actual_dimension = self._get_embedding_function_dimension(dense_embedding_function)
+                if hnsw_config.dimension != actual_dimension:
+                    raise ValueError(
+                        f"Configuration dimension ({hnsw_config.dimension}) doesn't match "
+                        f"embedding function dimension ({actual_dimension})."
+                    )
+
+        dimension = hnsw_config.dimension
 
         # Extract fulltext parser configuration
-        fulltext_config = _extract_fulltext_config(configuration)
-        fulltext_index_clause = _get_fulltext_index_sql(fulltext_config)
+        fulltext_index_clause = _get_fulltext_index_sql(schema.fulltext_index)
+
+        # Sparse vector index
+        sparse_vector_index_config = schema.sparse_vector_index
+        sparse_field_sql = (
+            f"{CollectionFieldNames.SPARSE_EMBEDDING} SPARSEVECTOR,\n" if sparse_vector_index_config else ""
+        )
+        sparse_index_sql = (
+            f",\n            VECTOR INDEX idx_sparse ({CollectionFieldNames.SPARSE_EMBEDDING}) {_get_sparse_vector_index_sql(sparse_vector_index_config)}"
+            if sparse_vector_index_config
+            else ""
+        )
 
         # Construct table name
         collection_id = None
@@ -680,7 +781,9 @@ class BaseClient(BaseConnection, AdminAPI):
             # for testing purpose
             table_name = self._create_collection_meta_v1(name)
         else:
-            collection_meta = self._create_collection_meta_v2(name, embedding_function)
+            collection_meta = self._create_collection_meta_v2(
+                name, dense_embedding_function, sparse_vector_index_config=sparse_vector_index_config
+            )
             collection_id = collection_meta.get("collection_id")
             table_name = collection_meta["table_name"]
 
@@ -689,9 +792,9 @@ class BaseClient(BaseConnection, AdminAPI):
             _id varbinary(512) PRIMARY KEY NOT NULL,
             document string,
             embedding vector({dimension}),
-            metadata json,
+            {sparse_field_sql}metadata json,
             FULLTEXT INDEX idx_fts(document) {fulltext_index_clause},
-            VECTOR INDEX idx_vec (embedding) {_get_vector_index_sql(hnsw_config)}
+            VECTOR INDEX idx_vec (embedding) {_get_vector_index_sql(hnsw_config)}{sparse_index_sql}
         ) ORGANIZATION = HEAP;"""
 
         # Execute SQL to create table
@@ -703,11 +806,35 @@ class BaseClient(BaseConnection, AdminAPI):
             client=self,
             name=name,
             collection_id=collection_id,
-            dimension=dimension,
-            embedding_function=embedding_function,
-            distance=distance,
+            dimension=schema.vector_index.hnsw.dimension,
+            embedding_function=schema.vector_index.embedding_function,
+            distance=schema.vector_index.hnsw.distance,
+            sparse_vector_index_config=sparse_vector_index_config,
             **kwargs,
         )
+
+    def _get_embedding_function_dimension(self, embedding_function: EmbeddingFunction) -> int:
+        """Get the dimension from an embedding function."""
+        try:
+            if hasattr(embedding_function, "dimension"):
+                dim = embedding_function.dimension
+                logger.debug(f"Using embedding function dimension: {dim}")
+                return dim
+            else:
+                test_embeddings = embedding_function.__call__("seekdb")
+                if test_embeddings and len(test_embeddings) > 0:
+                    dim = len(test_embeddings[0])
+                    logger.info(f"Calculated embedding function dimension: {dim}")
+                    return dim
+                else:
+                    raise ValueError(  # noqa: TRY301
+                        "Embedding function returned empty result when called with 'seekdb'"
+                    )
+        except Exception as e:
+            raise ValueError(
+                f"Failed to get dimension from embedding function: {e}. "
+                f"Please ensure the embedding function has a 'dimension' attribute or can be called with a string input."
+            ) from e
 
     def _create_sdk_collections_if_not_exists(self) -> None:
         try:
@@ -723,7 +850,12 @@ class BaseClient(BaseConnection, AdminAPI):
         except Exception as e:
             raise ValueError(f"Failed to create sdk_collections table: {e}") from e
 
-    def _create_collection_meta_v2(self, collection_name: str, embedding_function) -> dict[str, str]:
+    def _create_collection_meta_v2(
+        self,
+        collection_name: str,
+        embedding_function,
+        sparse_vector_index_config: SparseVectorIndexConfig | None = None,
+    ) -> dict[str, str]:
         try:
             results = {}
             settings = {"version": 2}
@@ -732,6 +864,21 @@ class BaseClient(BaseConnection, AdminAPI):
                     "name": embedding_function.name(),
                     "properties": embedding_function.get_config(),
                 }
+
+            # Persist sparse vector index config
+            if sparse_vector_index_config is not None:
+                sparse_settings = {}
+                source_key = sparse_vector_index_config.source_key
+                if source_key is not None:
+                    # Convert FieldKey to string for serialization
+                    sparse_settings["source_key"] = source_key.name if hasattr(source_key, "name") else str(source_key)
+                sparse_ef = sparse_vector_index_config.embedding_function
+                if sparse_ef is not None and SparseEmbeddingFunction.support_persistence(sparse_ef):
+                    sparse_settings["embedding_function"] = {
+                        "name": sparse_ef.name(),
+                        "properties": sparse_ef.get_config(),
+                    }
+                settings["sparse_vector_index"] = sparse_settings
 
             settings_str = escape_string(json.dumps(settings))
 
@@ -878,6 +1025,41 @@ class BaseClient(BaseConnection, AdminAPI):
             raise ValueError(f"Embedding function class '{ef_name}' not found")
         return embedding_function_class.build_from_config(ef_settings.get("properties", {}))
 
+    def _resolve_sparse_vector_index_config(self, settings: str | None) -> SparseVectorIndexConfig | None:
+        """Restore SparseVectorIndexConfig from persisted settings JSON."""
+        if not settings:
+            return None
+        settings_json = json.loads(settings)
+        sparse_settings = settings_json.get("sparse_vector_index")
+        if not sparse_settings:
+            return None
+
+        # Resolve sparse embedding function
+        sparse_ef = None
+        ef_info = sparse_settings.get("embedding_function")
+        if ef_info:
+            ef_name = ef_info.get("name", "")
+            if ef_name:
+                sparse_ef_class = SparseEmbeddingFunctionRegistry.get_class(ef_name)
+                if sparse_ef_class:
+                    sparse_ef = sparse_ef_class.build_from_config(ef_info.get("properties", {}))
+                else:
+                    logger.warning(f"Sparse embedding function class '{ef_name}' not found in registry")
+
+        # Resolve source_key
+        source_key_str = sparse_settings.get("source_key")
+        source_key = None
+        if source_key_str:
+            if source_key_str == "#document" or source_key_str == FieldKey.DOCUMENT.name:
+                source_key = FieldKey.DOCUMENT
+            else:
+                source_key = source_key_str
+
+        return SparseVectorIndexConfig(
+            embedding_function=sparse_ef,
+            source_key=source_key if source_key else FieldKey.DOCUMENT,
+        )
+
     def _validate_embedding_function(
         self,
         embedding_function: EmbeddingFunction | None,
@@ -921,6 +1103,10 @@ class BaseClient(BaseConnection, AdminAPI):
             metadata = self._resolve_collection_metadata_from_table(
                 CollectionNames.table_name_v2(collection_meta.collection_id), name
             )
+
+            # Resolve sparse vector index config from persisted settings
+            sparse_vector_index_config = self._resolve_sparse_vector_index_config(collection_meta.settings)
+
             return Collection(
                 client=self,
                 name=name,
@@ -928,6 +1114,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 embedding_function=embedding_function,
                 dimension=metadata["dimension"],
                 distance=metadata["distance"],
+                sparse_vector_index_config=sparse_vector_index_config,
             )
         except Exception as e:
             raise ValueError(f"Failed to get collection: {e}") from e
@@ -1201,6 +1388,7 @@ class BaseClient(BaseConnection, AdminAPI):
     def get_or_create_collection(
         self,
         name: str,
+        schema: Schema | None = None,
         configuration: ConfigurationParam = _NOT_PROVIDED,
         embedding_function: EmbeddingFunctionParam = _NOT_PROVIDED,
         **kwargs,
@@ -1209,13 +1397,17 @@ class BaseClient(BaseConnection, AdminAPI):
 
         Args:
             name: The name of the collection.
+            schema: Schema configuration for fine-grained index control, including
+                   sparse vector index support. When provided, ``configuration`` and
+                   ``embedding_function`` parameters are ignored.
             configuration: Index configuration. Defaults to None (uses HNSW with
                 Cosine distance and dimension 384). Can be a ``Configuration`` or
                 ``HNSWConfiguration`` object. If set to None, the dimension will be
-                inferred from the embedding function.
+                inferred from the embedding function. Ignored if ``schema`` is provided.
             embedding_function: The embedding function to use for this collection.
                 Defaults to ``DefaultEmbeddingFunction`` (all-MiniLM-L6-v2). If set to None,
                 no embedding function will be used (embeddings must be provided manually).
+                Ignored if ``schema`` is provided.
             **kwargs: Additional parameters passed to ``create_collection`` if the collection is created.
 
         Returns:
@@ -1239,6 +1431,7 @@ class BaseClient(BaseConnection, AdminAPI):
         # Collection doesn't exist, create it with provided or default configuration
         return self.create_collection(
             name=name,
+            schema=schema,
             configuration=configuration,
             embedding_function=embedding_function,
             **kwargs,
@@ -1323,6 +1516,72 @@ class BaseClient(BaseConnection, AdminAPI):
     # These methods are called by Collection objects, different clients implement different logic
 
     # -------------------- DML Operations --------------------
+
+    def _generate_sparse_embeddings(  # noqa: C901
+        self,
+        sparse_config: SparseVectorIndexConfig,
+        documents: list[str] | None,
+        metadatas: list[dict] | None,
+        num_items: int,
+    ) -> list[SparseVector | None]:
+        """
+        Generate sparse embeddings based on SparseVectorIndexConfig.
+
+        Returns a list of SparseVector (or None) for each item.
+        """
+        sparse_ef = sparse_config.embedding_function
+        if sparse_ef is None:
+            return [None] * num_items
+
+        source_type, metadata_key = sparse_config.resolve_source_key()
+
+        # Gather source texts
+        source_texts = []
+        for i in range(num_items):
+            if source_type == "document":
+                text = documents[i] if documents and i < len(documents) else None
+                if text is None:
+                    raise ValueError(
+                        f"Sparse vector index is configured to generate from document field, "
+                        f"but document at index {i} is None."
+                    )
+                if not isinstance(text, str):
+                    raise TypeError(
+                        f"Sparse vector index source_key refers to document field, "
+                        f"but value at index {i} is not a string: {type(text).__name__}"
+                    )
+                source_texts.append(text)
+            elif source_type == "metadata":
+                meta = metadatas[i] if metadatas and i < len(metadatas) else None
+                if meta is None:
+                    raise ValueError(
+                        f"Sparse vector index is configured to generate from metadata['{metadata_key}'], "
+                        f"but metadata at index {i} is None."
+                    )
+                text = meta.get(metadata_key)
+                if text is None:
+                    raise ValueError(
+                        f"Sparse vector index is configured to generate from metadata['{metadata_key}'], "
+                        f"but metadata['{metadata_key}'] at index {i} is None."
+                    )
+                if not isinstance(text, str):
+                    raise TypeError(
+                        f"Sparse vector index source_key refers to metadata['{metadata_key}'], "
+                        f"but value at index {i} is not a string: {type(text).__name__}"
+                    )
+                source_texts.append(text)
+            else:
+                return [None] * num_items
+
+        # Generate sparse embeddings
+        logger.debug(f"Generating sparse embeddings for {len(source_texts)} items")
+        try:
+            sparse_vectors = sparse_ef(source_texts)
+        except Exception as e:
+            raise ValueError(f"Failed to generate sparse embeddings: {e}") from e
+        else:
+            logger.debug(f"✅ Successfully generated {len(sparse_vectors)} sparse embeddings")
+            return sparse_vectors
 
     def _collection_add(  # noqa: C901
         self,
@@ -1438,6 +1697,13 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             table_name = CollectionNames.table_name(collection_name)
 
+        # Handle sparse embeddings generation
+        sparse_config = kwargs.get("sparse_vector_index_config")
+        sparse_embeddings = None
+        has_sparse = sparse_config is not None
+        if has_sparse:
+            sparse_embeddings = self._generate_sparse_embeddings(sparse_config, documents, metadatas, num_items)
+
         # Build INSERT SQL
         values_list = []
         for i in range(num_items):
@@ -1473,10 +1739,21 @@ class BaseClient(BaseConnection, AdminAPI):
             vec_val = embeddings[i] if embeddings else None
             vec_sql = "NULL" if vec_val is None else _embedding_to_hexstring(vec_val)
 
-            values_list.append(f"({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})")
+            # Process sparse vector
+            if has_sparse:
+                sparse_val = sparse_embeddings[i] if sparse_embeddings else None
+                sparse_sql = "NULL" if sparse_val is None else _sparse_vector_to_sql(sparse_val)
+                values_list.append(f"({id_sql}, {doc_sql}, {meta_sql}, {vec_sql}, {sparse_sql})")
+            else:
+                values_list.append(f"({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})")
+
+        # Build column list
+        columns = f"{CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}"
+        if has_sparse:
+            columns += f", {CollectionFieldNames.SPARSE_EMBEDDING}"
 
         # Build final SQL
-        sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING})
+        sql = f"""INSERT INTO `{table_name}` ({columns})
                  VALUES {",".join(values_list)}"""
 
         logger.debug(f"Executing SQL: {sql}")
@@ -1584,6 +1861,15 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             table_name = CollectionNames.table_name(collection_name)
 
+        # Handle sparse embeddings generation
+        sparse_config = kwargs.get("sparse_vector_index_config")
+        sparse_embeddings = None
+        if sparse_config is not None:
+            source_type, _ = sparse_config.resolve_source_key()
+            should_generate = (source_type == "document" and documents) or (source_type == "metadata" and metadatas)
+            if should_generate:
+                sparse_embeddings = self._generate_sparse_embeddings(sparse_config, documents, metadatas, len(ids))
+
         # Update each item
         for i in range(len(ids)):
             # Process ID - support any string format
@@ -1613,6 +1899,11 @@ class BaseClient(BaseConnection, AdminAPI):
                 if vec_val is not None:
                     vec_str = "[" + ",".join(map(str, vec_val)) + "]"
                     set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = '{vec_str}'")
+
+            # Handle sparse embedding update
+            if sparse_embeddings and sparse_embeddings[i] is not None:
+                sparse_sql = _sparse_vector_to_sql(sparse_embeddings[i])
+                set_clauses.append(f"{CollectionFieldNames.SPARSE_EMBEDDING} = {sparse_sql}")
 
             if not set_clauses:
                 continue
@@ -1726,6 +2017,13 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             table_name = CollectionNames.table_name(collection_name)
 
+        # Handle sparse embeddings generation
+        sparse_config = kwargs.get("sparse_vector_index_config")
+        sparse_embeddings = None
+        has_sparse = sparse_config is not None
+        if has_sparse and (documents or metadatas):
+            sparse_embeddings = self._generate_sparse_embeddings(sparse_config, documents, metadatas, len(ids))
+
         # Upsert each item
         for i in range(len(ids)):
             # Process ID - support any string format
@@ -1777,6 +2075,11 @@ class BaseClient(BaseConnection, AdminAPI):
                     vec_str = _embedding_to_hexstring(final_vector) if final_vector else "NULL"
                     set_clauses.append(f"{CollectionFieldNames.EMBEDDING} = {vec_str}")
 
+                # Handle sparse embedding update
+                if sparse_embeddings and sparse_embeddings[i] is not None:
+                    sparse_sql = _sparse_vector_to_sql(sparse_embeddings[i])
+                    set_clauses.append(f"{CollectionFieldNames.SPARSE_EMBEDDING} = {sparse_sql}")
+
                 if set_clauses:
                     sql = (
                         f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE {CollectionFieldNames.ID} = {id_sql}"
@@ -1800,8 +2103,17 @@ class BaseClient(BaseConnection, AdminAPI):
 
                 vec_sql = "NULL" if vec_val is None else _embedding_to_hexstring(vec_val)
 
-                sql = f"""INSERT INTO `{table_name}` ({CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING})
-                         VALUES ({id_sql}, {doc_sql}, {meta_sql}, {vec_sql})"""
+                # Build column list and values for insert
+                columns = f"{CollectionFieldNames.ID}, {CollectionFieldNames.DOCUMENT}, {CollectionFieldNames.METADATA}, {CollectionFieldNames.EMBEDDING}"
+                values = f"{id_sql}, {doc_sql}, {meta_sql}, {vec_sql}"
+
+                if has_sparse and sparse_embeddings and sparse_embeddings[i] is not None:
+                    sparse_sql = _sparse_vector_to_sql(sparse_embeddings[i])
+                    columns += f", {CollectionFieldNames.SPARSE_EMBEDDING}"
+                    values += f", {sparse_sql}"
+
+                sql = f"""INSERT INTO `{table_name}` ({columns})
+                         VALUES ({values})"""
                 logger.debug(f"Executing SQL: {sql}")
                 self._execute(sql)
 
@@ -2267,6 +2579,7 @@ class BaseClient(BaseConnection, AdminAPI):
         where: dict[str, Any] | None = None,
         where_document: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        query_key: FieldKey | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -2306,6 +2619,29 @@ class BaseClient(BaseConnection, AdminAPI):
         else:
             table_name = CollectionNames.table_name(collection_name)
 
+        # Check if this is a sparse vector query
+        sparse_config = kwargs.get("sparse_vector_index_config")
+        is_sparse_query = query_key is not None and (
+            query_key is FieldKey.SPARSE_EMBEDDING
+            or (hasattr(query_key, "name") and query_key.name == "#sparse_embedding")
+        )
+
+        if is_sparse_query:
+            return self._collection_query_sparse(
+                conn=conn,
+                table_name=table_name,
+                query_embeddings=query_embeddings,
+                query_texts=query_texts,
+                n_results=n_results,
+                where=where,
+                where_document=where_document,
+                include=include,
+                sparse_config=sparse_config,
+                collection_name=collection_name,
+                **kwargs,
+            )
+
+        # ===== Dense vector query path =====
         # Handle vector generation logic:
         # 1. If query_embeddings are provided, use them directly without embedding
         # 2. If query_embeddings are not provided but query_texts are provided:
@@ -2446,6 +2782,186 @@ class BaseClient(BaseConnection, AdminAPI):
 
         logger.debug(
             f"✅ Query completed for '{collection_name}' with {len(query_embeddings)} vectors, returning {len(all_ids)} result lists"
+        )
+        return result
+
+    def _collection_query_sparse(  # noqa: C901
+        self,
+        conn,
+        table_name: str,
+        query_embeddings: list[float] | list[list[float]] | None = None,
+        query_texts: str | list[str] | None = None,
+        n_results: int = 10,
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+        include: list[str] | None = None,
+        sparse_config=None,
+        collection_name: str = "",
+        **kwargs,
+    ) -> dict[str, Any]:
+        """
+        [Internal] Query collection by sparse vector similarity.
+
+        Supports:
+        1. Direct sparse vector query via query_embeddings (SparseVector, dict, or list thereof)
+        2. Text-based sparse vector query via query_texts + sparse embedding function
+
+        Args:
+            conn: Database connection
+            table_name: Table name
+            query_embeddings: Sparse vector(s) - SparseVector, dict[int, float], or list thereof
+            query_texts: Query text(s) to be converted to sparse vectors
+            n_results: Number of results
+            where: Metadata filter
+            where_document: Document filter
+            include: Fields to include
+            sparse_config: SparseVectorIndexConfig instance
+            collection_name: Collection name (for logging)
+        """
+        logger.debug(f"Sparse vector query on collection '{collection_name}'")
+
+        # Resolve sparse query vectors
+        sparse_query_vectors: list[SparseVector] = []
+
+        if query_embeddings is not None:
+            # User provided sparse vectors directly
+            # Normalize to list of SparseVector
+            if isinstance(query_embeddings, SparseVector):
+                sparse_query_vectors = [query_embeddings]
+            elif isinstance(query_embeddings, dict):
+                sparse_query_vectors = [SparseVector.from_dict(query_embeddings)]
+            elif isinstance(query_embeddings, list):
+                for item in query_embeddings:
+                    if isinstance(item, SparseVector):
+                        sparse_query_vectors.append(item)
+                    elif isinstance(item, dict):
+                        sparse_query_vectors.append(SparseVector.from_dict(item))
+                    else:
+                        raise TypeError(
+                            f"For sparse vector queries, query_embeddings must contain "
+                            f"SparseVector or dict[int, float], got {type(item).__name__}"
+                        )
+            else:
+                raise TypeError(
+                    f"For sparse vector queries, query_embeddings must be "
+                    f"SparseVector, dict[int, float], or list thereof, got {type(query_embeddings).__name__}"
+                )
+        elif query_texts is not None:
+            # Generate sparse vectors from query texts using sparse embedding function
+            if sparse_config is None or sparse_config.embedding_function is None:
+                raise ValueError(
+                    "query_texts provided for sparse vector query but no sparse embedding function is configured. "
+                    "Either:\n"
+                    "  1. Provide query_embeddings as SparseVector or dict[int, float] directly, or\n"
+                    "  2. Configure a sparse embedding function in SparseVectorIndexConfig."
+                )
+            sparse_ef = sparse_config.embedding_function
+            # Normalize query_texts to list
+            if isinstance(query_texts, str):
+                query_texts = [query_texts]
+            logger.debug(f"Generating sparse embeddings for {len(query_texts)} query texts...")
+            sparse_vectors = sparse_ef(query_texts)
+            sparse_query_vectors = sparse_vectors
+        else:
+            raise ValueError(
+                "Neither query_embeddings nor query_texts provided for sparse vector query. "
+                "Please provide either:\n"
+                "  1. query_embeddings as SparseVector or dict[int, float], or\n"
+                "  2. query_texts with a configured sparse embedding function."
+            )
+
+        if not sparse_query_vectors:
+            raise ValueError("No sparse query vectors resolved.")
+
+        # Normalize include fields
+        include_fields = self._normalize_include_fields(include)
+
+        # Build SELECT clause
+        select_clause = self._build_select_clause(include_fields)
+
+        # Build WHERE clause from filters
+        where_clause, params = self._build_where_clause(where, where_document)
+
+        # Sparse vector queries always use inner_product distance
+        distance_func = "inner_product"
+
+        use_context_manager = self._use_context_manager_for_cursor()
+
+        # Collect results for each sparse query vector separately
+        all_ids = []
+        all_documents = []
+        all_metadatas = []
+        all_embeddings = []
+        all_distances = []
+
+        for sv in sparse_query_vectors:
+            # Convert sparse vector to SQL string format
+            sv_sql = _sparse_vector_to_sql(sv)
+
+            # Build SQL query with sparse vector distance calculation
+            sql = f"""
+                SELECT {select_clause},
+                       {distance_func}(sparse_embedding, {sv_sql}) AS distance
+                FROM `{table_name}`
+                {where_clause}
+                ORDER BY {distance_func}(sparse_embedding, {sv_sql})
+                APPROXIMATE
+                LIMIT %s
+            """
+
+            # Execute query
+            query_params = [*params, n_results]
+            logger.debug(f"Executing sparse SQL: {sql}")
+            logger.debug(f"Parameters: {query_params}")
+
+            rows = self._execute_query_with_cursor(conn, sql, query_params, use_context_manager)
+
+            # Collect results for this query vector
+            query_ids = []
+            query_documents = []
+            query_metadatas = []
+            query_embeddings_list = []
+            query_distances = []
+
+            for row in rows:
+                result_item = self._process_query_row(row, include_fields)
+                query_ids.append(result_item.get("_id"))
+
+                if "documents" in include_fields or include is None:
+                    query_documents.append(result_item.get("document"))
+
+                if "metadatas" in include_fields or include is None:
+                    query_metadatas.append(result_item.get("metadata") or {})
+
+                if "embeddings" in include_fields:
+                    query_embeddings_list.append(result_item.get("embedding"))
+
+                query_distances.append(result_item.get("distance"))
+
+            all_ids.append(query_ids)
+            if "documents" in include_fields or include is None:
+                all_documents.append(query_documents)
+            if "metadatas" in include_fields or include is None:
+                all_metadatas.append(query_metadatas)
+            if "embeddings" in include_fields:
+                all_embeddings.append(query_embeddings_list)
+            all_distances.append(query_distances)
+
+        # Build result dictionary in chromadb format
+        result = {"ids": all_ids, "distances": all_distances}
+
+        if "documents" in include_fields or include is None:
+            result["documents"] = all_documents
+
+        if "metadatas" in include_fields or include is None:
+            result["metadatas"] = all_metadatas
+
+        if "embeddings" in include_fields:
+            result["embeddings"] = all_embeddings
+
+        logger.debug(
+            f"Sparse query completed for '{collection_name}' with {len(sparse_query_vectors)} vectors, "
+            f"returning {len(all_ids)} result lists"
         )
         return result
 

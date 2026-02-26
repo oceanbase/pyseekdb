@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from .embedding_function import Documents as EmbeddingDocuments
     from .embedding_function import EmbeddingFunction
+    from .schema import SparseVectorIndexConfig
+    from .sparse_embedding_function import SparseEmbeddingFunction
 
 
 class Collection:
@@ -34,6 +36,7 @@ class Collection:
         dimension: int | None = None,
         embedding_function: Optional["EmbeddingFunction[EmbeddingDocuments]"] = None,
         distance: str | None = None,
+        sparse_vector_index_config: Optional["SparseVectorIndexConfig"] = None,
         **metadata,
     ):
         """
@@ -46,6 +49,8 @@ class Collection:
             dimension: Vector dimension
             embedding_function: Embedding function to convert documents to embeddings
             distance: Distance metric used by the index (e.g., 'l2', 'cosine', 'inner_product')
+            sparse_vector_index_config: Sparse vector index configuration (optional).
+                When set, the collection supports sparse vector operations.
             **metadata: Other metadata
         """
         self._client = client  # Core: hold reference to the client
@@ -54,6 +59,7 @@ class Collection:
         self._dimension = dimension
         self._embedding_function = embedding_function
         self._distance = distance
+        self._sparse_vector_index_config = sparse_vector_index_config
         self._metadata = metadata
 
     # ==================== Properties ====================
@@ -92,6 +98,23 @@ class Collection:
     def distance(self) -> str | None:
         """Distance metric used by the index (e.g., 'l2', 'cosine', 'inner_product')"""
         return self._distance
+
+    @property
+    def sparse_vector_index_config(self) -> Optional["SparseVectorIndexConfig"]:
+        """Sparse vector index configuration, if any."""
+        return self._sparse_vector_index_config
+
+    @property
+    def sparse_embedding_function(self) -> Optional["SparseEmbeddingFunction"]:
+        """Sparse embedding function for this collection, if configured."""
+        if self._sparse_vector_index_config is not None:
+            return self._sparse_vector_index_config.embedding_function
+        return None
+
+    @property
+    def has_sparse_vector_index(self) -> bool:
+        """Check if this collection has a sparse vector index."""
+        return self._sparse_vector_index_config is not None
 
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
@@ -184,6 +207,7 @@ class Collection:
             metadatas=metadatas,
             documents=documents,
             embedding_function=self._embedding_function,
+            sparse_vector_index_config=self._sparse_vector_index_config,
             **kwargs,
         )
 
@@ -226,6 +250,7 @@ class Collection:
             metadatas=metadatas,
             documents=documents,
             embedding_function=self._embedding_function,
+            sparse_vector_index_config=self._sparse_vector_index_config,
             **kwargs,
         )
 
@@ -268,6 +293,7 @@ class Collection:
             metadatas=metadatas,
             documents=documents,
             embedding_function=self._embedding_function,
+            sparse_vector_index_config=self._sparse_vector_index_config,
             **kwargs,
         )
 
@@ -319,13 +345,16 @@ class Collection:
         where: dict[str, Any] | None = None,
         where_document: dict[str, Any] | None = None,
         include: list[str] | None = None,
+        query_key: str | None = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
         Query collection by vector similarity
 
         Args:
-            query_embeddings: Query vector(s) (optional if query_texts provided)
+            query_embeddings: Query vector(s) (optional if query_texts provided).
+                For dense vector queries: list[float] or list[list[float]].
+                For sparse vector queries: SparseVector or list[SparseVector] or dict[int, float].
             query_texts: Query text(s) to be embedded (optional if query_embeddings provided)
             n_results: Number of results to return (default: 10)
             where: Filter condition on metadata supporting:
@@ -337,6 +366,8 @@ class Collection:
                    - Logical operators: $or, $and
             include: Fields to include in results, e.g., ["documents", "metadatas", "embeddings"] (optional)
                      By default, returns "documents" and "metadatas". Always includes "_id".
+            query_key: Specify which index to query. Default is None (dense vector).
+                       Use ``K.SPARSE_EMBEDDING`` to query using sparse vector index.
             **kwargs: Additional parameters
 
         Returns:
@@ -348,29 +379,10 @@ class Collection:
             - distances: Optional[List[List[float]]] - List of distance lists, one list per query
 
         Examples:
-            # Query by single embedding
+            # Query by single embedding (dense vector)
             results = collection.query(
                 query_embeddings=[0.1, 0.2, 0.3],
                 n_results=5
-            )
-            # results["ids"][0] contains IDs for the query
-            # results["documents"][0] contains documents for the query
-            # results["distances"][0] contains distances for the query
-
-            # Query by multiple embeddings
-            results = collection.query(
-                query_embeddings=[[11.1, 12.1, 13.1], [1.1, 2.3, 3.2]],
-                n_results=5
-            )
-            # results["ids"][0] contains IDs for first query
-            # results["ids"][1] contains IDs for second query
-
-            # Query with filters
-            results = collection.query(
-                query_embeddings=[[0.1, 0.2, 0.3]],
-                where={"chapter": {"$gte": 3}},
-                where_document={"$contains": "machine learning"},
-                include=["documents", "metadatas", "embeddings"]
             )
 
             # Query by texts (will be embedded automatically)
@@ -379,10 +391,11 @@ class Collection:
                 n_results=10
             )
 
-            # Query by multiple texts
+            # Sparse vector query using query_key
             results = collection.query(
-                query_texts=["text1", "text2"],
-                n_results=10
+                query_texts=["fox animal"],
+                query_key=K.SPARSE_EMBEDDING,
+                n_results=5
             )
         """
         return self._client._collection_query(
@@ -396,6 +409,8 @@ class Collection:
             include=include,
             embedding_function=self._embedding_function,
             distance=self._distance,
+            query_key=query_key,
+            sparse_vector_index_config=self._sparse_vector_index_config,
             **kwargs,
         )
 

@@ -6,8 +6,12 @@ with pyseekdb collections.
 """
 
 from .amazon_bedrock_embedding_function import AmazonBedrockEmbeddingFunction
+from .bm25_sparse_embedding_function import BM25SparseEmbeddingFunction
 from .cohere_embedding_function import CohereEmbeddingFunction
 from .google_vertex_embedding_function import GoogleVertexEmbeddingFunction
+from .huggingface_sparse_embedding_function import (
+    HuggingFaceSparseEmbeddingFunction,
+)
 from .jina_embedding_function import JinaEmbeddingFunction
 from .litellm_base_embedding_function import LiteLLMBaseEmbeddingFunction
 from .mistral_embedding_function import MistralEmbeddingFunction
@@ -27,8 +31,10 @@ from .voyageai_embedding_function import VoyageaiEmbeddingFunction
 
 __all__ = [
     "AmazonBedrockEmbeddingFunction",
+    "BM25SparseEmbeddingFunction",
     "CohereEmbeddingFunction",
     "GoogleVertexEmbeddingFunction",
+    "HuggingFaceSparseEmbeddingFunction",
     "JinaEmbeddingFunction",
     "LiteLLMBaseEmbeddingFunction",
     "MistralEmbeddingFunction",

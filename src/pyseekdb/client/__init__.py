@@ -25,7 +25,13 @@ from .base_connection import BaseConnection
 from .client_base import BaseClient, ClientAPI
 from .client_seekdb_embedded import SeekdbEmbeddedClient
 from .client_seekdb_server import RemoteServerClient
-from .configuration import Configuration, FulltextIndexConfig, HNSWConfiguration
+from .configuration import (
+    Configuration,
+    FulltextIndexConfig,
+    HNSWConfiguration,
+    SparseVectorIndexConfig,
+    VectorIndexConfig,
+)
 from .database import Database
 from .embedding_function import (
     DefaultEmbeddingFunction,
@@ -33,6 +39,14 @@ from .embedding_function import (
     get_default_embedding_function,
     register_embedding_function,
 )
+from .schema import Schema
+from .sparse_embedding_function import (
+    SparseEmbeddingFunction,
+    SparseEmbeddingFunctionRegistry,
+    SparseVector,
+    register_sparse_embedding_function,
+)
+from .types import K
 from .version import Version
 
 logger = logging.getLogger(__name__)
@@ -123,11 +137,19 @@ __all__ = [
     "EmbeddingFunction",
     "FulltextIndexConfig",
     "HNSWConfiguration",
+    "K",
     "RemoteServerClient",
+    "Schema",
     "SeekdbEmbeddedClient",
+    "SparseEmbeddingFunction",
+    "SparseEmbeddingFunctionRegistry",
+    "SparseVector",
+    "SparseVectorIndexConfig",
+    "VectorIndexConfig",
     "Version",
     "get_default_embedding_function",
     "register_embedding_function",
+    "register_sparse_embedding_function",
 ]
 
 

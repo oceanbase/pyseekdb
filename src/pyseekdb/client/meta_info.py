@@ -9,6 +9,7 @@ class CollectionFieldNames:
     ID = "_id"
     DOCUMENT = "document"
     EMBEDDING = "embedding"
+    SPARSE_EMBEDDING = "sparse_embedding"
     METADATA = "metadata"
 
     ALL_FIELDS: ClassVar[list[str]] = [ID, DOCUMENT, EMBEDDING, METADATA]
