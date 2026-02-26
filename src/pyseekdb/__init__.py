@@ -132,7 +132,6 @@ __all__ = [
     "NgramFulltextIndexConfig",
     "RemoteServerClient",
     "Schema",
-    "SeekdbEmbeddedClient",
     "SpaceFulltextIndexConfig",
     "SparseEmbeddingFunction",
     "SparseEmbeddingFunctionRegistry",
