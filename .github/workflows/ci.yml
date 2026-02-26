@@ -114,6 +114,31 @@ jobs:
           uv run pytest tests/unit_tests/ -v --log-cli-level=${log_level} | tee pytest.log
           tail -n 1 pytest.log | grep '=======' | grep 'passed' |grep -q 'failed' && exit 1 || exit 0
 
+      - name: Diagnose non-db integration subset on Python 3.14
+        if: matrix.python-version == '3.14'
+        run: |
+          set -o pipefail
+          echo "Collect-only for non-db integration subset"
+          uv run pytest tests/integration_tests/ --collect-only -q -k "not server and not embedded and not oceanbase" | tee collect_only.log
+
+          echo "Run test_default_embedding_function::test_dimension_of"
+          set +e
+          uv run pytest tests/integration_tests/test_default_embedding_function.py::TestDefaultEmbeddingFunction::test_dimension_of -vv -s -o faulthandler_timeout=120 | tee diag_dimension_of.log
+          code1=${PIPESTATUS[0]}
+          echo "exit code (dimension_of): ${code1}"
+          set -e
+          if [ "${code1}" -ne 0 ]; then
+            exit "${code1}"
+          fi
+
+          echo "Run test_detect_db_type_and_version::test_version_comparison"
+          set +e
+          uv run pytest tests/integration_tests/test_detect_db_type_and_version.py::TestDetectDbTypeAndVersion::test_version_comparison -vv -s -o faulthandler_timeout=120 | tee diag_version_comparison.log
+          code2=${PIPESTATUS[0]}
+          echo "exit code (version_comparison): ${code2}"
+          set -e
+          exit "${code2}"
+
       - name: Run integration tests without any test mode
         run: |
           if [ "${{ env.RUNNER_DEBUG }}" = "true" ]; then
@@ -123,7 +148,9 @@ jobs:
           fi
           set -o pipefail
           uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} -k "not server and not embedded and not oceanbase" | tee pytest.log
-          tail -n 1 pytest.log | grep '=======' | grep 'passed' | grep -q 'failed' && exit 1 || exit 0
+          pytest_exit=${PIPESTATUS[0]}
+          echo "integration pytest exit code: ${pytest_exit}"
+          exit ${pytest_exit}
 
   integration-test:
     runs-on: ubuntu-latest
