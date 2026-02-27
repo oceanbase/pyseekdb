@@ -3149,14 +3149,13 @@ class BaseClient(BaseConnection, AdminAPI):
         # Execute SET statement
         self._execute_query_with_cursor(conn, set_sql, [], use_context_manager)
 
-        # Get SQL query from DBMS_HYBRID_SEARCH.GET_SQL
-        get_sql_query = f"SELECT DBMS_HYBRID_SEARCH.GET_SQL('{table_name}', @search_parm) as query_sql FROM dual"
-        logger.debug(f"Getting SQL query: {get_sql_query}")
+        # Call DBMS_HYBRID_SEARCH.SEARCH directly instead of GET_SQL + SQL execution
+        search_query = f"SELECT DBMS_HYBRID_SEARCH.SEARCH('{table_name}', @search_parm) as search_result FROM dual"
+        logger.debug(f"Executing search query: {search_query}")
 
-        rows = self._execute_query_with_cursor(conn, get_sql_query, [], use_context_manager)
-
-        if not rows or not rows[0].get("query_sql"):
-            logger.warning("No SQL query returned from GET_SQL")
+        rows = self._execute_query_with_cursor(conn, search_query, [], use_context_manager)
+        if not rows or not rows[0].get("search_result"):
+            logger.warning("No result returned from DBMS_HYBRID_SEARCH.SEARCH")
             return {
                 "ids": [[]],
                 "distances": [[]],
@@ -3165,19 +3164,16 @@ class BaseClient(BaseConnection, AdminAPI):
                 "embeddings": [[]],
             }
 
-        # Get the SQL query string
-        query_sql = rows[0]["query_sql"]
-        if isinstance(query_sql, str):
-            # Remove any surrounding quotes if present
-            query_sql = query_sql.strip().strip("'\"")
+        # Parse the search result JSON
+        search_result_json = rows[0]["search_result"]
+        if isinstance(search_result_json, str):
+            search_result = json.loads(search_result_json)
+        else:
+            search_result = search_result_json
+        logger.debug(f"Search result received from DBMS_HYBRID_SEARCH.SEARCH")
 
-        logger.debug(f"Executing query SQL: {query_sql}")
-
-        # Execute the returned SQL query
-        result_rows = self._execute_query_with_cursor(conn, query_sql, [], use_context_manager)
-
-        # Transform SQL query results to standard format
-        return self._transform_sql_result(result_rows, include)
+        # Transform search result to standard format
+        return self._transform_sql_result(search_result, include)
 
     def _build_search_parm(  # noqa: C901
         self,
