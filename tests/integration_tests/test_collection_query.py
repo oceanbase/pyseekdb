@@ -8,6 +8,8 @@ import uuid
 
 import pytest
 
+from pyseekdb.client.query_types import QueryHint
+
 
 class TestCollectionQuery:
     """Test collection.query() interface using parameterized db_client fixture"""
@@ -195,6 +197,76 @@ class TestCollectionQuery:
 
         # No cleanup needed - the fixture handles it automatically!
         print("   ✅ All tests passed (cleanup will be automatic)")
+
+    def test_collection_query_with_query_hint(self, db_client):
+        """
+        Test collection.query() with QueryHint for database optimization.
+
+        Tests:
+        - Query with parallel hint
+        - Query with query_timeout hint
+        - Query with both hints and filters
+
+        Automatically runs for: embedded, server, oceanbase
+        """
+        # Create test collection
+        collection_name = f"test_query_hint_{int(time.time() * 1000)}"
+
+        collection = db_client.create_collection(name=collection_name)
+        dimension = collection.dimension
+
+        try:
+            # Insert test data
+            inserted_ids = self._insert_test_data(db_client, collection_name, dimension)
+            assert len(inserted_ids) > 0
+
+            # Generate query vector
+            query_vector = self._generate_query_vector(dimension)
+
+            # Test 1: Query with parallel hint
+            print("\n✅ Testing query with parallel hint")
+            query_hint = QueryHint(parallel=6)
+            results = collection.query(query_embeddings=query_vector, n_results=3, query_hint=query_hint)
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 3
+            print(f"   Found {len(results['ids'][0])} results with parallel hint")
+
+            # Test 2: Query with query_timeout hint
+            print("✅ Testing query with query_timeout hint")
+            query_hint = QueryHint(query_timeout=8.0)
+            results = collection.query(query_embeddings=query_vector, n_results=3, query_hint=query_hint)
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 3
+            print(f"   Found {len(results['ids'][0])} results with query_timeout hint")
+
+            # Test 3: Query with both hints and metadata filter
+            print("✅ Testing query with combined hints and metadata filter")
+            query_hint = QueryHint(parallel=4, query_timeout=12.0)
+            results = collection.query(
+                query_embeddings=query_vector, n_results=5, where={"category": "AI"}, query_hint=query_hint
+            )
+            assert results is not None
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results with combined hints and filter")
+
+            # Test 4: Query by text with hints
+            print("✅ Testing query by text with hints")
+            query_hint = QueryHint(parallel=2, query_timeout=10.0)
+            results = collection.query(query_texts=["machine learning algorithms"], n_results=3, query_hint=query_hint)
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 3
+            print(f"   Found {len(results['ids'][0])} results with text query and hints")
+
+        finally:
+            # Cleanup
+            try:
+                db_client.delete_collection(name=collection_name)
+                print(f"   Cleaned up collection: {collection_name}")
+            except Exception as cleanup_error:
+                print(f"   Warning: Failed to cleanup collection: {cleanup_error}")
 
 
 if __name__ == "__main__":

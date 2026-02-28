@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from .embedding_function import Documents as EmbeddingDocuments
     from .embedding_function import EmbeddingFunction
+    from .query_types import QueryHint
     from .schema import SparseVectorIndexConfig
     from .sparse_embedding_function import SparseEmbeddingFunction
 
@@ -346,6 +347,7 @@ class Collection:
         where_document: dict[str, Any] | None = None,
         include: list[str] | None = None,
         query_key: Any | None = None,
+        query_hint: "QueryHint | None" = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -370,6 +372,7 @@ class Collection:
             query_key: Specify which index to query. Default is None (dense vector).
                        Use ``K.SPARSE_EMBEDDING`` (or ``"#sparse_embedding"``)
                        to query using sparse vector index.
+            query_hint: Query optimization hints for database execution (optional)
             **kwargs: Additional parameters
 
         Returns:
@@ -399,6 +402,15 @@ class Collection:
                 query_key=K.SPARSE_EMBEDDING,
                 n_results=5
             )
+
+            # Query with query hint
+            from pyseekdb.client.query_types import QueryHint
+            results = collection.query(
+                query_texts=["machine learning"],
+                n_results=5,
+                where={"score": {"$gte": 90}},
+                query_hint=QueryHint(parallel=8, query_timeout=10.0)
+            )
         """
         return self._client._collection_query(
             collection_id=self._id,
@@ -409,6 +421,7 @@ class Collection:
             where=where,
             where_document=where_document,
             include=include,
+            query_hint=query_hint,
             embedding_function=self._embedding_function,
             distance=self._distance,
             query_key=query_key,
@@ -424,6 +437,7 @@ class Collection:
         limit: int | None = None,
         offset: int | None = None,
         include: list[str] | None = None,
+        query_hint: "QueryHint | None" = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -436,6 +450,7 @@ class Collection:
             limit: Maximum number of results to return (optional)
             offset: Number of results to skip (optional)
             include: Fields to include in results, e.g., ["metadatas", "documents", "embeddings"] (optional)
+            query_hint: Query optimization hints for database execution (optional)
             **kwargs: Additional parameters
 
         Returns:
@@ -469,6 +484,14 @@ class Collection:
 
             # Get all data
             results = collection.get(limit=100)
+
+            # Get with query hint
+            from pyseekdb.client.query_types import QueryHint
+            results = collection.get(
+                where={"category": "AI"},
+                limit=10,
+                query_hint=QueryHint(parallel=4, query_timeout=5.0)
+            )
         """
         return self._client._collection_get(
             collection_id=self._id,
@@ -479,6 +502,7 @@ class Collection:
             limit=limit,
             offset=offset,
             include=include,
+            query_hint=query_hint,
             **kwargs,
         )
 
@@ -489,6 +513,7 @@ class Collection:
         rank: dict[str, Any] | None = None,
         n_results: int = 10,
         include: list[str] | None = None,
+        query_hint: "QueryHint | None" = None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -507,6 +532,7 @@ class Collection:
             rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
+            query_hint: Query optimization hints for database execution (optional)
             **kwargs: Additional parameters
 
         Returns:
@@ -537,6 +563,22 @@ class Collection:
             # results["ids"][0] contains IDs for the hybrid search
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
+
+            # Hybrid search with query hint
+            from pyseekdb.client.query_types import QueryHint
+            results = collection.hybrid_search(
+                query={
+                    "where_document": {"$contains": "AI"},
+                    "n_results": 8
+                },
+                knn={
+                    "query_texts": ["artificial intelligence"],
+                    "n_results": 8
+                },
+                rank={"rrf": {"rank_window_size": 60}},
+                n_results=10,
+                query_hint=QueryHint(parallel=6, query_timeout=15.0)
+            )
         """
         # When no query/knn provided, return only ids/distances by default
         if include is None and not query and not knn:
@@ -550,6 +592,7 @@ class Collection:
             rank=rank,
             n_results=n_results,
             include=include,
+            query_hint=query_hint,
             embedding_function=self._embedding_function,
             dimension=self._dimension,
             **kwargs,

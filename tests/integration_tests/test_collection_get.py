@@ -9,6 +9,7 @@ import uuid
 import pytest
 
 import pyseekdb
+from pyseekdb.client.query_types import QueryHint
 
 
 # ==================== Simple 3D Embedding Function for Testing ====================
@@ -526,6 +527,75 @@ class TestCollectionGet:
             assert "ids" in results
             # Should return rows with tag='neural' (excluded 'ml' and 'python')
             print(f"   Found {len(results['ids'])} results with tag not in ['ml', 'python']")
+
+        finally:
+            # Cleanup
+            try:
+                db_client.delete_collection(name=collection_name)
+                print(f"   Cleaned up collection: {collection_name}")
+            except Exception as cleanup_error:
+                print(f"   Warning: Failed to cleanup collection: {cleanup_error}")
+
+    def test_collection_get_with_query_hint(self, db_client):
+        """
+        Test collection.get() with QueryHint for database optimization.
+
+        Tests:
+        - Get with parallel hint
+        - Get with query_timeout hint
+        - Get with both parallel and query_timeout hints
+
+        Automatically runs for: embedded, server, oceanbase
+        """
+        # Create test collection
+        collection_name = f"test_get_hint_{int(time.time() * 1000)}"
+        config = pyseekdb.HNSWConfiguration(dimension=3, distance="l2")
+        embedding_function = Simple3DEmbeddingFunction()
+        collection = db_client.create_collection(
+            name=collection_name,
+            configuration=config,
+            embedding_function=embedding_function,
+        )
+
+        try:
+            inserted_ids = self._insert_test_data(db_client, collection_name)
+            assert len(inserted_ids) > 0, f"Failed to get inserted IDs. Expected at least 1, got {len(inserted_ids)}"
+
+            # Test 1: Get with parallel hint
+            print("\n✅ Testing get with parallel hint")
+            query_hint = QueryHint(parallel=4)
+            results = collection.get(ids=inserted_ids[0], query_hint=query_hint)
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Found {len(results['ids'])} result with parallel hint")
+
+            # Test 2: Get with query_timeout hint
+            print("✅ Testing get with query_timeout hint")
+            query_hint = QueryHint(query_timeout=10.0)
+            results = collection.get(ids=inserted_ids[0], query_hint=query_hint)
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Found {len(results['ids'])} result with query_timeout hint")
+
+            # Test 3: Get with both hints
+            print("✅ Testing get with both parallel and query_timeout hints")
+            query_hint = QueryHint(parallel=8, query_timeout=5.0)
+            results = collection.get(ids=inserted_ids[0], query_hint=query_hint)
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"]) == 1
+            print(f"   Found {len(results['ids'])} result with combined hints")
+
+            # Test 4: Get with filter and hint
+            print("✅ Testing get with metadata filter and query hint")
+            if len(inserted_ids) >= 2:
+                query_hint = QueryHint(parallel=2, query_timeout=15.0)
+                results = collection.get(where={"category": "AI"}, query_hint=query_hint, limit=2)
+                assert results is not None
+                assert "ids" in results
+                print(f"   Found {len(results['ids'])} results with filter and hints")
 
         finally:
             # Cleanup

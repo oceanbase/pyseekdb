@@ -8,6 +8,8 @@ import uuid
 
 import pytest
 
+from pyseekdb.client.query_types import QueryHint
+
 
 class TestCollectionHybridSearch:
     """Test collection.hybrid_search() interface using parameterized db_client fixture"""
@@ -368,6 +370,90 @@ class TestCollectionHybridSearch:
         assert results_id and results_id.get("ids") and len(results_id["ids"][0]) > 0
         assert target_id in results_id["ids"][0]
         print(f"   Found target ID: {target_id}")
+
+    def test_collection_hybrid_search_with_query_hint(self, db_client):
+        """
+        Test collection.hybrid_search() with QueryHint for database optimization.
+
+        Tests:
+        - Hybrid search with parallel hint
+        - Hybrid search with query_timeout hint
+        - Hybrid search with combined hints
+
+        Automatically runs for: embedded, server, oceanbase
+        """
+        # Create test collection
+        collection_name = f"test_hybrid_hint_{int(time.time() * 1000)}"
+        collection, dimension = self._create_test_collection(db_client, collection_name)
+
+        try:
+            # Insert test data
+            inserted_ids = self._insert_test_data(db_client, collection_name, dimension)
+            assert len(inserted_ids) > 0
+
+            # Test 1: Hybrid search with parallel hint
+            print("\n✅ Testing hybrid search with parallel hint")
+            query_hint = QueryHint(parallel=5)
+            results = collection.hybrid_search(
+                query={"where_document": {"$contains": "machine"}},
+                knn={"query_texts": ["learning"], "n_results": 3},
+                n_results=5,
+                query_hint=query_hint,
+            )
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 5
+            print(f"   Found {len(results['ids'][0])} results with parallel hint")
+
+            # Test 2: Hybrid search with query_timeout hint
+            print("✅ Testing hybrid search with query_timeout hint")
+            query_hint = QueryHint(query_timeout=15.0)
+            results = collection.hybrid_search(
+                query={"where_document": {"$contains": "programming"}},
+                knn={"query_texts": ["python"], "n_results": 2},
+                n_results=4,
+                query_hint=query_hint,
+            )
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 4
+            print(f"   Found {len(results['ids'][0])} results with query_timeout hint")
+
+            # Test 3: Hybrid search with both hints and ranking
+            print("✅ Testing hybrid search with combined hints and ranking")
+            query_hint = QueryHint(parallel=3, query_timeout=20.0)
+            results = collection.hybrid_search(
+                query={"where_document": {"$contains": "algorithm"}, "n_results": 3},
+                knn={"query_texts": ["advanced"], "n_results": 3},
+                rank={"rrf": {"rank_window_size": 60, "rank_constant": 60}},
+                n_results=6,
+                query_hint=query_hint,
+            )
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 6
+            print(f"   Found {len(results['ids'][0])} results with combined hints and ranking")
+
+            # Test 4: Hybrid search with metadata filters and hints
+            print("✅ Testing hybrid search with metadata filters and hints")
+            query_hint = QueryHint(parallel=4, query_timeout=10.0)
+            results = collection.hybrid_search(
+                query={"where_document": {"$contains": "learning"}, "where": {"category": "AI"}},
+                knn={"query_texts": ["machine learning"], "where": {"score": {"$gte": 90}}, "n_results": 2},
+                n_results=4,
+                query_hint=query_hint,
+            )
+            assert results is not None
+            assert "ids" in results
+            print(f"   Found {len(results['ids'][0])} results with filters and hints")
+
+        finally:
+            # Cleanup
+            try:
+                db_client.delete_collection(name=collection_name)
+                print(f"   Cleaned up collection: {collection_name}")
+            except Exception as cleanup_error:
+                print(f"   Warning: Failed to cleanup collection: {cleanup_error}")
 
 
 if __name__ == "__main__":
