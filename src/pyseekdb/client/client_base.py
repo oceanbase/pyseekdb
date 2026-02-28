@@ -2728,7 +2728,7 @@ class BaseClient(BaseConnection, AdminAPI):
             vector_str = _embedding_to_hexstring(query_vector)
 
             # Build query hint
-            hint_sql = _query_hint_to_sql(query_hint)
+            hint_sql = _query_hint_to_sql(query_hint, table_name=table_name)
 
             # Build SQL query with vector distance calculation
             # Reference: SELECT id, vec FROM t2 ORDER BY l2_distance(vec, '[0.1, 0.2, 0.3]') APPROXIMATE LIMIT 5;
@@ -2811,6 +2811,7 @@ class BaseClient(BaseConnection, AdminAPI):
         include: list[str] | None = None,
         sparse_config=None,
         collection_name: str = "",
+        query_hint=None,
         **kwargs,
     ) -> dict[str, Any]:
         """
@@ -2897,7 +2898,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 ORDER BY {distance_func}(sparse_embedding, {sv_sql})
                 APPROXIMATE
                 LIMIT %s
-            """
+            """.strip()
 
             # Execute query
             query_params = [*params, n_results]
@@ -3023,7 +3024,7 @@ class BaseClient(BaseConnection, AdminAPI):
         where_clause, params = self._build_where_clause(where, where_document, id_list)
 
         # Build query hint
-        hint_sql = _query_hint_to_sql(query_hint)
+        hint_sql = _query_hint_to_sql(query_hint, table_name=table_name)
 
         # Build SQL query
         sql = f"""
@@ -3183,7 +3184,7 @@ class BaseClient(BaseConnection, AdminAPI):
             query_sql = query_sql.strip().strip("'\"")
 
         # Add query hint to the generated SQL
-        hint_sql = _query_hint_to_sql(query_hint)
+        hint_sql = _query_hint_to_sql(query_hint, table_name=table_name)
         if hint_sql and query_sql.upper().startswith("SELECT"):
             # Insert hint after SELECT keyword
             query_sql = query_sql.replace("SELECT", f"SELECT {hint_sql}", 1)

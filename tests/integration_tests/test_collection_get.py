@@ -591,7 +591,7 @@ class TestCollectionGet:
             # Test 4: Get with filter and hint
             print("✅ Testing get with metadata filter and query hint")
             if len(inserted_ids) >= 2:
-                query_hint = QueryHint(parallel=2, query_timeout=15.0)
+                query_hint = QueryHint(parallel=2, query_timeout=15.0, vector_index=True)
                 results = collection.get(where={"category": "AI"}, query_hint=query_hint, limit=2)
                 assert results is not None
                 assert "ids" in results

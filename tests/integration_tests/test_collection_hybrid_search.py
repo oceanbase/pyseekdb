@@ -447,6 +447,20 @@ class TestCollectionHybridSearch:
             assert "ids" in results
             print(f"   Found {len(results['ids'][0])} results with filters and hints")
 
+            # Test 5: Hybrid search with vector index control
+            print("✅ Testing hybrid search with vector index control")
+            query_hint = QueryHint(vector_index=True)  # Ensure vector index is used
+            results = collection.hybrid_search(
+                query={"where_document": {"$contains": "programming"}, "n_results": 3},
+                knn={"query_texts": ["python"], "n_results": 3},
+                n_results=5,
+                query_hint=query_hint,
+            )
+            assert results is not None
+            assert "ids" in results
+            assert len(results["ids"][0]) <= 5
+            print(f"   Found {len(results['ids'][0])} results with vector index control")
+
         finally:
             # Cleanup
             try:
