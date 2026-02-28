@@ -8,6 +8,7 @@ import uuid
 
 import pytest
 
+from pyseekdb import HNSWConfiguration
 from pyseekdb.client.query_types import QueryHint
 
 
@@ -212,7 +213,9 @@ class TestCollectionQuery:
         # Create test collection
         collection_name = f"test_query_hint_{int(time.time() * 1000)}"
 
-        collection = db_client.create_collection(name=collection_name)
+        collection = db_client.create_collection(
+            name=collection_name, configuration=HNSWConfiguration(dimension=3, distance="l2")
+        )
         dimension = collection.dimension
 
         try:

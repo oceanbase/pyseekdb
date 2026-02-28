@@ -384,7 +384,7 @@ class TestCollectionHybridSearch:
         """
         # Create test collection
         collection_name = f"test_hybrid_hint_{int(time.time() * 1000)}"
-        collection, dimension = self._create_test_collection(db_client, collection_name)
+        collection, dimension = self._create_test_collection(db_client, collection_name, dimension=3)
 
         try:
             # Insert test data
