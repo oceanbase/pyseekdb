@@ -2649,6 +2649,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 include=include,
                 sparse_config=sparse_config,
                 collection_name=collection_name,
+                query_hint=query_hint,
                 **kwargs,
             )
 
@@ -2864,6 +2865,8 @@ class BaseClient(BaseConnection, AdminAPI):
         if not sparse_query_vectors:
             raise ValueError("No sparse query vectors resolved.")
 
+        hint_sql = _query_hint_to_sql(query_hint, table_name=table_name)
+
         # Normalize include fields
         include_fields = self._normalize_include_fields(include)
 
@@ -2891,7 +2894,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
             # Build SQL query with sparse vector distance calculation
             sql = f"""
-                SELECT {select_clause},
+                SELECT {hint_sql} {select_clause},
                        {distance_func}(sparse_embedding, {sv_sql}) AS distance
                 FROM `{table_name}`
                 {where_clause}
