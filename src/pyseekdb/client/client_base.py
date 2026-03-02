@@ -3190,7 +3190,7 @@ class BaseClient(BaseConnection, AdminAPI):
         hint_sql = _query_hint_to_sql(query_hint, table_name=table_name)
         if hint_sql and query_sql.upper().startswith("SELECT"):
             # Insert hint after SELECT keyword
-            query_sql = query_sql.replace("SELECT", f"SELECT {hint_sql}", 1)
+            query_sql = f"SELECT {hint_sql} {query_sql[len('SELECT') :]}"
 
         logger.debug(f"Executing query SQL: {query_sql}")
 
