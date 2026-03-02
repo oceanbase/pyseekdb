@@ -15,6 +15,17 @@ from pyseekdb.client.query_types import QueryHint
 class TestCollectionQuery:
     """Test collection.query() interface using parameterized db_client fixture"""
 
+    def _generate_query_vector(self, dimension: int, base_vector: list[float] | None = None) -> list[float]:
+        """Generate a query vector with the correct dimension"""
+        if base_vector is None:
+            base_vector = [1.0, 2.0, 3.0]
+
+        if dimension <= len(base_vector):
+            return base_vector[:dimension]
+        else:
+            extended = base_vector * ((dimension // len(base_vector)) + 1)
+            return extended[:dimension]
+
     def _insert_test_data(self, client, collection_name: str, dimension: int = 3):
         """Helper method to insert test data using direct SQL
 
