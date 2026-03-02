@@ -396,7 +396,7 @@ class TestCollectionHybridSearch:
             query_hint = QueryHint(parallel=5)
             results = collection.hybrid_search(
                 query={"where_document": {"$contains": "machine"}},
-                knn={"query_texts": ["learning"], "n_results": 3},
+                knn={"query_embeddings": self._generate_query_vector(dimension), "n_results": 3},
                 n_results=5,
                 query_hint=query_hint,
             )
@@ -410,7 +410,7 @@ class TestCollectionHybridSearch:
             query_hint = QueryHint(query_timeout=15.0)
             results = collection.hybrid_search(
                 query={"where_document": {"$contains": "programming"}},
-                knn={"query_texts": ["python"], "n_results": 2},
+                knn={"query_embeddings": self._generate_query_vector(dimension), "n_results": 2},
                 n_results=4,
                 query_hint=query_hint,
             )
@@ -424,7 +424,7 @@ class TestCollectionHybridSearch:
             query_hint = QueryHint(parallel=3, query_timeout=20.0)
             results = collection.hybrid_search(
                 query={"where_document": {"$contains": "algorithm"}, "n_results": 3},
-                knn={"query_texts": ["advanced"], "n_results": 3},
+                knn={"query_embeddings": self._generate_query_vector(dimension), "n_results": 3},
                 rank={"rrf": {"rank_window_size": 60, "rank_constant": 60}},
                 n_results=6,
                 query_hint=query_hint,
@@ -439,7 +439,11 @@ class TestCollectionHybridSearch:
             query_hint = QueryHint(parallel=4, query_timeout=10.0)
             results = collection.hybrid_search(
                 query={"where_document": {"$contains": "learning"}, "where": {"category": "AI"}},
-                knn={"query_texts": ["machine learning"], "where": {"score": {"$gte": 90}}, "n_results": 2},
+                knn={
+                    "query_embeddings": self._generate_query_vector(dimension),
+                    "where": {"score": {"$gte": 90}},
+                    "n_results": 2,
+                },
                 n_results=4,
                 query_hint=query_hint,
             )
@@ -452,7 +456,7 @@ class TestCollectionHybridSearch:
             query_hint = QueryHint(vector_index=True)  # Ensure vector index is used
             results = collection.hybrid_search(
                 query={"where_document": {"$contains": "programming"}, "n_results": 3},
-                knn={"query_texts": ["python"], "n_results": 3},
+                knn={"query_embeddings": self._generate_query_vector(dimension), "n_results": 3},
                 n_results=5,
                 query_hint=query_hint,
             )
