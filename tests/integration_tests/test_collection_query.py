@@ -269,7 +269,7 @@ class TestCollectionQuery:
             # Test 4: Query by text with hints
             print("✅ Testing query by text with hints")
             query_hint = QueryHint(parallel=2, query_timeout=10.0, vector_index=True)
-            results = collection.query(query_texts=["machine learning algorithms"], n_results=3, query_hint=query_hint)
+            results = collection.query(query_embeddings=query_vector, n_results=3, query_hint=query_hint)
             assert results is not None
             assert "ids" in results
             assert len(results["ids"][0]) <= 3
