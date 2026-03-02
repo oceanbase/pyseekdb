@@ -214,7 +214,7 @@ class TestCollectionQuery:
         collection_name = f"test_query_hint_{int(time.time() * 1000)}"
 
         collection = db_client.create_collection(
-            name=collection_name, configuration=HNSWConfiguration(dimension=3, distance="l2")
+            name=collection_name, configuration=HNSWConfiguration(dimension=3, distance="l2"), embedding_function=None
         )
         dimension = collection.dimension
 
