@@ -72,6 +72,7 @@ class TestCollectionQuery:
         )
 
         print(f"   Inserted {len(test_data)} test records (dimension={dimension})")
+        return insert_ids
 
     def test_collection_query(self, db_client):
         """
