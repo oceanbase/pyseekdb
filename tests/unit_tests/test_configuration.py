@@ -12,14 +12,13 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from pyseekdb import (  # noqa: E402
-    BqHNSWConfiguration,
     Configuration,
     FulltextIndexConfig,
     HNSWConfiguration,
-    IKFulltextIndexConfig,
-    Ngram2FulltextIndexConfig,
-    NgramFulltextIndexConfig,
-    SpaceFulltextIndexConfig,
+    IKProperties,
+    Ngram2Properties,
+    NgramProperties,
+    SpaceProperties,
 )
 from pyseekdb.client.client_base import _get_vector_index_sql  # noqa: E402
 
@@ -43,11 +42,13 @@ class TestHNSWConfiguration:
 
     def test_invalid_dimension(self):
         """Test that invalid dimension raises ValueError"""
-        with pytest.raises(ValueError, match="dimension must be positive"):
+        with pytest.raises(ValueError, match="must be between"):
             HNSWConfiguration(dimension=0)
 
-        with pytest.raises(ValueError, match="dimension must be positive"):
+        with pytest.raises(ValueError, match="must be between"):
             HNSWConfiguration(dimension=-1)
+        with pytest.raises(ValueError, match="must be between"):
+            HNSWConfiguration(dimension=4097)
 
     def test_invalid_distance(self):
         """Test that invalid distance raises ValueError"""
@@ -68,20 +69,16 @@ class TestHNSWConfiguration:
         """Test properties with primitive value types"""
         config = HNSWConfiguration(
             dimension=128,
+            distance="cosine",
+            type="hnsw",
+            lib="vsag",
             properties={
-                "M": 16,
-                "ef_search": 200,
-                "ef_construction": 400,
-                "extra_info_max_size": 100,
                 "normalize": True,
                 "quantization": "pq",
                 "alpha": 0.75,
             },
         )
-        assert config.properties["m"] == 16
-        assert config.properties["ef_search"] == 200
-        assert config.properties["ef_construction"] == 400
-        assert config.properties["extra_info_max_size"] == 100
+
         assert config.properties["normalize"] is True
         assert config.properties["quantization"] == "pq"
         assert config.properties["alpha"] == 0.75
@@ -102,6 +99,7 @@ class TestHNSWConfiguration:
         with pytest.warns(UserWarning, match="reserved keyword"):
             config = HNSWConfiguration(
                 dimension=128,
+                distance="cosine",
                 properties={
                     "distance": "cosine",
                     "type": "hnsw",
@@ -116,21 +114,17 @@ class TestHNSWConfiguration:
 
     def test_hnsw_numeric_ranges(self):
         with pytest.raises(ValueError, match="m must be between 5 and 128"):
-            HNSWConfiguration(properties={"m": 3})
+            HNSWConfiguration(M=3)
         with pytest.raises(ValueError, match="ef_construction must be between 5 and 1000"):
-            HNSWConfiguration(properties={"ef_construction": 1001})
+            HNSWConfiguration(ef_construction=1001)
         with pytest.raises(ValueError, match="ef_search must be between 1 and 1000"):
-            HNSWConfiguration(properties={"ef_search": 0})
+            HNSWConfiguration(ef_search=0)
         with pytest.raises(ValueError, match="extra_info_max_size must be between 0 and 16384"):
-            HNSWConfiguration(properties={"extra_info_max_size": 17000})
+            HNSWConfiguration(extra_info_max_size=17000)
 
     def test_hnsw_bq_properties(self):
-        config = BqHNSWConfiguration(refine_k=4.0, refine_type="sq8", bq_bits_query=32, bq_use_fht=True)
+        config = HNSWConfiguration(type="hnsw_bq", refine_k=4.0, refine_type="sq8", bq_bits_query=32, bq_use_fht=True)
         assert config.type == "hnsw_bq"
-        assert config.properties["refine_k"] == 4.0
-        assert config.properties["refine_type"] == "sq8"
-        assert config.properties["bq_bits_query"] == 32
-        assert config.properties["bq_use_fht"] is True
 
     def test_vector_index_sql_with_properties(self):
         """Test SQL generation includes properties"""
@@ -139,9 +133,9 @@ class TestHNSWConfiguration:
             distance="cosine",
             type="hnsw_sq",
             lib="vsag",
+            M=16,
+            ef_search=200,
             properties={
-                "M": 16,
-                "ef_search": 200,
                 "quantization": "pq",
             },
         )
@@ -172,17 +166,9 @@ class TestFulltextIndexConfig:
 
     def test_parser_with_params(self):
         """Test parser with parameters"""
-        config = FulltextIndexConfig(analyzer="ngram", properties={"size": 2})
+        config = FulltextIndexConfig(analyzer="ngram", properties={"ngram_token_size": 2})
         assert config.analyzer == "ngram"
-        assert config.properties == {"size": 2}
-
-    def test_parser_with_multiple_params(self):
-        """Test parser with multiple parameters"""
-        config = FulltextIndexConfig(analyzer="ngram", properties={"size": 3, "min_size": 1, "max_size": 5})
-        assert config.analyzer == "ngram"
-        assert config.properties["size"] == 3
-        assert config.properties["min_size"] == 1
-        assert config.properties["max_size"] == 5
+        assert config.properties == {"ngram_token_size": 2}
 
     def test_unknown_analyzer_warns(self):
         with pytest.warns(UserWarning, match="Unknown analyzer"):
@@ -192,24 +178,24 @@ class TestFulltextIndexConfig:
 
     def test_space_analyzer_param_validation(self):
         with pytest.raises(ValueError, match="max_token_size should not be less than min_token_size"):
-            SpaceFulltextIndexConfig(min_token_size=16, max_token_size=10)
+            FulltextIndexConfig(analyzer="space", properties=SpaceProperties(min_token_size=16, max_token_size=10))
 
     def test_ngram_analyzer_param_validation(self):
         with pytest.raises(ValueError, match="ngram_token_size must be between 1 and 10"):
-            NgramFulltextIndexConfig(ngram_token_size=11)
+            FulltextIndexConfig(analyzer="ngram", properties=NgramProperties(ngram_token_size=11))
 
     def test_ngram2_analyzer_param_validation(self):
         with pytest.raises(ValueError, match="max_ngram_size should not be less than min_ngram_size"):
-            Ngram2FulltextIndexConfig(min_ngram_size=10, max_ngram_size=2)
+            FulltextIndexConfig(analyzer="ngram2", properties=Ngram2Properties(min_ngram_size=10, max_ngram_size=2))
 
     def test_ik_mode_validation(self):
         with pytest.raises(ValueError, match="ik_mode should be one of"):
-            IKFulltextIndexConfig(ik_mode="invalid")
+            FulltextIndexConfig(analyzer="ik", properties=IKProperties(ik_mode="invalid"))
 
     def test_params_with_different_types(self):
         """Test params with different primitive types"""
         config = FulltextIndexConfig(
-            analyzer="ik",
+            analyzer="jieba",
             properties={
                 "string_param": "value",
                 "int_param": 42,
