@@ -104,6 +104,8 @@ def _normalize_ik_mode(properties: dict[str, PrimitiveValue]) -> None:
 
 
 def _validate_fulltext_properties_by_analyzer(analyzer: str, properties: dict[str, PrimitiveValue] | None) -> None:
+    if not properties:
+        return
     if analyzer in {FulltextAnalyzer.SPACE.value, FulltextAnalyzer.BENG.value}:
         _validate_space_or_beng_properties(properties)
     elif analyzer == FulltextAnalyzer.NGRAM.value:

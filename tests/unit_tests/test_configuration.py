@@ -125,6 +125,10 @@ class TestHNSWConfiguration:
     def test_hnsw_bq_properties(self):
         config = HNSWConfiguration(type="hnsw_bq", refine_k=4.0, refine_type="sq8", bq_bits_query=32, bq_use_fht=True)
         assert config.type == "hnsw_bq"
+        assert config.refine_k == 4.0
+        assert config.refine_type == "sq8"
+        assert config.bq_bits_query == 32
+        assert config.bq_use_fht is True
 
     def test_vector_index_sql_with_properties(self):
         """Test SQL generation includes properties"""
@@ -146,6 +150,22 @@ class TestHNSWConfiguration:
         assert "M=16" in sql
         assert "ef_search=200" in sql
         assert "quantization='pq'" in sql
+
+    def test_vector_index_sql_with_bq_fields(self):
+        """Test SQL generation quotes string fields and formats bool fields"""
+        config = HNSWConfiguration(
+            dimension=128,
+            type="hnsw_bq",
+            refine_k=4.0,
+            refine_type="sq8",
+            bq_bits_query=32,
+            bq_use_fht=True,
+        )
+        sql = _get_vector_index_sql(config)
+        assert "refine_k=4.0" in sql
+        assert "refine_type='sq8'" in sql
+        assert "bq_bits_query=32" in sql
+        assert "bq_use_fht=" in sql
 
 
 class TestFulltextIndexConfig:

@@ -186,7 +186,12 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     )
     for key, value in optional_fields:
         if value is not None:
-            property_parts.append(f"{key}={value}")
+            if isinstance(value, str):
+                property_parts.append(f"{key}='{value}'")
+            elif isinstance(value, bool):
+                property_parts.append(f"{key}={str(value).lower()}")
+            else:
+                property_parts.append(f"{key}={value}")
     property_str = ", ".join(property_parts)
     properties_str = f", {property_str}" if property_str else ""
     return f"WITH (DISTANCE={hnsw_config.distance}, TYPE={hnsw_config.type}, LIB={hnsw_config.lib}{properties_str})"
@@ -773,6 +778,8 @@ class BaseClient(BaseConnection, AdminAPI):
                     )
 
         dimension = hnsw_config.dimension
+        if dimension < 1 or dimension > 4096:
+            raise ValueError(f"Dimension must be between 1 and 4096, got {dimension}")
 
         # Extract fulltext parser configuration
         fulltext_index_clause = _get_fulltext_index_sql(schema.fulltext_index)
