@@ -37,7 +37,7 @@ class TestHNSWConfiguration:
     def test_default_distance(self):
         """Test default distance metric"""
         config = HNSWConfiguration()
-        assert config.distance == "l2"
+        assert config.distance == "cosine"
         assert config.dimension == 384
 
     def test_invalid_dimension(self):
@@ -110,10 +110,10 @@ class TestHNSWConfiguration:
         assert "distance" not in {key.lower() for key in config.properties}
         assert "type" not in {key.lower() for key in config.properties}
         assert "lib" not in {key.lower() for key in config.properties}
-        assert config.properties["m"] == 32
+        assert "m" not in {key.lower() for key in config.properties}
 
     def test_hnsw_numeric_ranges(self):
-        with pytest.raises(ValueError, match="m must be between 5 and 128"):
+        with pytest.raises(ValueError, match="M must be between 5 and 128"):
             HNSWConfiguration(M=3)
         with pytest.raises(ValueError, match="ef_construction must be between 5 and 1000"):
             HNSWConfiguration(ef_construction=1001)
@@ -143,7 +143,7 @@ class TestHNSWConfiguration:
         assert "DISTANCE=cosine" in sql
         assert "TYPE=hnsw_sq" in sql
         assert "LIB=vsag" in sql
-        assert "m=16" in sql
+        assert "M=16" in sql
         assert "ef_search=200" in sql
         assert "quantization='pq'" in sql
 

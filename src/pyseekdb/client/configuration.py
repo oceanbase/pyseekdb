@@ -282,13 +282,13 @@ class HNSWConfiguration:
 
     def __post_init__(self):
         _validate_hnsw_base_fields(self)
+        _validate_hnsw_configuration(self)
 
         _ensure_primitive_properties(self.properties)
         if not self.properties:
             return
 
         _normalize_hnsw_properties(self.properties)
-        _validate_hnsw_configuration(self)
 
 
 class IKProperties(TypedDict, total=False):
