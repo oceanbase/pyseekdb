@@ -66,6 +66,10 @@ import importlib.metadata
 if importlib.util.find_spec("onnxruntime"):
     import onnxruntime  # noqa: F401
 
+# torch and pylibseekdb both use openmp library, which is conflict on macos.
+if importlib.util.find_spec("torch"):
+    import torch  # noqa: F401
+
 from .client import (
     AdminAPI,
     AdminClient,

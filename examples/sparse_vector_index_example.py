@@ -1,10 +1,23 @@
+################################################################################
+# Sparse Vector Index Example
+# install dependencies first:
+# pip install "bm25s[full]" sentence-transformers
+# Note: bm25s[full] is used for bm25 embedding function,
+# sentence-transformers is used for hugging face embedding function and
+# reranking with model
+################################################################################
+
 from __future__ import annotations
 
 import contextlib
 from typing import Any, Literal
 
+from transformers.utils import logging as hf_logging
+
 from pyseekdb import Client, HNSWConfiguration, K, Schema, SparseVectorIndexConfig
 from pyseekdb.utils.embedding_functions import BM25SparseEmbeddingFunction
+
+hf_logging.set_verbosity_error()
 
 # 1. Initialize client (Embedded mode; creates seekdb.db in the current directory)
 client = Client()
