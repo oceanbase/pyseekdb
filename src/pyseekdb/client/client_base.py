@@ -595,7 +595,17 @@ class BaseClient(BaseConnection, AdminAPI):
         effective_tenant = self._database_tenant(tenant)
         logger.debug(f"Forking database: {source_name} -> {destination_name}{self._database_context(effective_tenant)}")
         sql = f"FORK DATABASE `{source_name}` TO `{destination_name}`"
-        self._execute(sql)
+        try:
+            self._execute(sql)
+        except Exception as ex:
+            args = getattr(ex, "args", ())
+            if args and isinstance(args[0], int) and args[0] == 1007:
+                raise ValueError(f"Database '{destination_name}' already exists") from ex
+
+            msg = str(ex).lower()
+            if ("database exists" in msg or "already exists" in msg) and "database" in msg:
+                raise ValueError(f"Database '{destination_name}' already exists") from ex
+            raise
         logger.debug(f"✅ Successfully forked database '{source_name}' to '{destination_name}'")
         return self.get_database(destination_name, tenant=tenant)
 
