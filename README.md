@@ -13,9 +13,9 @@ Key features:
 
 ## Documentation
 
-- Docs home: https://oceanbase.github.io/pyseekdb/
-- User guide: https://oceanbase.github.io/pyseekdb/guide/
-- API reference: https://oceanbase.github.io/pyseekdb/api/
+- Docs home: https://docs.seekdb.ai/seekdb/seekdb-overview/
+- User guide: https://docs.seekdb.ai/seekdb/deploy-overview
+- API reference: https://docs.seekdb.ai/seekdb/api-overview
 - RAG demo: [English](demo/rag/README.md) / [中文](demo/rag/README_CN.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 

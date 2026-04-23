@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/oceanbase/pyseekdb/"
+Homepage = "https://www.seekdb.ai/"
 Repository = "https://github.com/oceanbase/pyseekdb/"
 "Bug Tracker" = "https://github.com/oceanbase/pyseekdb/issues"
 
