@@ -110,6 +110,8 @@ class TestCollectionQuery:
         # Insert test data
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
 
+        collection.refresh()
+
         # Test 1: Basic vector similarity query
         print("\n✅ Testing basic query")
         # Generate query vector with correct dimension

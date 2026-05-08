@@ -325,6 +325,8 @@ class TestCollectionV1Compatibility:
             ],
         )
 
+        collection.refresh()
+
         # Query with vector similarity
         query_vector = [1.0, 2.0, 3.0]
         results = collection.query(

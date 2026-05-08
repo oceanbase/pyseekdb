@@ -1504,6 +1504,12 @@ class BaseClient(BaseConnection, AdminAPI):
         logger.debug(f"db_type: {db_type}, version: {version}")
         return db_type.lower() == "seekdb" and version >= version_120
 
+    def _refresh_enabled(self) -> bool:
+        db_type, version = self.detect_db_type_and_version()
+        version_130 = Version("1.3.0.0")
+        logger.debug(f"db_type: {db_type}, version: {version}")
+        return db_type.lower() == "seekdb" and version >= version_130
+
     def _get_collection_id(self, collection_name: str) -> str:
         collection_id_query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name}'"
         collection_id_query_result = self._execute(collection_id_query_sql)

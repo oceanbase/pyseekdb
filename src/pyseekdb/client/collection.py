@@ -115,6 +115,30 @@ class Collection:
     def __repr__(self) -> str:
         return f"Collection(name='{self._name}', dimension={self._dimension}, client={self._client.mode})"
 
+    def __getattribute__(self, name: str):
+        # Hide refresh for unsupported database versions to keep public surface
+        # consistent with server capabilities.
+        if name == "refresh":
+            is_refresh_available = object.__getattribute__(self, "_is_refresh_available")
+            if not is_refresh_available():
+                raise AttributeError("'Collection' object has no attribute 'refresh'")
+        return object.__getattribute__(self, name)
+
+    def __dir__(self) -> list[str]:
+        attrs = super().__dir__()
+        if "refresh" in attrs and not self._is_refresh_available():
+            attrs.remove("refresh")
+        return attrs
+
+    def _is_refresh_available(self) -> bool:
+        checker = getattr(self._client, "_refresh_enabled", None)
+        if callable(checker):
+            try:
+                return bool(checker())
+            except Exception:
+                return False
+        return True
+
     def fork(self, forked_name: str) -> "Collection":
         """
         Fork (duplicate) this collection to create a new collection with the same data.
@@ -599,7 +623,13 @@ class Collection:
 
         This executes ``CALL dbms_index_manager.refresh();`` and returns only
         after the database completes the refresh procedure.
+
+        Note:
+            This method is only available for seekdb version 1.3.0.0 or higher.
+            In 1.2.0.0 and earlier, this method is hidden from the collection API.
         """
+        if not self._is_refresh_available():
+            raise AttributeError("'Collection' object has no attribute 'refresh'")
         self._client._execute("CALL dbms_index_manager.refresh();")
 
     # ==================== Collection Info ====================
