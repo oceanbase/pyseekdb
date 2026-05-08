@@ -50,7 +50,7 @@ def _run_official_example(collection):
         ids=PRODUCT_IDS,
     )
 
-    collection.refresh()
+    collection.refresh_index()
 
     results = collection.query(
         query_texts=["powerful computer for professional work"],

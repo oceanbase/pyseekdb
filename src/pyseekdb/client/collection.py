@@ -617,7 +617,7 @@ class Collection:
             **kwargs,
         )
 
-    def refresh(self) -> None:
+    def refresh_index(self) -> None:
         """
         Flush async vector index build tasks.
 
