@@ -593,6 +593,15 @@ class Collection:
             **kwargs,
         )
 
+    def flush(self) -> None:
+        """
+        Flush async vector index build tasks.
+
+        This executes ``CALL dbms_index_manager.refresh();`` and returns only
+        after the database completes the refresh procedure.
+        """
+        self._client._execute("CALL dbms_index_manager.refresh();")
+
     # ==================== Collection Info ====================
 
     def count(self) -> int:
