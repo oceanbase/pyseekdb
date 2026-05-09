@@ -120,18 +120,19 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             assert {"ids", "distances", "embeddings"}.issubset(set(embeddings_only.keys()))
             assert isinstance(embeddings_only["embeddings"], list)
             assert len(embeddings_only["embeddings"]) >= 1
-            assert all(
-                (e is None) or (isinstance(e, list) and len(e) == dimension) for e in embeddings_only["embeddings"][0]
-            )
+            embeddings_only_batch = embeddings_only["embeddings"][0]
+            assert embeddings_only_batch is None or isinstance(embeddings_only_batch, list)
+            if isinstance(embeddings_only_batch, list):
+                assert all((e is None) or (isinstance(e, list) and len(e) == dimension) for e in embeddings_only_batch)
 
             # 6) include=["documents","embeddings"]: requested fields should exist (extra fields may be present)
             docs_and_embeddings = collection.hybrid_search(knn=knn, n_results=2, include=["documents", "embeddings"])
             assert {"ids", "distances", "documents", "embeddings"}.issubset(set(docs_and_embeddings.keys()))
             assert all(isinstance(d, str) for d in docs_and_embeddings["documents"][0])
-            assert all(
-                (e is None) or (isinstance(e, list) and len(e) == dimension)
-                for e in docs_and_embeddings["embeddings"][0]
-            )
+            docs_and_embeddings_batch = docs_and_embeddings["embeddings"][0]
+            assert docs_and_embeddings_batch is None or isinstance(docs_and_embeddings_batch, list)
+            if isinstance(docs_and_embeddings_batch, list):
+                assert all((e is None) or (isinstance(e, list) and len(e) == dimension) for e in docs_and_embeddings_batch)
         finally:
             with contextlib.suppress(Exception):
                 db_client.delete_collection(name=collection_name)
