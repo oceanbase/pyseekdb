@@ -137,7 +137,8 @@ class Collection:
                 return bool(checker())
             except Exception:
                 return False
-        return True
+        # Fail closed: if capability detection is unavailable, treat refresh as unsupported.
+        return False
 
     def fork(self, forked_name: str) -> "Collection":
         """
