@@ -1510,6 +1510,18 @@ class BaseClient(BaseConnection, AdminAPI):
         logger.debug(f"db_type: {db_type}, version: {version}")
         return db_type.lower() == "seekdb" and version >= version_130
 
+    def refresh_index(self) -> None:
+        """
+        Flush async vector index build tasks when supported.
+
+        For unsupported database versions, this method is a no-op to keep
+        collection-level API calls backward compatible.
+        """
+        if not self._refresh_enabled():
+            return
+
+        self._execute("CALL dbms_index_manager.refresh();")
+
     def _get_collection_id(self, collection_name: str) -> str:
         collection_id_query_sql = f"SELECT COLLECTION_ID FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name}'"
         collection_id_query_result = self._execute(collection_id_query_sql)

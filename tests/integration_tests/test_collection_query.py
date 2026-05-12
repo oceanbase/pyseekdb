@@ -110,8 +110,7 @@ class TestCollectionQuery:
         # Insert test data
         self._insert_test_data(db_client, collection_name, dimension=actual_dimension)
 
-        if hasattr(collection, "refresh_index"):
-            collection.refresh_index()
+        collection.refresh_index()
 
         # Test 1: Basic vector similarity query
         print("\n✅ Testing basic query")
