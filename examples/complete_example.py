@@ -247,6 +247,7 @@ collection.upsert(
 # ============================================================================
 
 # 6.1 Basic vector similarity query
+collection.refresh_index()  # Refresh index to ensure all updates are searchable
 query_vector = embeddings[0]  # Query with first document's vector
 results = collection.query(query_embeddings=query_vector, n_results=3)
 print(f"Query results: {len(results['ids'][0])} items")

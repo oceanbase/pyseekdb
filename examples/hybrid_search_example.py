@@ -54,6 +54,8 @@ metadatas = [
 ids = [f"doc_{i + 1}" for i in range(len(documents))]
 collection.add(ids=ids, documents=documents, metadatas=metadatas)
 
+collection.refresh_index()  # Refresh index to ensure all updates are searchable
+
 print("=" * 100)
 print("SCENARIO 1: Keyword + Semantic Search")
 print("=" * 100)

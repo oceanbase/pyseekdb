@@ -82,6 +82,9 @@ collection.add(
 print(f"\nAdded {len(documents)} documents to collection")
 print("Note: Embeddings were automatically generated from documents using the embedding function")
 
+# Refresh the index to make the added documents searchable
+collection.refresh_index()
+
 # ==================== Step 4: Query the Collection ====================
 # With embedding function, you can query using text directly
 # The embedding function will automatically convert query text to query vector

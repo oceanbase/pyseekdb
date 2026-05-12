@@ -41,6 +41,9 @@ collection.add(
     metadatas=[{"tag": "hello"}, {"tag": "demo"}],
 )
 
+# Refresh the index to make the added documents searchable
+collection.refresh_index()
+
 results = collection.query(query_texts=["hello"], n_results=3)
 print(results["ids"][0])
 ```

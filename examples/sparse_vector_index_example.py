@@ -51,6 +51,8 @@ collection.add(
     ],
 )
 
+collection.refresh_index()  # Refresh index to ensure all updates are searchable
+
 # 5. Run sparse vector search
 results = collection.query(
     query_texts=["machine learning"],
@@ -245,6 +247,7 @@ docs = [
 ]
 ids = [str(i) for i in range(len(docs))]
 collection.add(documents=docs, ids=ids)
+collection.refresh_index()  # Refresh index to ensure all updates are searchable
 
 query = "apple fruit"
 
