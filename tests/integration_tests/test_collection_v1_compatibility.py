@@ -325,7 +325,8 @@ class TestCollectionV1Compatibility:
             ],
         )
 
-        collection.refresh_index()
+        if hasattr(collection, "refresh_index"):
+            collection.refresh_index()
 
         # Query with vector similarity
         query_vector = [1.0, 2.0, 3.0]

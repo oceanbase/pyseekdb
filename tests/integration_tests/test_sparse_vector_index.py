@@ -474,7 +474,8 @@ class TestCollectionQueryWithSparse:
         name = _unique_name("query_dense_with_sparse")
         try:
             collection, _ids, _ = self._setup_with_data(db_client, name)
-            collection.refresh_index()
+            if hasattr(collection, "refresh_index"):
+                collection.refresh_index()
             results = collection.query(
                 query_embeddings=[1.0, 2.0, 3.0],
                 n_results=3,

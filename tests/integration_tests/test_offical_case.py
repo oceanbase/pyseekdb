@@ -50,7 +50,8 @@ def _run_official_example(collection):
         ids=PRODUCT_IDS,
     )
 
-    collection.refresh_index()
+    if hasattr(collection, "refresh_index"):
+        collection.refresh_index()
 
     results = collection.query(
         query_texts=["powerful computer for professional work"],
