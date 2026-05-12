@@ -93,46 +93,38 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             query_vector = self._generate_query_vector(dimension)
             knn = {"query_embeddings": query_vector, "n_results": 2}
 
-            # 1) include=None: current default returns documents+metadatas+embeddings
+            # 1) include=None: default returns documents+metadatas; should not return embedding column
             default_include = collection.hybrid_search(knn=knn, n_results=2)
-            assert set(default_include.keys()) == {"ids", "distances", "documents", "metadatas", "embeddings"}
+            assert set(default_include.keys()) == {"ids", "distances", "documents", "metadatas"}
             assert all(isinstance(d, str) for d in default_include["documents"][0])
             assert all(isinstance(m, dict) and m for m in default_include["metadatas"][0])
-            assert all(isinstance(e, list) and len(e) == dimension for e in default_include["embeddings"][0])
 
-            # 2) include=[]: currently backend may still return extra fields; ensure base fields exist
+            # 2) include=[]: ids/distances only; should not return document/metadata/embedding columns
             ids_only = collection.hybrid_search(knn=knn, n_results=2, include=[])
-            assert {"ids", "distances"}.issubset(set(ids_only.keys()))
+            assert set(ids_only.keys()) == {"ids", "distances"}
 
-            # 3) include=["documents"]: requested field should exist (extra fields may be present)
+            # 3) include=["documents"]: only document column
             docs_only = collection.hybrid_search(knn=knn, n_results=2, include=["documents"])
-            assert {"ids", "distances", "documents"}.issubset(set(docs_only.keys()))
+            assert set(docs_only.keys()) == {"ids", "distances", "documents"}
             assert all(isinstance(d, str) for d in docs_only["documents"][0])
 
-            # 4) include=["metadatas"]: requested field should exist (extra fields may be present)
+            # 4) include=["metadatas"]: only metadata column
             metadatas_only = collection.hybrid_search(knn=knn, n_results=2, include=["metadatas"])
-            assert {"ids", "distances", "metadatas"}.issubset(set(metadatas_only.keys()))
+            assert set(metadatas_only.keys()) == {"ids", "distances", "metadatas"}
             assert all(isinstance(m, dict) and m for m in metadatas_only["metadatas"][0])
 
-            # 5) include=["embeddings"]: requested field should exist (extra fields may be present)
-            # Some backends may return empty/None embedding entries even when field is requested.
+            # 5) include=["embeddings"]: only embedding column
             embeddings_only = collection.hybrid_search(knn=knn, n_results=2, include=["embeddings"])
-            assert {"ids", "distances", "embeddings"}.issubset(set(embeddings_only.keys()))
-            assert isinstance(embeddings_only["embeddings"], list)
-            assert len(embeddings_only["embeddings"]) >= 1
-            embeddings_only_batch = embeddings_only["embeddings"][0]
-            assert embeddings_only_batch is None or isinstance(embeddings_only_batch, list)
-            if isinstance(embeddings_only_batch, list):
-                assert all((e is None) or (isinstance(e, list) and len(e) == dimension) for e in embeddings_only_batch)
+            assert set(embeddings_only.keys()) == {"ids", "distances", "embeddings"}
+            first_embedding = embeddings_only["embeddings"][0][0]
+            assert isinstance(first_embedding, list)
+            assert len(first_embedding) == dimension
 
-            # 6) include=["documents","embeddings"]: requested fields should exist (extra fields may be present)
+            # 6) include=["documents","embeddings"]: document+embedding columns
             docs_and_embeddings = collection.hybrid_search(knn=knn, n_results=2, include=["documents", "embeddings"])
-            assert {"ids", "distances", "documents", "embeddings"}.issubset(set(docs_and_embeddings.keys()))
+            assert set(docs_and_embeddings.keys()) == {"ids", "distances", "documents", "embeddings"}
             assert all(isinstance(d, str) for d in docs_and_embeddings["documents"][0])
-            docs_and_embeddings_batch = docs_and_embeddings["embeddings"][0]
-            assert docs_and_embeddings_batch is None or isinstance(docs_and_embeddings_batch, list)
-            if isinstance(docs_and_embeddings_batch, list):
-                assert all((e is None) or (isinstance(e, list) and len(e) == dimension) for e in docs_and_embeddings_batch)
+            assert all(isinstance(e, list) and len(e) == dimension for e in docs_and_embeddings["embeddings"][0])
         finally:
             with contextlib.suppress(Exception):
                 db_client.delete_collection(name=collection_name)
