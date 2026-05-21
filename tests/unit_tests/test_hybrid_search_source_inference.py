@@ -26,6 +26,9 @@ class _DummyClient:
     def _build_source_fields(self, include: list[str] | None) -> list[str]:
         return BaseClient._build_source_fields(self, include)
 
+    def _convert_id_from_bytes(self, value: Any) -> Any:
+        return value
+
 
 class TestHybridSearchPublicSurfaceUnit:
     def test_collection_forwards_include_only(self) -> None:
@@ -87,3 +90,26 @@ class TestBuildSourceFieldsUnit:
         assert BaseClient._build_source_fields(dummy, include=["ids"]) == ["_id"]
         assert BaseClient._build_source_fields(dummy, include=["distances"]) == ["_id"]
         assert BaseClient._build_source_fields(dummy, include=["documents", "ids", "distances"]) == ["_id", "document"]
+
+
+class TestTransformSqlResultEmptyRowsUnit:
+    def test_empty_rows_returns_expected_columns_by_include(self) -> None:
+        dummy = _DummyClient()
+
+        default_result = BaseClient._transform_sql_result(dummy, result_rows=[], include=None)
+        assert set(default_result.keys()) == {"ids", "distances", "documents", "metadatas"}
+        assert default_result["ids"] == [[]]
+        assert default_result["distances"] == [[]]
+        assert default_result["documents"] == [[]]
+        assert default_result["metadatas"] == [[]]
+
+        ids_only_result = BaseClient._transform_sql_result(dummy, result_rows=[], include=[])
+        assert set(ids_only_result.keys()) == {"ids", "distances"}
+        assert ids_only_result["ids"] == [[]]
+        assert ids_only_result["distances"] == [[]]
+
+        embeddings_result = BaseClient._transform_sql_result(dummy, result_rows=[], include=["embeddings"])
+        assert set(embeddings_result.keys()) == {"ids", "distances", "embeddings"}
+        assert embeddings_result["ids"] == [[]]
+        assert embeddings_result["distances"] == [[]]
+        assert embeddings_result["embeddings"] == [[]]

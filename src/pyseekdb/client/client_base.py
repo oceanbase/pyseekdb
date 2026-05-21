@@ -3723,14 +3723,6 @@ class BaseClient(BaseConnection, AdminAPI):
             Standard format dictionary with ids, distances, metadatas, documents, embeddings
             in query-compatible format (List[List[...]] for consistency with query method)
         """
-        if not result_rows:
-            return {
-                "ids": [[]],
-                "distances": [[]],
-                "metadatas": [[]],
-                "documents": [[]],
-                "embeddings": [[]],
-            }
 
         ids = []
         distances = []

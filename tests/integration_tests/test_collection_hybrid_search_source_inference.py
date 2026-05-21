@@ -93,6 +93,8 @@ class TestCollectionHybridSearchSourceInferenceRealDB:
             query_vector = self._generate_query_vector(dimension)
             knn = {"query_embeddings": query_vector, "n_results": 2}
 
+            collection.refresh_index()
+
             # 1) include=None: default returns documents+metadatas; should not return embedding column
             default_include = collection.hybrid_search(knn=knn, n_results=2)
             assert set(default_include.keys()) == {"ids", "distances", "documents", "metadatas"}
