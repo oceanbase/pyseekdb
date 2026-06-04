@@ -82,9 +82,9 @@ def _require_embedded_pylibseekdb() -> None:
     except importlib.metadata.PackageNotFoundError:
         pytest.skip("pylibseekdb is not installed")
 
-    if installed_version <= MIN_PYLIBSEEKDB_VERSION:
+    if installed_version < MIN_PYLIBSEEKDB_VERSION:
         pytest.skip(
-            f"embedded multiprocess tests require pylibseekdb > {MIN_PYLIBSEEKDB_VERSION}, got {installed_version}"
+            f"embedded multiprocess tests require pylibseekdb >= {MIN_PYLIBSEEKDB_VERSION}, got {installed_version}"
         )
 
 
