@@ -36,6 +36,9 @@ THREADS_PER_PROCESS = 3
 ITEMS_PER_THREAD = 5
 WORKER_TIMEOUT_SECONDS = 60
 MIN_PYLIBSEEKDB_VERSION = Version("1.3.0.post1")
+_MP_CONTEXT = mp.get_context("spawn")
+
+pytestmark = pytest.mark.parametrize("_mode", ["embedded"], ids=["embedded"])
 
 
 def _purge_pyseekdb_modules() -> None:
@@ -89,20 +92,30 @@ def _require_embedded_pylibseekdb() -> None:
         )
 
 
-def _run_processes(
+def _run_processes(  # noqa: C901
     target: Callable[..., None],
     args_list: list[tuple[Any, ...]],
     expected_count: int,
     timeout: float = WORKER_TIMEOUT_SECONDS,
 ) -> list[dict[str, Any]]:
-    result_queue: mp.Queue[dict[str, Any]] = mp.Queue()
-    processes = [mp.Process(target=target, args=(*args, result_queue)) for args in args_list]
+    result_queue: mp.Queue[dict[str, Any]] = _MP_CONTEXT.Queue()
+    processes = [_MP_CONTEXT.Process(target=target, args=(*args, result_queue)) for args in args_list]
 
     for process in processes:
         process.start()
 
     deadline = time.time() + timeout
-    while time.time() < deadline and any(process.is_alive() for process in processes):
+    results: list[dict[str, Any]] = []
+    while time.time() < deadline:
+        while len(results) < expected_count:
+            try:
+                results.append(result_queue.get(timeout=0.1))
+            except Empty:
+                break
+        if len(results) >= expected_count and not any(process.is_alive() for process in processes):
+            break
+        if not any(process.is_alive() for process in processes) and len(results) < expected_count:
+            break
         time.sleep(0.1)
 
     for process in processes:
@@ -461,7 +474,7 @@ def _seed_collection_rows(
 
 
 class TestGetOrCreateCollectionMultiprocess:
-    def test_concurrent_get_or_create_collection(self, embedded_multiprocess_db):
+    def test_concurrent_get_or_create_collection(self, embedded_multiprocess_db, _mode):
         db_path, database = embedded_multiprocess_db
         collection_name = f"mp_collection_{uuid.uuid4().hex}"
 
@@ -489,7 +502,7 @@ class TestGetOrCreateCollectionMultiprocess:
 
 
 class TestMultiprocessMultithreadCrud:
-    def test_concurrent_add(self, crud_collection):
+    def test_concurrent_add(self, crud_collection, _mode):
         db_path, database, collection_name = crud_collection
 
         results = _run_processes(
@@ -512,7 +525,7 @@ class TestMultiprocessMultithreadCrud:
         collection = _get_collection(client, collection_name)
         assert collection.count() == expected_rows
 
-    def test_concurrent_get(self, crud_collection):
+    def test_concurrent_get(self, crud_collection, _mode):
         db_path, database, collection_name = crud_collection
         expected_rows = _seed_collection_rows(
             db_path, database, collection_name, NUM_PROCESSES, THREADS_PER_PROCESS, ITEMS_PER_THREAD
@@ -531,7 +544,7 @@ class TestMultiprocessMultithreadCrud:
         assert all(result["ok"] for result in results), results
         assert sum(result["fetched"] for result in results) == expected_rows
 
-    def test_concurrent_query(self, crud_collection):
+    def test_concurrent_query(self, crud_collection, _mode):
         db_path, database, collection_name = crud_collection
         _seed_collection_rows(db_path, database, collection_name, NUM_PROCESSES, THREADS_PER_PROCESS, ITEMS_PER_THREAD)
 
@@ -549,7 +562,7 @@ class TestMultiprocessMultithreadCrud:
         expected_queries = NUM_PROCESSES * THREADS_PER_PROCESS * ITEMS_PER_THREAD
         assert sum(result["queried"] for result in results) == expected_queries
 
-    def test_concurrent_update(self, crud_collection):
+    def test_concurrent_update(self, crud_collection, _mode):
         db_path, database, collection_name = crud_collection
         expected_rows = _seed_collection_rows(
             db_path, database, collection_name, NUM_PROCESSES, THREADS_PER_PROCESS, ITEMS_PER_THREAD
@@ -568,7 +581,7 @@ class TestMultiprocessMultithreadCrud:
         assert all(result["ok"] for result in results), results
         assert sum(result["updated"] for result in results) == expected_rows
 
-    def test_concurrent_delete(self, crud_collection):
+    def test_concurrent_delete(self, crud_collection, _mode):
         db_path, database, collection_name = crud_collection
         expected_rows = _seed_collection_rows(
             db_path, database, collection_name, NUM_PROCESSES, THREADS_PER_PROCESS, ITEMS_PER_THREAD
@@ -591,7 +604,7 @@ class TestMultiprocessMultithreadCrud:
         collection = _get_collection(client, collection_name)
         assert collection.count() == 0
 
-    def test_concurrent_mixed_crud(self, crud_collection):
+    def test_concurrent_mixed_crud(self, crud_collection, _mode):
         db_path, database, collection_name = crud_collection
 
         results = _run_processes(
