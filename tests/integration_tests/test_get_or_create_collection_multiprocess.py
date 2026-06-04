@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import gc
 import importlib
+import importlib.metadata
 import multiprocessing as mp
 import sys
 import tempfile
@@ -22,6 +23,7 @@ from queue import Empty
 from typing import Any
 
 import pytest
+from packaging.version import Version
 
 repo_root = Path(__file__).resolve().parents[2]
 src_root = repo_root / "src"
@@ -32,6 +34,7 @@ NUM_PROCESSES = 2
 THREADS_PER_PROCESS = 3
 ITEMS_PER_THREAD = 5
 WORKER_TIMEOUT_SECONDS = 60
+MIN_PYLIBSEEKDB_VERSION = Version("1.3.0.post1")
 
 
 def _purge_pyseekdb_modules() -> None:
@@ -66,6 +69,23 @@ def _refresh_collection(db_path: str, database: str, collection_name: str) -> No
     client = _make_client(db_path, database)
     collection = _get_collection(client, collection_name)
     collection.refresh_index()
+
+
+def _require_embedded_pylibseekdb() -> None:
+    try:
+        import pylibseekdb  # noqa: F401
+    except ImportError:
+        pytest.skip("seekdb embedded package is not installed")
+
+    try:
+        installed_version = Version(importlib.metadata.version("pylibseekdb"))
+    except importlib.metadata.PackageNotFoundError:
+        pytest.skip("pylibseekdb is not installed")
+
+    if installed_version <= MIN_PYLIBSEEKDB_VERSION:
+        pytest.skip(
+            f"embedded multiprocess tests require pylibseekdb > {MIN_PYLIBSEEKDB_VERSION}, got {installed_version}"
+        )
 
 
 def _run_processes(
@@ -370,10 +390,7 @@ def _mixed_crud_worker(
 
 @pytest.fixture
 def embedded_multiprocess_db():
-    try:
-        import pylibseekdb  # noqa: F401
-    except ImportError:
-        pytest.skip("seekdb embedded package is not installed")
+    _require_embedded_pylibseekdb()
 
     db_path = Path(tempfile.mkdtemp(prefix="seekdb-mp-"))
     database = "test_mp"
