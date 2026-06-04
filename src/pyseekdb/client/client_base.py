@@ -1722,7 +1722,6 @@ class BaseClient(BaseConnection, AdminAPI):
                 logger.debug(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.debug(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
                     logger.exception("Failed to generate embeddings")
                     raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
@@ -1897,7 +1896,6 @@ class BaseClient(BaseConnection, AdminAPI):
                 logger.debug(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.debug(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
                     logger.exception("Failed to generate embeddings")
                     raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
@@ -2053,7 +2051,6 @@ class BaseClient(BaseConnection, AdminAPI):
                 logger.debug(f"Generating embeddings for {len(documents)} documents using embedding function")
                 try:
                     embeddings = embedding_function(documents)
-                    logger.info(f"✅ Successfully generated {len(embeddings)} embeddings")
                 except Exception as e:
                     logger.exception("Failed to generate embeddings")
                     raise ValueError(f"Failed to generate embeddings from documents: {e}") from e
