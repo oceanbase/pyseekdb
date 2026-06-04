@@ -3,8 +3,10 @@ Base client interface definition
 """
 
 import contextlib
+import fcntl
 import json
 import logging
+import os
 import re
 import struct
 import warnings
@@ -61,6 +63,28 @@ _MAX_COLLECTION_NAME_LENGTH = 512
 logger = logging.getLogger(__name__)
 
 from .types import _NOT_PROVIDED, _NotProvided  # noqa: E402, F401
+
+
+def _extract_collection_id_from_sdk_row(row: Any) -> str:
+    if isinstance(row, dict):
+        collection_id = row.get("COLLECTION_ID", "")
+    elif isinstance(row, (tuple, list)):
+        collection_id = row[0] if len(row) > 0 else ""
+    else:
+        collection_id = str(row)
+    return str(collection_id or "")
+
+
+def _is_collection_conflict_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    if isinstance(exc, ValueError):
+        if "already exists" in message and "collection" in message:
+            return True
+        if "failed to create collection metadata" in message:
+            return True
+    if "already exists" in message and ("table" in message or "code=1050" in message):
+        return True
+    return type(exc).__name__ == "SeekdbError" and "already exists" in message
 
 
 def _extract_hnsw_config(config: ConfigurationParam) -> HNSWConfiguration | None:
@@ -715,7 +739,23 @@ class BaseClient(BaseConnection, AdminAPI):
             fulltext_index=fulltext_config,
         )
 
-    def create_collection(
+    @contextlib.contextmanager
+    def _collection_creation_lock(self):
+        """Serialize collection creation for embedded clients across processes."""
+        db_path = getattr(self, "path", None)
+        if not db_path:
+            yield
+            return
+
+        lock_path = os.path.join(db_path, ".pyseekdb.collection.lock")
+        with open(lock_path, "w", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def create_collection(  # noqa: C901
         self,
         name: str,
         schema: Schema | None = None,
@@ -843,7 +883,12 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Execute SQL to create table
         logger.debug(f"Creating table: {table_name} with SQL: {sql}")
-        self._execute(sql)
+        try:
+            self._execute(sql)
+        except Exception as exc:
+            if _is_collection_conflict_error(exc):
+                raise ValueError(f"Collection '{name}' already exists") from exc
+            raise
 
         # Create and return Collection object
         return Collection(
@@ -928,11 +973,16 @@ class BaseClient(BaseConnection, AdminAPI):
 
             self._create_sdk_collections_if_not_exists()
             collection_name_in_table = escape_string(collection_name)
-            delete_sql = f"DELETE FROM `{CollectionNames.sdk_collections_table_name()}` WHERE COLLECTION_NAME = '{collection_name_in_table}'"
-            self._execute(delete_sql)
-            insert_sql = f"INSERT INTO `{CollectionNames.sdk_collections_table_name()}` (COLLECTION_NAME, SETTINGS) VALUES ('{collection_name_in_table}', '{settings_str}')"
-            self._execute(insert_sql)
-            collection_id = self._get_collection_id(collection_name)
+            try:
+                collection_id = self._get_collection_id(collection_name)
+            except ValueError:
+                insert_sql = (
+                    f"INSERT INTO `{CollectionNames.sdk_collections_table_name()}` "
+                    f"(COLLECTION_NAME, SETTINGS) VALUES ('{collection_name_in_table}', '{settings_str}')"
+                )
+                self._execute(insert_sql)
+                collection_id = self._get_collection_id(collection_name)
+
             results["collection_id"] = collection_id
             results["table_name"] = CollectionNames.table_name_v2(collection_id)
             return results  # noqa: TRY300
@@ -1398,15 +1448,9 @@ class BaseClient(BaseConnection, AdminAPI):
             rows = self._execute(query_sql)
             if not rows or len(rows) == 0:
                 return False
-            if isinstance(rows[0], dict):
-                collection_id = rows[0]["COLLECTION_ID"]
-            elif isinstance(rows[0], (tuple, list)):
-                collection_id = rows[0][0] if len(rows[0]) > 0 else ""
-            else:
-                collection_id = str(rows[0])
-            desc_sql = f"DESCRIBE `{CollectionNames.table_name_v2(collection_id)}`"
-            desc_result = self._execute(desc_sql)
-            return not (not desc_result or len(desc_result) == 0)
+
+            collection_id = _extract_collection_id_from_sdk_row(rows[0])
+            return bool(collection_id)
         except Exception:
             return False
 
@@ -1469,20 +1513,22 @@ class BaseClient(BaseConnection, AdminAPI):
         # Validate collection name before any database interaction
         _validate_collection_name(name)
 
-        # First, try to get the collection
-        if self.has_collection(name):
-            # Collection exists, return it
-            # Pass embedding_function (could be _NOT_PROVIDED, None, or an EmbeddingFunction instance)
-            return self.get_collection(name, embedding_function=embedding_function)
+        with self._collection_creation_lock():
+            if self.has_collection(name):
+                return self.get_collection(name, embedding_function=embedding_function)
 
-        # Collection doesn't exist, create it with provided or default configuration
-        return self.create_collection(
-            name=name,
-            schema=schema,
-            configuration=configuration,
-            embedding_function=embedding_function,
-            **kwargs,
-        )
+            try:
+                return self.create_collection(
+                    name=name,
+                    schema=schema,
+                    configuration=configuration,
+                    embedding_function=embedding_function,
+                    **kwargs,
+                )
+            except Exception as exc:
+                if _is_collection_conflict_error(exc) or self.has_collection(name):
+                    return self.get_collection(name, embedding_function=embedding_function)
+                raise
 
     def _get_collection_table_name(self, collection_id: str | None, collection_name: str) -> str:
         """
@@ -1527,12 +1573,9 @@ class BaseClient(BaseConnection, AdminAPI):
         collection_id_query_result = self._execute(collection_id_query_sql)
         if not collection_id_query_result or len(collection_id_query_result) == 0:
             raise ValueError(f"Collection not found: '{collection_name}'")
-        if isinstance(collection_id_query_result[0], dict):
-            collection_id = collection_id_query_result[0]["COLLECTION_ID"]
-        elif isinstance(collection_id_query_result[0], (tuple, list)):
-            collection_id = collection_id_query_result[0][0] if len(collection_id_query_result[0]) > 0 else ""
-        else:
-            collection_id = str(collection_id_query_result[0])
+        collection_id = _extract_collection_id_from_sdk_row(collection_id_query_result[0])
+        if not collection_id:
+            raise ValueError(f"Collection not found: '{collection_name}'")
         return collection_id
 
     def _collection_fork(self, collection: Collection, forked_name: str) -> None:
