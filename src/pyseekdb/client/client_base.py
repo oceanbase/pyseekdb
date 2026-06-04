@@ -3,10 +3,8 @@ Base client interface definition
 """
 
 import contextlib
-import fcntl
 import json
 import logging
-import os
 import re
 import struct
 import warnings
@@ -739,23 +737,7 @@ class BaseClient(BaseConnection, AdminAPI):
             fulltext_index=fulltext_config,
         )
 
-    @contextlib.contextmanager
-    def _collection_creation_lock(self):
-        """Serialize collection creation for embedded clients across processes."""
-        db_path = getattr(self, "path", None)
-        if not db_path:
-            yield
-            return
-
-        lock_path = os.path.join(db_path, ".pyseekdb.collection.lock")
-        with open(lock_path, "w", encoding="utf-8") as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-    def create_collection(  # noqa: C901
+    def create_collection(
         self,
         name: str,
         schema: Schema | None = None,
@@ -808,6 +790,8 @@ class BaseClient(BaseConnection, AdminAPI):
             ... )
         """
         _validate_collection_name(name)
+        # Only fully initialized collections (metadata + physical table) count as existing.
+        # Metadata without a table is treated as an incomplete create and repaired below.
         if self.has_collection(name):
             raise ValueError(f"Collection '{name}' already exists")
 
@@ -872,7 +856,7 @@ class BaseClient(BaseConnection, AdminAPI):
             table_name = collection_meta["table_name"]
 
         # Construct CREATE TABLE SQL statement with HEAP organization
-        sql = f"""CREATE TABLE `{table_name}` (
+        sql = f"""CREATE TABLE IF NOT EXISTS `{table_name}` (
             _id varbinary(512) PRIMARY KEY NOT NULL,
             document string,
             embedding vector({dimension}),
@@ -883,12 +867,7 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Execute SQL to create table
         logger.debug(f"Creating table: {table_name} with SQL: {sql}")
-        try:
-            self._execute(sql)
-        except Exception as exc:
-            if _is_collection_conflict_error(exc):
-                raise ValueError(f"Collection '{name}' already exists") from exc
-            raise
+        self._execute(sql)
 
         # Create and return Collection object
         return Collection(
@@ -1442,6 +1421,13 @@ class BaseClient(BaseConnection, AdminAPI):
         """
         return self._has_collection_v2(name) or self._has_collection_v1(name)
 
+    def _collection_table_exists(self, table_name: str) -> bool:
+        try:
+            table_info = self._execute(f"DESCRIBE `{table_name}`")
+            return table_info is not None and len(table_info) > 0
+        except Exception:
+            return False
+
     def _has_collection_v2(self, name: str) -> bool:
         try:
             query_sql = f"SELECT COLLECTION_ID FROM {CollectionNames.sdk_collections_table_name()} WHERE COLLECTION_NAME = '{name}'"
@@ -1450,7 +1436,10 @@ class BaseClient(BaseConnection, AdminAPI):
                 return False
 
             collection_id = _extract_collection_id_from_sdk_row(rows[0])
-            return bool(collection_id)
+            if not collection_id:
+                return False
+
+            return self._collection_table_exists(CollectionNames.table_name_v2(collection_id))
         except Exception:
             return False
 
@@ -1513,22 +1502,21 @@ class BaseClient(BaseConnection, AdminAPI):
         # Validate collection name before any database interaction
         _validate_collection_name(name)
 
-        with self._collection_creation_lock():
-            if self.has_collection(name):
-                return self.get_collection(name, embedding_function=embedding_function)
+        if self.has_collection(name):
+            return self.get_collection(name, embedding_function=embedding_function)
 
-            try:
-                return self.create_collection(
-                    name=name,
-                    schema=schema,
-                    configuration=configuration,
-                    embedding_function=embedding_function,
-                    **kwargs,
-                )
-            except Exception as exc:
-                if _is_collection_conflict_error(exc) or self.has_collection(name):
-                    return self.get_collection(name, embedding_function=embedding_function)
-                raise
+        try:
+            return self.create_collection(
+                name=name,
+                schema=schema,
+                configuration=configuration,
+                embedding_function=embedding_function,
+                **kwargs,
+            )
+        except Exception as exc:
+            if _is_collection_conflict_error(exc) or self.has_collection(name):
+                return self.get_collection(name, embedding_function=embedding_function)
+            raise
 
     def _get_collection_table_name(self, collection_id: str | None, collection_name: str) -> str:
         """

@@ -2,10 +2,9 @@
 Unit tests for concurrent-safe get_or_create_collection helpers.
 """
 
-import contextlib
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -43,8 +42,7 @@ class TestGetOrCreateCollectionRecovery:
         client.get_collection.return_value = existing
         client.create_collection.side_effect = ValueError("Collection 'items' already exists")
 
-        with patch.object(BaseClient, "_collection_creation_lock", return_value=contextlib.nullcontext()):
-            result = BaseClient.get_or_create_collection(client, "items")
+        result = BaseClient.get_or_create_collection(client, "items")
 
         assert result is existing
         client.get_collection.assert_called_once_with("items", embedding_function=_NOT_PROVIDED)
@@ -58,8 +56,7 @@ class TestGetOrCreateCollectionRecovery:
             "Failed to create collection metadata: Collection not found: 'items'"
         )
 
-        with patch.object(BaseClient, "_collection_creation_lock", return_value=contextlib.nullcontext()):
-            result = BaseClient.get_or_create_collection(client, "items")
+        result = BaseClient.get_or_create_collection(client, "items")
 
         assert result is existing
         client.get_collection.assert_called_once_with("items", embedding_function=_NOT_PROVIDED)
