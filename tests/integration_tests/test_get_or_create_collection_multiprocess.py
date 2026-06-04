@@ -1,11 +1,12 @@
 """
-Integration tests for concurrent collection operations in embedded and OceanBase modes.
+Integration tests for concurrent collection operations across client modes.
 
 Covers multiprocess + multithread workloads. Each thread must use its own
 ``pyseekdb.Client`` instance because ``Client`` is not thread-safe.
 
-These tests are tagged with ``[embedded]`` / ``[oceanbase]`` and run only in the
-corresponding integration-test CI jobs, not in the unit-test integration step.
+Tests are parameterized with ``[embedded]``, ``[server]``, and ``[oceanbase]``
+so each runs in the matching integration-test CI job, not in the unit-test
+integration step.
 """
 
 from __future__ import annotations
@@ -42,13 +43,20 @@ WORKER_TIMEOUT_SECONDS = 60
 MIN_PYLIBSEEKDB_VERSION = Version("1.3.0.post1")
 _MP_CONTEXT = mp.get_context("spawn")
 
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
+SERVER_PORT = int(os.environ.get("SERVER_PORT", "2881"))
+SERVER_USER = os.environ.get("SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("SERVER_PASSWORD", "")
+
 OB_HOST = os.environ.get("OB_HOST", "localhost")
 OB_PORT = int(os.environ.get("OB_PORT", "11202"))
 OB_TENANT = os.environ.get("OB_TENANT", "mysql")
 OB_USER = os.environ.get("OB_USER", "root")
 OB_PASSWORD = os.environ.get("OB_PASSWORD", "")
 
-pytestmark = pytest.mark.parametrize("_mode", ["embedded", "oceanbase"], ids=["embedded", "oceanbase"])
+pytestmark = pytest.mark.parametrize(
+    "_mode", ["embedded", "server", "oceanbase"], ids=["embedded", "server", "oceanbase"]
+)
 
 
 def _purge_pyseekdb_modules() -> None:
@@ -75,7 +83,7 @@ def _make_client(client_config: dict[str, Any]):
     mode = client_config["mode"]
     if mode == "embedded":
         return pyseekdb.Client(path=client_config["path"], database=client_config["database"])
-    if mode == "oceanbase":
+    if mode in ("server", "oceanbase"):
         return pyseekdb.Client(
             host=client_config["host"],
             port=client_config["port"],
@@ -92,7 +100,7 @@ def _make_admin_client(client_config: dict[str, Any]):
     mode = client_config["mode"]
     if mode == "embedded":
         return pyseekdb.AdminClient(path=client_config["path"])
-    if mode == "oceanbase":
+    if mode in ("server", "oceanbase"):
         return pyseekdb.AdminClient(
             host=client_config["host"],
             port=client_config["port"],
@@ -442,6 +450,16 @@ def _build_client_config(mode: str) -> tuple[dict[str, Any], Path | None]:
         _require_embedded_pylibseekdb()
         temp_db_path = Path(tempfile.mkdtemp(prefix="seekdb-mp-"))
         client_config = {"mode": "embedded", "path": str(temp_db_path), "database": database}
+    elif mode == "server":
+        client_config = {
+            "mode": "server",
+            "host": SERVER_HOST,
+            "port": SERVER_PORT,
+            "tenant": "sys",
+            "database": database,
+            "user": SERVER_USER,
+            "password": SERVER_PASSWORD,
+        }
     elif mode == "oceanbase":
         client_config = {
             "mode": "oceanbase",
