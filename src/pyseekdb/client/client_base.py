@@ -74,15 +74,15 @@ def _extract_collection_id_from_sdk_row(row: Any) -> str:
 
 
 def _is_collection_conflict_error(exc: BaseException) -> bool:
-    message = str(exc).lower()
-    if isinstance(exc, ValueError):
-        if "already exists" in message and "collection" in message:
+    current: BaseException | None = exc
+    while current is not None:
+        message = str(current).lower()
+        if "already exists" in message and ("collection" in message or "table" in message or "code=1050" in message):
             return True
-        if "failed to create collection metadata" in message:
+        if type(current).__name__ == "SeekdbError" and "already exists" in message:
             return True
-    if "already exists" in message and ("table" in message or "code=1050" in message):
-        return True
-    return type(exc).__name__ == "SeekdbError" and "already exists" in message
+        current = current.__cause__
+    return False
 
 
 def _extract_hnsw_config(config: ConfigurationParam) -> HNSWConfiguration | None:

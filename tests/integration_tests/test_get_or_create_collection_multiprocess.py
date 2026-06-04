@@ -12,6 +12,7 @@ import gc
 import importlib
 import importlib.metadata
 import multiprocessing as mp
+import shutil
 import sys
 import tempfile
 import time
@@ -107,7 +108,7 @@ def _run_processes(
     for process in processes:
         if process.is_alive():
             process.terminate()
-            process.join(timeout=2)
+        process.join(timeout=2)
 
     results: list[dict[str, Any]] = []
     while len(results) < expected_count:
@@ -263,6 +264,8 @@ def _update_worker(
         ]
         collection.update(ids=ids, metadatas=metadatas)
         result = collection.get(ids=ids, include=["metadatas"])
+        if len(result["ids"]) != len(ids):
+            raise AssertionError(f"expected {len(ids)} updated rows, got {len(result['ids'])}")
         for metadata in result["metadatas"]:
             if not metadata.get("updated"):
                 raise AssertionError(f"metadata not updated: {metadata}")
@@ -402,6 +405,9 @@ def embedded_multiprocess_db():
     gc.collect()
 
     yield str(db_path), database
+
+    with contextlib.suppress(Exception):
+        shutil.rmtree(db_path, ignore_errors=True)
 
 
 @pytest.fixture
