@@ -77,6 +77,14 @@ EmbeddingFunctionParam = EmbeddingFunction[EmbeddingDocuments] | None | Any
 
 _COLLECTION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
+# DBMS_HYBRID_SEARCH.GET_SQL may quote a JSON_EXTRACT expression as though it
+# were a column identifier.  Require JSON_EXTRACT to start the quoted content
+# so the match cannot span from one ordinary quoted identifier to another.
+_QUOTED_JSON_EXTRACT_EXPRESSION_PATTERN = re.compile(
+    r"`(?P<expression>\s*\(*\s*JSON_EXTRACT\s*\([^`]*\)\s*\)*\s*)`",
+    re.IGNORECASE,
+)
+
 # Maximum allowed length for user-facing collection names.
 _MAX_COLLECTION_NAME_LENGTH = 512
 
@@ -90,6 +98,11 @@ _LAKEBASE_VERSION_MARKER = "database ai"
 logger = logging.getLogger(__name__)
 
 from .types import _NOT_PROVIDED, _NotProvided  # noqa: E402, F401
+
+
+def _unquote_json_extract_expressions(query_sql: str) -> str:
+    """Unquote JSON_EXTRACT expressions without touching adjacent SQL identifiers."""
+    return _QUOTED_JSON_EXTRACT_EXPRESSION_PATTERN.sub(r"\g<expression>", query_sql)
 
 
 def is_lakebase_version_string(version_str: str) -> bool:
@@ -4507,16 +4520,10 @@ class BaseClient(BaseConnection, AdminAPI):
             # Remove any surrounding quotes if present
             query_sql = query_sql.strip().strip("'\"")
 
-        # OB's GET_SQL wraps field names in backticks, which turns
-        # `JSON_EXTRACT(metadata, '$.key')` (with or without outer
-        # parentheses) into a literal column name instead of a
-        # function call. Strip the backticks so OB evaluates the
-        # expression as a function call.
-        query_sql = re.sub(
-            r"`([^`]*JSON_EXTRACT[^`]*)`",
-            r"\1",
-            query_sql,
-        )
+        # OB's GET_SQL can wrap JSON_EXTRACT expressions in backticks, which
+        # turns them into literal column names. Unquote only those complete
+        # expressions; ordinary identifiers around them must remain quoted.
+        query_sql = _unquote_json_extract_expressions(query_sql)
 
         # Add query hint to the generated SQL
         hint_sql = _query_hint_to_sql(query_hint, table_name=table_name)
