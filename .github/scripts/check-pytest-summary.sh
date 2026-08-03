@@ -12,7 +12,7 @@ if [[ ! -s "${pytest_log}" ]]; then
   exit 1
 fi
 
-summary="$(tail -n 1 "${pytest_log}")"
+summary="$(awk 'NF { last = $0 } END { print last }' "${pytest_log}")"
 failure_pattern='(^|[[:space:]])[1-9][0-9]*[[:space:]]+(failed|errors?)([,=[:space:]]|$)'
 success_pattern='(^|[[:space:]])[1-9][0-9]*[[:space:]]+passed([,=[:space:]]|$)'
 

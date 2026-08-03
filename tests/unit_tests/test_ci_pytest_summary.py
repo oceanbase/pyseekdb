@@ -12,6 +12,7 @@ CHECK_SCRIPT = Path(__file__).parents[2] / ".github" / "scripts" / "check-pytest
     ("summary", "expected_returncode"),
     [
         ("================ 92 passed, 1 xfailed in 1.23s ================", 0),
+        ("================ 92 passed in 1.23s ================\n\n \t", 0),
         ("= 12 failed, 92 passed, 311 skipped, 1 xpassed in 135.47s =", 1),
         ("================ 1 error, 2 passed in 0.42s ================", 1),
         ("================ 5 skipped in 0.10s ================", 1),
