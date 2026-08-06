@@ -8,6 +8,7 @@ docs/_build/
 
 # tests
 seekdb.db/
+tests/upgrade_test_state.json
 
 # demo
 .env
