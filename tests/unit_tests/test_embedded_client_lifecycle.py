@@ -21,6 +21,39 @@ class _FakeConnection:
         self._events.append(("connection.close", self.path))
 
 
+class _FakePyMySQLCursor:
+    description = (("value",),)
+
+    def __init__(self, events: list[tuple[Any, ...]]) -> None:
+        self._events = events
+
+    def __enter__(self):
+        self._events.append(("cursor.enter",))
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._events.append(("cursor.exit",))
+
+    def execute(self, sql: str, params: list[Any]) -> None:
+        self._events.append(("cursor.execute", sql, params))
+
+    def fetchall(self) -> list[dict[str, int]]:
+        return [{"value": 7}]
+
+
+class _FakePyMySQLConnection:
+    def __init__(self, events: list[tuple[Any, ...]]) -> None:
+        self._events = events
+        self.open = True
+
+    def cursor(self) -> _FakePyMySQLCursor:
+        return _FakePyMySQLCursor(self._events)
+
+    def close(self) -> None:
+        self._events.append(("pymysql.close",))
+        self.open = False
+
+
 class _FakeInstance:
     def __init__(self, path: str, events: list[tuple[Any, ...]], fail_connect: bool = False) -> None:
         self.path = path
@@ -52,6 +85,36 @@ class _FakeInstanceApi:
 
     def connect(self, *, database: str, autocommit: bool) -> _FakeConnection:
         raise AssertionError("the module-level connection must not be used by the instance API")
+
+
+class _FakeOptionsInstance:
+    def __init__(self, path: str, events: list[tuple[Any, ...]]) -> None:
+        self.path = path
+        self._events = events
+
+    def connection_options(self) -> dict[str, Any]:
+        self._events.append(("instance.connection_options", self.path))
+        return {"user": "root", "unix_socket": f"{self.path}/run/sql.sock"}
+
+    def connect(self, *, database: str, autocommit: bool) -> _FakeConnection:
+        raise AssertionError("the native connection must not be used when connection_options is available")
+
+    def close(self) -> None:
+        self._events.append(("instance.close", self.path))
+
+
+class _FakeOptionsApi:
+    SeekdbInstance = _FakeOptionsInstance
+
+    def __init__(self) -> None:
+        self.events: list[tuple[Any, ...]] = []
+
+    def open(self, *, db_dir: str) -> _FakeOptionsInstance:
+        self.events.append(("open", db_dir))
+        return _FakeOptionsInstance(db_dir, self.events)
+
+    def connection_options(self) -> dict[str, Any]:
+        raise AssertionError("the module-level connection options must not be used")
 
 
 class _FakeLegacyApi:
@@ -126,6 +189,92 @@ def test_connect_failure_releases_new_instance_and_allows_retry(tmp_path, monkey
     assert fake_seekdb.events[-1] == ("instance.close", path)
 
     assert client.get_raw_connection().path == path
+    client.close()
+    assert [event for event in fake_seekdb.events if event[0] == "open"] == [("open", path), ("open", path)]
+
+
+def test_connection_options_backend_uses_pymysql_and_closes_in_lifecycle_order(
+    tmp_path, monkeypatch, embedded_module
+) -> None:
+    fake_seekdb = _FakeOptionsApi()
+    _install_fake_seekdb(embedded_module, monkeypatch, fake_seekdb)
+    connect_calls: list[dict[str, Any]] = []
+
+    def fake_connect(**kwargs: Any) -> _FakePyMySQLConnection:
+        connect_calls.append(kwargs)
+        fake_seekdb.events.append(("pymysql.connect",))
+        return _FakePyMySQLConnection(fake_seekdb.events)
+
+    monkeypatch.setattr(embedded_module.pymysql, "connect", fake_connect)
+    path = str((tmp_path / "db").resolve())
+    client = embedded_module.SeekdbEmbeddedClient(
+        path=path,
+        database="app",
+        host="wrong-host",
+        user="wrong-user",
+        read_timeout=5,
+    )
+
+    connection = client.get_raw_connection()
+
+    assert isinstance(connection, _FakePyMySQLConnection)
+    assert client.mode == "SeekdbEmbeddedClient"
+    assert client.is_connected()
+    assert connect_calls == [
+        {
+            "read_timeout": 5,
+            "user": "root",
+            "unix_socket": f"{path}/run/sql.sock",
+            "database": "app",
+            "charset": "utf8mb4",
+            "cursorclass": embedded_module.DictCursor,
+            "autocommit": True,
+        }
+    ]
+
+    rows = client._execute_query_with_cursor(connection, "SELECT %s AS value", [7], True)
+    assert rows == [{"value": 7}]
+
+    client.close()
+    client.close()
+
+    assert fake_seekdb.events == [
+        ("open", path),
+        ("instance.connection_options", path),
+        ("pymysql.connect",),
+        ("cursor.enter",),
+        ("cursor.execute", "SELECT %s AS value", [7]),
+        ("cursor.exit",),
+        ("pymysql.close",),
+        ("instance.close", path),
+    ]
+
+
+def test_pymysql_connect_failure_releases_instance_and_allows_retry(tmp_path, monkeypatch, embedded_module) -> None:
+    fake_seekdb = _FakeOptionsApi()
+    _install_fake_seekdb(embedded_module, monkeypatch, fake_seekdb)
+    attempts = 0
+
+    def fake_connect(**kwargs: Any) -> _FakePyMySQLConnection:
+        nonlocal attempts
+        del kwargs
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("pymysql connect failed")
+        return _FakePyMySQLConnection(fake_seekdb.events)
+
+    monkeypatch.setattr(embedded_module.pymysql, "connect", fake_connect)
+    path = str((tmp_path / "db").resolve())
+    client = embedded_module.SeekdbEmbeddedClient(path=path)
+
+    with pytest.raises(RuntimeError, match="pymysql connect failed"):
+        client.get_raw_connection()
+
+    assert client._instance is None
+    assert not client._initialized
+    assert fake_seekdb.events[-1] == ("instance.close", path)
+
+    assert isinstance(client.get_raw_connection(), _FakePyMySQLConnection)
     client.close()
     assert [event for event in fake_seekdb.events if event[0] == "open"] == [("open", path), ("open", path)]
 

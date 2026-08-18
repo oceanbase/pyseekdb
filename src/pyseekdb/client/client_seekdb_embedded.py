@@ -9,6 +9,9 @@ import threading
 from collections.abc import Sequence
 from typing import Any
 
+import pymysql
+from pymysql.cursors import DictCursor
+
 # Try to import pylibseekdb - it may not be available on all platforms
 try:
     import pylibseekdb as seekdb  # type: ignore[import-not-found]
@@ -24,6 +27,64 @@ from .database import Database
 from .sql_utils import render_sql_with_params
 
 logger = logging.getLogger(__name__)
+
+
+class _NativeEmbeddedBackend:
+    """Connect through pylibseekdb's native Python connection wrapper."""
+
+    supports_dbapi_cursor = False
+
+    @staticmethod
+    def connect(instance: Any, database: str, connection_kwargs: dict[str, Any]) -> Any:
+        del connection_kwargs
+        if instance is not None:
+            return instance.connect(database=database, autocommit=True)
+        return seekdb.connect(database=database, autocommit=True)  # type: ignore[union-attr]
+
+    @staticmethod
+    def is_connection_open(connection: Any) -> bool:
+        return connection is not None
+
+
+class _PyMySQLEmbeddedBackend:
+    """Connect to an owned SeekDB instance through its MySQL endpoint."""
+
+    supports_dbapi_cursor = True
+
+    @staticmethod
+    def connect(instance: Any, database: str, connection_kwargs: dict[str, Any]) -> pymysql.Connection:
+        if instance is None:
+            raise RuntimeError("pylibseekdb returned no SeekdbInstance for a PyMySQL embedded connection")
+
+        options = dict(instance.connection_options())
+        kwargs = dict(connection_kwargs)
+
+        # The endpoint and user belong to the lifecycle handle. Never let
+        # caller-provided values redirect this connection to another instance.
+        for key in ("host", "port", "unix_socket", "user"):
+            kwargs.pop(key, None)
+        kwargs.update(options)
+
+        # Database selection remains caller-owned. BaseClient relies on a
+        # dictionary cursor and autocommit behavior matching RemoteServerClient.
+        kwargs.pop("db", None)
+        kwargs["database"] = database
+        kwargs.setdefault("charset", "utf8mb4")
+        kwargs["cursorclass"] = DictCursor
+        kwargs["autocommit"] = True
+        return pymysql.connect(**kwargs)
+
+    @staticmethod
+    def is_connection_open(connection: Any) -> bool:
+        return connection is not None and bool(getattr(connection, "open", False))
+
+
+def _create_embedded_backend() -> _NativeEmbeddedBackend | _PyMySQLEmbeddedBackend:
+    """Select the safest connection backend from pylibseekdb's capabilities."""
+    instance_type = getattr(seekdb, "SeekdbInstance", None)
+    if instance_type is not None and callable(getattr(instance_type, "connection_options", None)):
+        return _PyMySQLEmbeddedBackend()
+    return _NativeEmbeddedBackend()
 
 
 class SeekdbEmbeddedClient(BaseClient):
@@ -59,6 +120,8 @@ class SeekdbEmbeddedClient(BaseClient):
             raise ValueError(f"Path exists but is not a directory: {self.path}")
 
         self.database = database
+        self._connection_kwargs = dict(kwargs)
+        self._backend = _create_embedded_backend()
         self._connection_lock = threading.RLock()
         self._instance = None
         self._connection = None
@@ -68,11 +131,12 @@ class SeekdbEmbeddedClient(BaseClient):
 
     # ==================== Connection Management ====================
 
-    def _ensure_connection(self) -> Any:  # seekdb.Connection
+    def _ensure_connection(self) -> Any:
         """Ensure connection is established (internal method)"""
         with self._connection_lock:
-            if self._connection is not None:
+            if self._backend.is_connection_open(self._connection):
                 return self._connection
+            self._connection = None
 
             if not self._initialized:
                 try:
@@ -88,12 +152,7 @@ class SeekdbEmbeddedClient(BaseClient):
                 self._initialized = True
 
             try:
-                if self._instance is not None:
-                    connection = self._instance.connect(database=self.database, autocommit=True)
-                else:
-                    connection = seekdb.connect(  # type: ignore[attr-defined]
-                        database=self.database, autocommit=True
-                    )
+                connection = self._backend.connect(self._instance, self.database, self._connection_kwargs)
             except Exception:
                 if self._instance is not None:
                     try:
@@ -136,9 +195,9 @@ class SeekdbEmbeddedClient(BaseClient):
     def is_connected(self) -> bool:
         """Check connection status"""
         with self._connection_lock:
-            return self._connection is not None and self._initialized
+            return self._initialized and self._backend.is_connection_open(self._connection)
 
-    def get_raw_connection(self) -> Any:  # seekdb.Connection
+    def get_raw_connection(self) -> Any:
         """Get raw connection object"""
         return self._ensure_connection()
 
@@ -148,28 +207,27 @@ class SeekdbEmbeddedClient(BaseClient):
         return "SeekdbEmbeddedClient"
 
     def _use_context_manager_for_cursor(self) -> bool:
-        """
-        Override to use try/finally instead of context manager for cursor
-        (seekdb embedded client doesn't support context manager)
-        """
-        return False
+        """Use DB-API cursor contexts for PyMySQL, not for the legacy native cursor."""
+        return self._backend.supports_dbapi_cursor
 
     def _execute_query_with_cursor(  # noqa: C901
         self, conn: Any, sql: str, params: list[Any], use_context_manager: bool = True
     ) -> list[dict[str, Any]]:
         """
-        Execute SQL query and return normalized rows
-        Override base class to handle pyseekdb cursor which doesn't support parameterized queries
+        Execute SQL through DB-API for PyMySQL or adapt the legacy native cursor.
 
         Args:
             conn: Database connection
             sql: SQL query string with %s placeholders
-            params: Query parameters to embed in SQL
-            use_context_manager: Whether to use context manager (ignored for embedded client)
+            params: Query parameters
+            use_context_manager: Whether the selected cursor supports a context manager
 
         Returns:
             List of normalized row dictionaries
         """
+        if self._backend.supports_dbapi_cursor:
+            return super()._execute_query_with_cursor(conn, sql, params, use_context_manager)
+
         # pyseekdb.Cursor.execute() only accepts SQL string, not parameters
         # Embed parameters directly into SQL
         embedded_sql = render_sql_with_params(sql, params)
