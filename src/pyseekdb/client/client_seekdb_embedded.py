@@ -5,6 +5,7 @@ Note: Only available when pylibseekdb is installed (Linux only)
 
 import logging
 import os
+import threading
 from collections.abc import Sequence
 from typing import Any
 
@@ -58,6 +59,8 @@ class SeekdbEmbeddedClient(BaseClient):
             raise ValueError(f"Path exists but is not a directory: {self.path}")
 
         self.database = database
+        self._connection_lock = threading.RLock()
+        self._instance = None
         self._connection = None
         self._initialized = False
 
@@ -67,37 +70,73 @@ class SeekdbEmbeddedClient(BaseClient):
 
     def _ensure_connection(self) -> Any:  # seekdb.Connection
         """Ensure connection is established (internal method)"""
-        if not self._initialized:
-            # 1. open seekdb
+        with self._connection_lock:
+            if self._connection is not None:
+                return self._connection
+
+            if not self._initialized:
+                try:
+                    self._instance = seekdb.open(db_dir=self.path)  # type: ignore[attr-defined]
+                    logger.info(f"✅ seekdb opened: {self.path}")
+                except Exception as exc:
+                    # pylibseekdb < 1.4 exposes only a process-wide module API.
+                    # Keep that legacy API working, but never hide this error for
+                    # the instance API where each db_dir has independent ownership.
+                    if hasattr(seekdb, "SeekdbInstance") or "initialized twice" not in str(exc):
+                        raise
+                    logger.debug(f"seekdb already opened through the legacy module API: {exc}")
+                self._initialized = True
+
             try:
-                seekdb.open(db_dir=self.path)  # type: ignore[attr-defined]
-                logger.info(f"✅ seekdb opened: {self.path}")
-            except Exception as e:
-                if "initialized twice" not in str(e):
-                    raise
-                logger.debug(f"seekdb already opened: {e}")
+                if self._instance is not None:
+                    connection = self._instance.connect(database=self.database, autocommit=True)
+                else:
+                    connection = seekdb.connect(  # type: ignore[attr-defined]
+                        database=self.database, autocommit=True
+                    )
+            except Exception:
+                if self._instance is not None:
+                    try:
+                        self._instance.close()
+                    except Exception as close_exc:
+                        logger.warning("Failed to close seekdb instance after connection error: %s", close_exc)
+                    finally:
+                        self._instance = None
+                        self._initialized = False
+                raise
 
-            self._initialized = True
-
-        # 3. Create connection
-        if self._connection is None:
-            self._connection = seekdb.connect(  # type: ignore[attr-defined]
-                database=self.database, autocommit=True
-            )
+            self._connection = connection
             logger.info(f"✅ Connected to database: {self.database}")
+            return self._connection
 
-        return self._connection
-
-    def _cleanup(self):
-        """Internal cleanup method: close connection)"""
-        if self._connection is not None:
-            self._connection.close()
+    def _cleanup(self) -> None:
+        """Close the connection and its owning pylibseekdb instance."""
+        with self._connection_lock:
+            connection = self._connection
+            instance = self._instance
             self._connection = None
-            logger.info(f"Connection closed: path={self.path}, database={self.database}")
+            self._instance = None
+
+            # Legacy pylibseekdb has only a process-wide module instance. Leave
+            # its initialization state intact because another pyseekdb client may
+            # still be using it. The object API provides safe per-instance close.
+            if instance is not None:
+                self._initialized = False
+
+            try:
+                if connection is not None:
+                    connection.close()
+            finally:
+                if instance is not None:
+                    instance.close()
+
+            if connection is not None or instance is not None:
+                logger.info(f"Connection closed: path={self.path}, database={self.database}")
 
     def is_connected(self) -> bool:
         """Check connection status"""
-        return self._connection is not None and self._initialized
+        with self._connection_lock:
+            return self._connection is not None and self._initialized
 
     def get_raw_connection(self) -> Any:  # seekdb.Connection
         """Get raw connection object"""

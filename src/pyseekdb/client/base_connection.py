@@ -32,6 +32,10 @@ class BaseConnection(ABC):
         """Internal cleanup method to close connection and release resources"""
         pass
 
+    def close(self) -> None:
+        """Close the client connection and release owned resources."""
+        self._cleanup()
+
     @abstractmethod
     def _execute(self, sql: str) -> Any:
         """Execute SQL statement (basic functionality)"""
@@ -56,13 +60,13 @@ class BaseConnection(ABC):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager support: automatic resource cleanup"""
-        self._cleanup()
+        self.close()
 
     def __del__(self):
         """Destructor: ensure connection is closed to prevent resource leaks"""
         try:
-            if hasattr(self, "_connection") and self.is_connected():
-                self._cleanup()
+            if hasattr(self, "_connection"):
+                self.close()
         except Exception as exc:
             # Ignore all exceptions in destructor
             # Avoid issues during interpreter shutdown

@@ -156,6 +156,10 @@ class _AdminClientProxy(AdminAPI):
         """Proxy to server implementation"""
         return self._server.fork_database(source_name=source_name, destination_name=destination_name, tenant=tenant)
 
+    def close(self) -> None:
+        """Close the underlying client and release its resources."""
+        self._server.close()
+
     def __repr__(self):
         """Return the developer-readable representation."""
         return f"<AdminClient server={self._server}>"
@@ -246,6 +250,10 @@ class _ClientProxy:
     def count_collection(self) -> int:
         """Proxy to server implementation - collection operations only"""
         return self._server.count_collection()
+
+    def close(self) -> None:
+        """Close the underlying client and release its resources."""
+        self._server.close()
 
     def __repr__(self):
         """Return the developer-readable representation."""
