@@ -23,7 +23,9 @@ import pyseekdb  # noqa: E402
 
 # ==================== Environment Variable Configuration ====================
 # Embedded mode
-SEEKDB_PATH = os.environ.get("SEEKDB_PATH", os.path.join(repo_root, "seekdb.db"))
+# Keep database files off system temp directories, which may be tmpfs and reject O_DIRECT.
+SEEKDB_TEST_DATA_ROOT = Path(os.environ.get("SEEKDB_TEST_DATA_ROOT", str(repo_root / ".seekdb-test-data")))
+SEEKDB_PATH = os.environ.get("SEEKDB_PATH", str(SEEKDB_TEST_DATA_ROOT / "seekdb.db"))
 SEEKDB_DATABASE = os.environ.get("SEEKDB_DATABASE", "test")
 
 # Server mode

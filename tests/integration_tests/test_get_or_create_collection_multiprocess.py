@@ -55,6 +55,9 @@ OB_TENANT = os.environ.get("OB_TENANT", "mysql")
 OB_USER = os.environ.get("OB_USER", "root")
 OB_PASSWORD = os.environ.get("OB_PASSWORD", "")
 
+# Keep database files off system temp directories, which may be tmpfs and reject O_DIRECT.
+SEEKDB_TEST_DATA_ROOT = Path(os.environ.get("SEEKDB_TEST_DATA_ROOT", str(repo_root / ".seekdb-test-data")))
+
 pytestmark = pytest.mark.parametrize(
     "_mode", ["embedded", "server", "oceanbase"], ids=["embedded", "server", "oceanbase"]
 )
@@ -484,7 +487,8 @@ def _build_client_config(mode: str) -> tuple[dict[str, Any], Path | None, Any]:
 
     if mode == "embedded":
         _require_embedded_pylibseekdb()
-        temp_db_path = Path(tempfile.mkdtemp(prefix="seekdb-mp-"))
+        SEEKDB_TEST_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        temp_db_path = Path(tempfile.mkdtemp(prefix="seekdb-mp-", dir=SEEKDB_TEST_DATA_ROOT))
         client_config = {"mode": "embedded", "path": str(temp_db_path), "database": database}
     elif mode == "server":
         client_config = {

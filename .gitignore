@@ -8,6 +8,7 @@ docs/_build/
 
 # tests
 seekdb.db/
+.seekdb-test-data/
 
 # demo
 .env

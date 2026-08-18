@@ -148,7 +148,7 @@ jobs:
       - name: Run integration tests for ${{ matrix.test_mode }}
         env:
           CI: 1
-          SEEKDB_PATH: ${{ runner.temp }}/seekdb.db
+          SEEKDB_TEST_DATA_ROOT: ${{ github.workspace }}/.seekdb-test-data
           OB_PORT: 10000
           SERVER_PORT: 2881
         run: |
