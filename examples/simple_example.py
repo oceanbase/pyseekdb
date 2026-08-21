@@ -11,32 +11,40 @@ This example demonstrates the most common operations with embedding functions:
 This is a minimal example to get you started quickly with embedding functions.
 """
 
+import os
+
 import pyseekdb
 
 # ==================== Step 1: Create Client Connection ====================
 # You can use embedded mode, server mode, or OceanBase mode
-# For this example, we'll use server mode (you can change to embedded or OceanBase)
+mode = os.getenv("MODE", "embedded")
 
 # Embedded mode (local seekdb)
-client = pyseekdb.Client(path="./seekdb.db", database="test")
+if mode == "embedded":
+    client = pyseekdb.Client(path="./seekdb.db", database="test")
+
 # Alternative: Server mode (connecting to remote seekdb server)
-# client = pyseekdb.Client(
-#     host="127.0.0.1",
-#     port=2881,
-#     database="test",
-#     user="root",
-#     password=""
-# )
+elif mode == "server":
+    client = pyseekdb.Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
 
 # Alternative: Remote server mode (OceanBase Server)
-# client = pyseekdb.Client(
-#     host="127.0.0.1",
-#     port=2881,
-#     tenant="test",  # OceanBase default tenant
-#     database="test",
-#     user="root",
-#     password=""
-# )
+elif mode == "oceanbase":
+    client = pyseekdb.Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        tenant=os.getenv("TENANT", "test"),  # OceanBase default tenant
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
+else:
+    raise ValueError(f"Unsupported MODE: {mode}")
 
 # ==================== Step 2: Create a Collection with Embedding Function ====================
 # A collection is like a table that stores documents with vector embeddings

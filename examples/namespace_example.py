@@ -7,17 +7,26 @@ Demonstrates:
 3. Vector query inside the namespace
 """
 
+import os
+
 import pyseekdb
 from pyseekdb import FulltextIndexConfig, IVFConfiguration, Schema, VectorIndexConfig
 
 # Connect to LakeBase / OceanBase (adjust host/port/credentials)
-client = pyseekdb.Client(
-    host="127.0.0.1",
-    port=2881,
-    database="test",
-    user="root@test",
-    password="",
-)
+mode = os.getenv("MODE", "oceanbase")
+if mode == "embedded":
+    client = pyseekdb.Client()
+elif mode in {"server", "oceanbase"}:
+    client = pyseekdb.Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        tenant=os.getenv("TENANT", "sys" if mode == "server" else "test"),
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
+else:
+    raise ValueError(f"Unsupported MODE: {mode}")
 
 schema = Schema(
     vector_index=VectorIndexConfig(

@@ -13,6 +13,7 @@ This is a complete reference for all client capabilities.
 """
 
 import logging
+import os
 import uuid
 
 import pyseekdb
@@ -23,26 +24,34 @@ logging.basicConfig(level=logging.DEBUG)
 # PART 1: CLIENT CONNECTION
 # ============================================================================
 
+mode = os.getenv("MODE", "embedded")
+
 # Option 1: Embedded mode (local seekdb)
-client = pyseekdb.Client(
-    # path="./seekdb.db",
-    # database="test"
-)
+if mode == "embedded":
+    client = pyseekdb.Client()
 
 # Option 2: Server mode (remote seekdb server)
-# client = pyseekdb.Client(
-#     host="127.0.0.1", port=2881, database="test", user="root", password=""
-# )
+elif mode == "server":
+    client = pyseekdb.Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
 
 # Option 3: Remote server mode (OceanBase Server)
-# client = pyseekdb.Client(
-#     host="127.0.0.1",
-#     port=2881,
-#     tenant="test",  # OceanBase default tenant
-#     database="test",
-#     user="root",
-#     password=""
-# )
+elif mode == "oceanbase":
+    client = pyseekdb.Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        tenant=os.getenv("TENANT", "test"),  # OceanBase default tenant
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
+else:
+    raise ValueError(f"Unsupported MODE: {mode}")
 
 # ============================================================================
 # PART 2: COLLECTION MANAGEMENT

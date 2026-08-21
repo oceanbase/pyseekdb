@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 from typing import Any, Literal
 
 from transformers.utils import logging as hf_logging
@@ -19,8 +20,21 @@ from pyseekdb.utils.embedding_functions import BM25SparseEmbeddingFunction
 
 hf_logging.set_verbosity_error()
 
-# 1. Initialize client (Embedded mode; creates seekdb.db in the current directory)
-client = Client()
+# 1. Initialize client (Embedded mode by default; creates seekdb.db in the current directory)
+mode = os.getenv("MODE", "embedded")
+if mode == "embedded":
+    client = Client()
+elif mode in {"server", "oceanbase"}:
+    client = Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        tenant=os.getenv("TENANT", "sys" if mode == "server" else "test"),
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
+else:
+    raise ValueError(f"Unsupported MODE: {mode}")
 
 # Clean up stale collections from previous runs
 for name in ["demo_sparse_collection", "hybrid_demo"]:

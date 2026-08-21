@@ -8,10 +8,25 @@ Key advantages of hybrid_search():
 - Handles complex scenarios that query() cannot
 """
 
+import os
+
 import pyseekdb
 
 # Setup
-client = pyseekdb.Client()
+mode = os.getenv("MODE", "embedded")
+if mode == "embedded":
+    client = pyseekdb.Client()
+elif mode in {"server", "oceanbase"}:
+    client = pyseekdb.Client(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "2881")),
+        tenant=os.getenv("TENANT", "sys" if mode == "server" else "test"),
+        database=os.getenv("DATABASE", "test"),
+        user=os.getenv("SEEKDB_USER", "root"),
+        password=os.getenv("SEEKDB_PASSWORD", ""),
+    )
+else:
+    raise ValueError(f"Unsupported MODE: {mode}")
 collection = client.get_or_create_collection(name="hybrid_search_demo")
 
 # Sample data

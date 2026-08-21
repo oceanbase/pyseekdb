@@ -104,7 +104,19 @@ jobs:
     strategy:
       fail-fast: false  # Allow other jobs to continue if one fails
       matrix:
-        test_mode: [embedded, server, oceanbase]
+        include:
+          - test_mode: embedded
+            example_host: 127.0.0.1
+            example_port: 2881
+            example_tenant: sys
+          - test_mode: server
+            example_host: 127.0.0.1
+            example_port: 2881
+            example_tenant: sys
+          - test_mode: oceanbase
+            example_host: localhost
+            example_port: 10000
+            example_tenant: mysql
 
     steps:
       - name: Free disk space
@@ -162,3 +174,28 @@ jobs:
           uv run pytest tests/integration_tests/ -v --log-cli-level=${log_level} \
             -k "${{ matrix.test_mode }}" | tee pytest.log
           bash .github/scripts/check-pytest-summary.sh pytest.log
+
+      - name: Run examples for ${{ matrix.test_mode }}
+        env:
+          MODE: ${{ matrix.test_mode }}
+          HOST: ${{ matrix.example_host }}
+          PORT: ${{ matrix.example_port }}
+          TENANT: ${{ matrix.example_tenant }}
+          DATABASE: test
+          SEEKDB_USER: root
+        run: |
+          for example_file in examples/*_example.py; do
+            if [[ "$example_file" == "examples/namespace_example.py" ]]; then
+              echo "Skipping ${example_file}: requires LakeBase 4.6.1+"
+              continue
+            fi
+
+            echo "Testing ${example_file} in ${MODE} mode"
+            if uv run python "$example_file"; then
+              echo "${example_file} passed"
+            else
+              status=$?
+              echo "${example_file} failed with exit code ${status}"
+              exit "$status"
+            fi
+          done
