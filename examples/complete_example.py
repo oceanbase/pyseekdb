@@ -35,6 +35,7 @@ elif mode == "server":
     client = pyseekdb.Client(
         host=os.getenv("HOST", "127.0.0.1"),
         port=int(os.getenv("PORT", "2881")),
+        tenant=os.getenv("TENANT", "sys"),
         database=os.getenv("DATABASE", "test"),
         user=os.getenv("SEEKDB_USER", "root"),
         password=os.getenv("SEEKDB_PASSWORD", ""),
