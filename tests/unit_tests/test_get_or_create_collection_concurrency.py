@@ -4,7 +4,7 @@ Unit tests for concurrent-safe get_or_create_collection helpers.
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,6 +14,8 @@ sys.path.insert(0, str(src_root))
 
 from pyseekdb.client.client_base import (  # noqa: E402
     BaseClient,
+    _is_catalog_bootstrap_transient_error,
+    _is_catalog_table_missing_error,
     _is_collection_conflict_error,
     _is_sdk_collection_catalog_conflict_error,
 )
@@ -78,6 +80,207 @@ class TestCollectionCatalogInsertRecovery:
         assert result["collection_id"] == "existing_id"
         insert_calls = [call for call in client._execute.call_args_list if "INSERT INTO" in str(call)]
         assert not insert_calls
+
+
+class TestCollectionCatalogBootstrap:
+    """Tests for state-driven, retry-bounded catalog initialization."""
+
+    @staticmethod
+    def _client(execute_side_effect):
+        """Build a client mock with the real catalog state helpers bound."""
+        client = MagicMock(spec=BaseClient)
+        client._qtable.side_effect = lambda table: f"`test_db`.`{table}`"
+        client._use_catalog_database = MagicMock()
+        client._rollback_connection_if_supported = MagicMock()
+        client._execute.side_effect = execute_side_effect
+        client._catalog_table_is_visible = BaseClient._catalog_table_is_visible.__get__(client, BaseClient)
+        client._catalog_unique_index_is_ready = BaseClient._catalog_unique_index_is_ready.__get__(client, BaseClient)
+        client._index_row_value = BaseClient._index_row_value
+        return client
+
+    @staticmethod
+    def _unique_index_row(column="collection_name", *, non_unique=0):
+        """Build one tuple-shaped SHOW INDEX row."""
+        return ("sdk_collections", non_unique, "uk_sdk_coll_name", 1, column)
+
+    def test_fast_path_uses_no_ddl_when_catalog_is_ready(self):
+        """A ready catalog is only probed and never receives redundant DDL."""
+
+        def execute(sql):
+            if sql.startswith("SHOW INDEX"):
+                return [self._unique_index_row()]
+            return []
+
+        client = self._client(execute)
+
+        BaseClient._ensure_catalog_table(
+            client,
+            "sdk_collections",
+            "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+            {"uk_sdk_coll_name": ("collection_name",)},
+        )
+
+        sql_calls = [call.args[0] for call in client._execute.call_args_list]
+        assert not any(sql.startswith("CREATE") for sql in sql_calls)
+        assert sum(sql.startswith("SHOW INDEX") for sql in sql_calls) == 1
+
+    def test_missing_table_is_created_and_inline_unique_index_is_verified(self):
+        """A missing table is created once and its inline unique key avoids extra index DDL."""
+        state = {"table": False}
+
+        def execute(sql):
+            if sql.startswith("SELECT 1") and not state["table"]:
+                raise RuntimeError('(1146, "Table test_db.sdk_collections doesn\'t exist")')
+            if sql.startswith("CREATE TABLE"):
+                state["table"] = True
+                return None
+            if sql.startswith("SHOW INDEX"):
+                return [self._unique_index_row()]
+            return []
+
+        client = self._client(execute)
+
+        BaseClient._ensure_catalog_table(
+            client,
+            "sdk_collections",
+            "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+            {"uk_sdk_coll_name": ("collection_name",)},
+        )
+
+        sql_calls = [call.args[0] for call in client._execute.call_args_list]
+        assert sum(sql.startswith("CREATE TABLE") for sql in sql_calls) == 1
+        assert not any(sql.startswith("CREATE UNIQUE INDEX") for sql in sql_calls)
+
+    def test_existing_legacy_table_adds_only_the_missing_unique_index(self):
+        """An old table without the required index receives exactly one index DDL."""
+        state = {"index": False}
+
+        def execute(sql):
+            if sql.startswith("SHOW INDEX"):
+                return [self._unique_index_row()] if state["index"] else []
+            if sql.startswith("CREATE UNIQUE INDEX"):
+                state["index"] = True
+            return []
+
+        client = self._client(execute)
+
+        BaseClient._ensure_catalog_table(
+            client,
+            "sdk_collections",
+            "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+            {"uk_sdk_coll_name": ("collection_name",)},
+        )
+
+        sql_calls = [call.args[0] for call in client._execute.call_args_list]
+        assert sum(sql.startswith("CREATE UNIQUE INDEX") for sql in sql_calls) == 1
+        assert not any(sql.startswith("CREATE TABLE") for sql in sql_calls)
+
+    def test_duplicate_index_race_rechecks_state_before_succeeding(self):
+        """A concurrent 1061 is retried and accepted only after the index is visible."""
+        state = {"create_attempts": 0}
+
+        def execute(sql):
+            if sql.startswith("SHOW INDEX"):
+                return [self._unique_index_row()] if state["create_attempts"] else []
+            if sql.startswith("CREATE UNIQUE INDEX"):
+                state["create_attempts"] += 1
+                raise RuntimeError('(1061, "Duplicate key name uk_sdk_coll_name")')
+            return []
+
+        client = self._client(execute)
+
+        with patch("pyseekdb.client.client_base.time.sleep") as sleep:
+            BaseClient._ensure_catalog_table(
+                client,
+                "sdk_collections",
+                "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+                {"uk_sdk_coll_name": ("collection_name",)},
+            )
+
+        assert state["create_attempts"] == 1
+        client._rollback_connection_if_supported.assert_called_once()
+        sleep.assert_called_once()
+
+    def test_persistent_schema_visibility_race_exhausts_bounded_retries(self):
+        """Persistent 1146 errors are not swallowed as successful initialization."""
+
+        def execute(sql):
+            if sql.startswith("SELECT 1"):
+                raise RuntimeError('(1146, "Table test_db.sdk_collections doesn\'t exist")')
+            return []
+
+        client = self._client(execute)
+
+        with (
+            patch("pyseekdb.client.client_base.time.sleep") as sleep,
+            pytest.raises(RuntimeError, match="not visible after CREATE TABLE"),
+        ):
+            BaseClient._ensure_catalog_table(
+                client,
+                "sdk_collections",
+                "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+                {"uk_sdk_coll_name": ("collection_name",)},
+            )
+
+        assert sleep.call_count == 5
+        assert client._rollback_connection_if_supported.call_count == 6
+
+    def test_non_transient_errors_are_not_retried(self):
+        """Permission and other unrelated failures remain visible to callers."""
+
+        def execute(_sql):
+            raise RuntimeError('(1142, "SELECT command denied")')
+
+        client = self._client(execute)
+
+        with (
+            patch("pyseekdb.client.client_base.time.sleep") as sleep,
+            pytest.raises(RuntimeError, match="1142"),
+        ):
+            BaseClient._ensure_catalog_table(
+                client,
+                "sdk_collections",
+                "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+                {"uk_sdk_coll_name": ("collection_name",)},
+            )
+
+        sleep.assert_not_called()
+        client._rollback_connection_if_supported.assert_not_called()
+
+    def test_wrong_existing_index_definition_is_rejected(self):
+        """A same-named non-unique or wrong-column index is never treated as ready."""
+
+        def execute(sql):
+            if sql.startswith("SHOW INDEX"):
+                return [self._unique_index_row(non_unique=1)]
+            return []
+
+        client = self._client(execute)
+
+        with pytest.raises(ValueError, match="not UNIQUE"):
+            BaseClient._ensure_catalog_table(
+                client,
+                "sdk_collections",
+                "CREATE TABLE IF NOT EXISTS sdk_collections (...) ",
+                {"uk_sdk_coll_name": ("collection_name",)},
+            )
+
+    def test_transient_error_detection_walks_cause_chain(self):
+        """Wrapped database error codes remain classifiable."""
+        inner = RuntimeError('(1146, "Table test_db.sdk_collections doesn\'t exist")')
+        outer = ValueError("catalog bootstrap failed")
+        outer.__cause__ = inner
+
+        assert _is_catalog_table_missing_error(outer)
+        assert _is_catalog_bootstrap_transient_error(outer)
+        assert not _is_catalog_bootstrap_transient_error(RuntimeError('(1142, "SELECT command denied")'))
+
+    def test_embedded_table_missing_error_format_is_transient(self):
+        """Embedded reports symbolic names followed by a parenthesized numeric code."""
+        exc = RuntimeError("execute sql failed OB_TABLE_NOT_EXIST(1146): Table '%s.%s' doesn't exist")
+
+        assert _is_catalog_table_missing_error(exc)
+        assert _is_catalog_bootstrap_transient_error(exc)
 
 
 class TestCollectionConflictDetection:

@@ -7,6 +7,7 @@ Unit tests for namespace-related classes:
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -424,6 +425,8 @@ class FakeClient(BaseClient):
         self.executed_sqls = []
         self.query_sqls = []
         self.query_return_value = []
+        self.catalog_tables = set()
+        self.catalog_indexes = {}
 
     def _ensure_connection(self):
         """Ensure connection."""
@@ -470,6 +473,23 @@ class FakeClient(BaseClient):
         if os.environ.get("PYSEEKDB_PRINT_SQL", "").lower() in ("1", "true", "yes"):
             print(f"[pyseekdb SQL] {sql}", flush=True)
         self.executed_sqls.append(sql)
+
+        table_match = re.search(r"`[^`]+`\.`([^`]+)`", sql)
+        table_name = table_match.group(1) if table_match else None
+        if sql.startswith("SELECT 1 FROM") and table_name not in self.catalog_tables:
+            raise RuntimeError(f'(1146, "Table test.{table_name} doesn\'t exist")')
+        if sql.startswith("CREATE TABLE") and table_name is not None:
+            self.catalog_tables.add(table_name)
+            for index_match in re.finditer(r"UNIQUE KEY\s+`?([^\s`(]+)`?\s*\(([^)]+)\)", sql, re.IGNORECASE):
+                index_name = index_match.group(1)
+                columns = tuple(column.strip().strip("`").lower() for column in index_match.group(2).split(","))
+                self.catalog_indexes.setdefault(table_name, {})[index_name] = columns
+        if sql.startswith("SHOW INDEX") and table_name is not None:
+            return [
+                (table_name, 0, index_name, position, column)
+                for index_name, columns in self.catalog_indexes.get(table_name, {}).items()
+                for position, column in enumerate(columns, start=1)
+            ]
         return None
 
     # Bypass the sdk_ltables lookup in unit tests: SQL-generation tests don't
@@ -1268,18 +1288,17 @@ class TestNamespaceCatalogs:
         assert "PRIMARY KEY (namespace_id, ltable_id, included_index)" in sql
         assert "PARTITION BY KEY(namespace_id) PARTITIONS 8" in sql
 
-    def test_ensure_namespace_catalogs_creates_catalog_tables_in_order(self):
-        """Test ensure namespace catalogs creates catalog tables in order."""
+    def test_ensure_namespace_catalogs_creates_only_missing_tables_in_order(self):
+        """Catalog bootstrap creates missing tables in order without redundant index DDL."""
         c = FakeClient()
         c._ensure_namespace_catalogs()
 
-        assert len(c.executed_sqls) == 7
-        assert c.executed_sqls[0] == "USE `test`"
-        assert "`test`.`sdk_namespaces`" in c.executed_sqls[2]
-        assert "`test`.`sdk_ltables`" in c.executed_sqls[3]
-        assert "`test`.`sdk_namespaces_stats`" in c.executed_sqls[4]
-        assert "CREATE UNIQUE INDEX uk_sdk_ns_coll_name" in c.executed_sqls[5]
-        assert "CREATE UNIQUE INDEX uk_sdk_lt_coll_ns_name" in c.executed_sqls[6]
+        create_table_sqls = [sql for sql in c.executed_sqls if sql.startswith("CREATE TABLE")]
+        assert len(create_table_sqls) == 3
+        assert "`test`.`sdk_namespaces`" in create_table_sqls[0]
+        assert "`test`.`sdk_ltables`" in create_table_sqls[1]
+        assert "`test`.`sdk_namespaces_stats`" in create_table_sqls[2]
+        assert not any(sql.startswith("CREATE UNIQUE INDEX") for sql in c.executed_sqls)
 
     def test_delete_ns_collection_meta_cleans_namespaces_stats_table(self):
         """Test delete ns collection meta cleans namespaces stats table."""

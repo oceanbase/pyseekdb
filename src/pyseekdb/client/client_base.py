@@ -95,6 +95,12 @@ NAMESPACE_MIN_OB_VERSION = NAMESPACE_MIN_LAKEBASE_VERSION
 
 _LAKEBASE_VERSION_MARKER = "database ai"
 
+# Catalog DDL is shared by every client process. Keep retries short and
+# bounded: success is determined by re-reading the catalog state, never by
+# merely suppressing a concurrent DDL exception.
+_CATALOG_BOOTSTRAP_BACKOFF_SECONDS = (0.02, 0.05, 0.1, 0.2, 0.4)
+_CATALOG_BOOTSTRAP_TRANSIENT_ERROR_CODES = (1050, 1061, 1146, 1205, 1213)
+
 logger = logging.getLogger(__name__)
 
 from .types import _NOT_PROVIDED, _NotProvided  # noqa: E402, F401
@@ -167,17 +173,54 @@ def _is_sdk_collection_catalog_conflict_error(exc: BaseException) -> bool:
     return False
 
 
-def _reraise_unless_unique_index_exists(exc: BaseException) -> None:
-    """Re-raise unless the exception indicates the unique index is already present."""
-    message = str(exc).lower()
-    if (
-        "already exists" in message
-        or "duplicate key name" in message
-        or "code=1061" in message
-        or ("1061" in message and "duplicate" in message)
-    ):
-        return
-    raise exc
+def _has_database_error_code(exc: BaseException, error_codes: tuple[int, ...]) -> bool:
+    """Return whether an exception cause chain contains one of the database error codes."""
+    current: BaseException | None = exc
+    while current is not None:
+        if current.args and isinstance(current.args[0], int) and current.args[0] in error_codes:
+            return True
+        message = str(current).lower()
+        for error_code in error_codes:
+            if (
+                f"({error_code}," in message
+                or f"({error_code})" in message
+                or f"code={error_code}" in message
+                or f"code: {error_code}" in message
+                or f"errno {error_code}" in message
+            ):
+                return True
+        current = current.__cause__
+    return False
+
+
+def _is_catalog_table_missing_error(exc: BaseException) -> bool:
+    """Return whether a catalog state probe failed because the table is not visible yet."""
+    if _has_database_error_code(exc, (1146,)):
+        return True
+    current: BaseException | None = exc
+    while current is not None:
+        message = str(current).lower()
+        if "ret=-5019" in message or "table not exist" in message or "table doesn't exist" in message:
+            return True
+        current = current.__cause__
+    return False
+
+
+def _is_catalog_bootstrap_transient_error(exc: BaseException) -> bool:
+    """Return whether catalog bootstrap may safely retry after checking real state again."""
+    return _has_database_error_code(exc, _CATALOG_BOOTSTRAP_TRANSIENT_ERROR_CODES) or _is_catalog_table_missing_error(
+        exc
+    )
+
+
+class _CatalogBootstrapStateNotReady(RuntimeError):
+    """Internal signal used when DDL returned but the current connection cannot verify the result."""
+
+
+def _require_catalog_bootstrap_state(is_ready: bool, message: str) -> None:
+    """Raise the internal retry signal unless a catalog state probe succeeded."""
+    if not is_ready:
+        raise _CatalogBootstrapStateNotReady(message)
 
 
 def _extract_hnsw_config(config: ConfigurationParam) -> HNSWConfiguration | None:
@@ -1269,8 +1312,8 @@ class BaseClient(BaseConnection, AdminAPI):
     def _create_sdk_collections_if_not_exists(self) -> None:
         """Create the sdk_collections catalog table if it does not already exist."""
         try:
-            self._use_catalog_database()
-            sdk_coll = self._qtable(CollectionNames.sdk_collections_table_name())
+            sdk_coll_name = CollectionNames.sdk_collections_table_name()
+            sdk_coll = self._qtable(sdk_coll_name)
             scp = self._stg_cache_policy_clause()
             create_table_sql = f"""CREATE TABLE IF NOT EXISTS {sdk_coll} (
                 collection_id CHAR(32) PRIMARY KEY DEFAULT (replace(uuid(), '-', '')),
@@ -1280,11 +1323,11 @@ class BaseClient(BaseConnection, AdminAPI):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 UNIQUE KEY uk_sdk_coll_name (collection_name)
             ) COMMENT='Settings of collections created by SDK' ORGANIZATION INDEX {scp};"""
-            self._execute(create_table_sql)
-            try:
-                self._execute(f"CREATE UNIQUE INDEX uk_sdk_coll_name ON {sdk_coll} (collection_name)")
-            except Exception as exc:
-                _reraise_unless_unique_index_exists(exc)
+            self._ensure_catalog_table(
+                table_name=sdk_coll_name,
+                create_table_sql=create_table_sql,
+                unique_indexes={"uk_sdk_coll_name": ("collection_name",)},
+            )
         except Exception as e:
             raise ValueError(f"Failed to create sdk_collections table: {e}") from e
 
@@ -1375,11 +1418,125 @@ class BaseClient(BaseConnection, AdminAPI):
         """Align session with pymysql database= so PL (DROP_NAMESPACE) uses the same DB."""
         self._execute(f"USE {_quote_sql_identifier(self._catalog_database())}")
 
+    def _catalog_table_is_visible(self, table_name: str) -> bool:
+        """Check whether the current connection can resolve a catalog table."""
+        try:
+            self._execute(f"SELECT 1 FROM {self._qtable(table_name)} LIMIT 0")
+        except Exception as exc:
+            if _is_catalog_table_missing_error(exc):
+                return False
+            raise
+        else:
+            return True
+
+    @staticmethod
+    def _index_row_value(row: Any, key: str, position: int) -> Any:
+        """Read a SHOW INDEX field from either a dict cursor row or a tuple row."""
+        if isinstance(row, dict):
+            row_by_lower_key = {str(row_key).lower(): value for row_key, value in row.items()}
+            return row_by_lower_key.get(key.lower())
+        if isinstance(row, (tuple, list)) and len(row) > position:
+            return row[position]
+        return None
+
+    def _catalog_unique_index_is_ready(
+        self,
+        table_name: str,
+        index_name: str,
+        expected_columns: tuple[str, ...],
+    ) -> bool:
+        """Verify that a named catalog index exists, is unique, and has the expected columns."""
+        rows = self._execute(f"SHOW INDEX FROM {self._qtable(table_name)}") or []
+        matching_rows = [
+            row for row in rows if str(self._index_row_value(row, "Key_name", 2) or "").lower() == index_name.lower()
+        ]
+        if not matching_rows:
+            return False
+
+        ordered_columns: list[tuple[int, str]] = []
+        for row in matching_rows:
+            non_unique = self._index_row_value(row, "Non_unique", 1)
+            if str(non_unique) != "0":
+                raise ValueError(f"Catalog index {index_name} on {table_name} exists but is not UNIQUE")
+            sequence = self._index_row_value(row, "Seq_in_index", 3)
+            column = self._index_row_value(row, "Column_name", 4)
+            if sequence is None or column is None:
+                raise ValueError(f"Unable to verify catalog index {index_name} on {table_name}")
+            ordered_columns.append((int(sequence), str(column).lower()))
+
+        actual_columns = tuple(column for _, column in sorted(ordered_columns))
+        normalized_expected_columns = tuple(column.lower() for column in expected_columns)
+        if actual_columns != normalized_expected_columns:
+            raise ValueError(
+                f"Catalog index {index_name} on {table_name} has columns {actual_columns}, "
+                f"expected {normalized_expected_columns}"
+            )
+        return True
+
+    def _ensure_catalog_table(
+        self,
+        table_name: str,
+        create_table_sql: str,
+        unique_indexes: dict[str, tuple[str, ...]],
+    ) -> None:
+        """Ensure a shared catalog table is visible and has the required unique indexes."""
+        attempts = len(_CATALOG_BOOTSTRAP_BACKOFF_SECONDS) + 1
+        last_error: BaseException | None = None
+
+        for attempt in range(attempts):
+            try:
+                self._use_catalog_database()
+
+                # Fast path: do not issue DDL once the table and indexes are ready.
+                table_is_visible = self._catalog_table_is_visible(table_name)
+                if not table_is_visible:
+                    self._execute(create_table_sql)
+                    _require_catalog_bootstrap_state(
+                        self._catalog_table_is_visible(table_name),
+                        f"Catalog table {table_name} is not visible after CREATE TABLE",
+                    )
+
+                for index_name, columns in unique_indexes.items():
+                    if self._catalog_unique_index_is_ready(table_name, index_name, columns):
+                        continue
+                    column_sql = ", ".join(_quote_sql_identifier(column) for column in columns)
+                    self._execute(
+                        f"CREATE UNIQUE INDEX {_quote_sql_identifier(index_name)} "
+                        f"ON {self._qtable(table_name)} ({column_sql})"
+                    )
+                    _require_catalog_bootstrap_state(
+                        self._catalog_unique_index_is_ready(table_name, index_name, columns),
+                        f"Catalog index {index_name} on {table_name} is not visible after CREATE INDEX",
+                    )
+
+                # The current connection must still see the final state before success.
+                _require_catalog_bootstrap_state(
+                    self._catalog_table_is_visible(table_name),
+                    f"Catalog table {table_name} is not visible after bootstrap",
+                )
+            except Exception as exc:
+                if not isinstance(exc, _CatalogBootstrapStateNotReady) and not _is_catalog_bootstrap_transient_error(
+                    exc
+                ):
+                    raise
+                last_error = exc
+                self._rollback_connection_if_supported()
+                if attempt < len(_CATALOG_BOOTSTRAP_BACKOFF_SECONDS):
+                    time.sleep(_CATALOG_BOOTSTRAP_BACKOFF_SECONDS[attempt])
+            else:
+                return
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(f"Failed to ensure catalog table {table_name}")
+
     def _ensure_namespace_catalogs(self) -> None:
         """Create the sdk_namespaces and sdk_ltables catalog tables and their unique indexes."""
-        self._use_catalog_database()
-        ns_namespaces_q = self._qtable(NamespaceCollectionNames.sdk_namespaces_table())
-        ns_ltables_q = self._qtable(NamespaceCollectionNames.sdk_ltables_table())
+        ns_namespaces_name = NamespaceCollectionNames.sdk_namespaces_table()
+        ns_ltables_name = NamespaceCollectionNames.sdk_ltables_table()
+        ns_stats_name = NamespaceCollectionNames.sdk_namespaces_stats_table()
+        ns_namespaces_q = self._qtable(ns_namespaces_name)
+        ns_ltables_q = self._qtable(ns_ltables_name)
         scp = self._stg_cache_policy_clause()
         ns_namespaces_sql = f"""CREATE TABLE IF NOT EXISTS {ns_namespaces_q} (
             namespace_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1404,7 +1561,7 @@ class BaseClient(BaseConnection, AdminAPI):
             UNIQUE KEY uk_sdk_lt_coll_ns_name (collection_id, namespace_id, ltable_name),
             KEY idx_sdk_lt_by_ns (collection_id, namespace_id)
         ) COMMENT='LTable catalog' ORGANIZATION INDEX {scp};"""
-        namespaces_stats_sql = f"""CREATE TABLE IF NOT EXISTS {self._qtable(NamespaceCollectionNames.sdk_namespaces_stats_table())} (
+        namespaces_stats_sql = f"""CREATE TABLE IF NOT EXISTS {self._qtable(ns_stats_name)} (
             collection_id CHAR(32) NOT NULL COMMENT 'collection id',
             namespace_id BIGINT UNSIGNED NOT NULL COMMENT 'namespace internal id',
             ltable_id BIGINT UNSIGNED NOT NULL COMMENT 'logic table internal id, 0 means namespace summary',
@@ -1418,22 +1575,21 @@ class BaseClient(BaseConnection, AdminAPI):
             KEY idx_sdk_ns_stat_by_collection (collection_id)
         ) COMMENT='Logic table row count and storage size statistics' DEFAULT CHARSET=utf8mb4 ORGANIZATION INDEX
         PARTITION BY KEY(namespace_id) PARTITIONS 8;"""
-        self._execute(ns_namespaces_sql)
-        self._execute(ns_ltables_sql)
-        self._execute(namespaces_stats_sql)
-        try:
-            self._execute(
-                f"CREATE UNIQUE INDEX uk_sdk_ns_coll_name ON {ns_namespaces_q} (collection_id, namespace_name)"
-            )
-        except Exception as exc:
-            _reraise_unless_unique_index_exists(exc)
-        try:
-            self._execute(
-                f"CREATE UNIQUE INDEX uk_sdk_lt_coll_ns_name ON {ns_ltables_q} "
-                f"(collection_id, namespace_id, ltable_name)"
-            )
-        except Exception as exc:
-            _reraise_unless_unique_index_exists(exc)
+        self._ensure_catalog_table(
+            table_name=ns_namespaces_name,
+            create_table_sql=ns_namespaces_sql,
+            unique_indexes={"uk_sdk_ns_coll_name": ("collection_id", "namespace_name")},
+        )
+        self._ensure_catalog_table(
+            table_name=ns_ltables_name,
+            create_table_sql=ns_ltables_sql,
+            unique_indexes={"uk_sdk_lt_coll_ns_name": ("collection_id", "namespace_id", "ltable_name")},
+        )
+        self._ensure_catalog_table(
+            table_name=ns_stats_name,
+            create_table_sql=namespaces_stats_sql,
+            unique_indexes={},
+        )
 
     def _rollback_connection_if_supported(self) -> None:
         """Roll back the current connection transaction if the backend supports it."""
