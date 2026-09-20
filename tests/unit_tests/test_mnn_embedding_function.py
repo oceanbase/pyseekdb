@@ -103,6 +103,12 @@ def test_forward_uses_mnn_inputs_and_mean_pools(tmp_path: Path, monkeypatch: pyt
         def getSessionInputAll(self, _session: object) -> dict[str, FakeInput]:
             return self.inputs
 
+        def resizeTensor(self, _tensor: FakeInput, _shape: tuple[int, ...]) -> None:
+            return None
+
+        def resizeSession(self, _session: object) -> bool:
+            return True
+
         def runSession(self, _session: object) -> int:
             return 0
 

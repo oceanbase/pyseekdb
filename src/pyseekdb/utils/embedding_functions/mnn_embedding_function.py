@@ -255,6 +255,23 @@ class MnnEmbeddingFunction:
             tensor = inputs.get(name)
             if tensor is None:
                 raise RuntimeError(f"MNN model is missing expected input tensor: {name}")
+
+            # The exported MiniLM ONNX graph has a dynamic sequence dimension.
+            # MNN keeps that dimension as ``-1`` until the session is resized;
+            # copying data before resizing returns INPUT_DATA_ERROR (code 3).
+            resize_tensor = getattr(self.interpreter, "resizeTensor", None)
+            if resize_tensor is not None:
+                resize_tensor(tensor, tuple(data.shape))
+
+        resize_session = getattr(self.interpreter, "resizeSession", None)
+        if resize_session is not None and resize_session(self.session) is False:
+            raise RuntimeError("MNN failed to resize the inference session")
+
+        # Fetch the tensors again because resizeSession replaces their backing
+        # storage on dynamic-shape models.
+        inputs = self.interpreter.getSessionInputAll(self.session)
+        for name, data in input_data.items():
+            tensor = inputs[name]
             tensor.copyFrom(self._make_input_tensor(data))
 
         result = self.interpreter.runSession(self.session)
