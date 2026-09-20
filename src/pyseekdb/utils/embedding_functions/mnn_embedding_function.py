@@ -161,7 +161,8 @@ class MnnEmbeddingFunction:
                         raise TimeoutError(f"Timed out waiting for model cache lock: {marker}")
                     yield
                 finally:
-                    marker.unlink(missing_ok=True)
+                    if acquired:
+                        marker.unlink(missing_ok=True)
 
     @staticmethod
     def _sha256(path: Path) -> str:
