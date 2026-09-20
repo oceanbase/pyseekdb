@@ -44,7 +44,7 @@ autosummary_imported_members = True
 autodoc_mock_imports = [
     "pylibseekdb",
     "pymysql",
-    "onnxruntime",
+    "MNN",
     "tokenizers",
     "httpx",
     "tqdm",

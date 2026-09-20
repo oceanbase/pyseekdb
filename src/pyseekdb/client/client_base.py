@@ -907,7 +907,7 @@ class BaseClient(BaseConnection, AdminAPI):
         if embedding_function is not None:
             try:
                 # First, try to get dimension from the embedding function's dimension property
-                # This avoids initializing the model (e.g., onnxruntime) during collection creation
+                # This avoids initializing the model (e.g., MNN) during collection creation
                 if hasattr(embedding_function, "dimension"):
                     actual_dimension = embedding_function.dimension
                     logger.debug(f"Using embedding function dimension: {actual_dimension}")

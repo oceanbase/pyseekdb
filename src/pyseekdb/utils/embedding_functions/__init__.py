@@ -15,6 +15,7 @@ from .huggingface_sparse_embedding_function import (
 from .jina_embedding_function import JinaEmbeddingFunction
 from .litellm_base_embedding_function import LiteLLMBaseEmbeddingFunction
 from .mistral_embedding_function import MistralEmbeddingFunction
+from .mnn_embedding_function import MnnEmbeddingFunction
 from .morph_embedding_function import MorphEmbeddingFunction
 from .ollama_embedding_function import OllamaEmbeddingFunction
 from .onnx_embedding_function import OnnxEmbeddingFunction
@@ -38,6 +39,7 @@ __all__ = [
     "JinaEmbeddingFunction",
     "LiteLLMBaseEmbeddingFunction",
     "MistralEmbeddingFunction",
+    "MnnEmbeddingFunction",
     "MorphEmbeddingFunction",
     "OllamaEmbeddingFunction",
     "OnnxEmbeddingFunction",

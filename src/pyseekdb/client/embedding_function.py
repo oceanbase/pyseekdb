@@ -6,7 +6,6 @@ for converting text documents to vector embeddings.
 """
 
 import logging
-import sys
 import warnings
 from abc import abstractmethod
 from typing import (
@@ -130,10 +129,11 @@ def dimension_of(embedding_function: EmbeddingFunction[D]) -> int:
 
 class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
     """
-    Default embedding function using ONNX runtime.
+    Default embedding function using MNN.
 
-    Uses the 'all-MiniLM-L6-v2' model via ONNX, which produces 384-dimensional embeddings.
-    This is a lightweight, fast model suitable for general-purpose text embeddings.
+    Uses the 'all-MiniLM-L6-v2' model converted from ONNX to MNN, which produces
+    384-dimensional embeddings. The source model is downloaded and converted on
+    first use, then cached locally for subsequent calls.
 
     Example:
         >>> ef = DefaultEmbeddingFunction()
@@ -155,34 +155,25 @@ class DefaultEmbeddingFunction(EmbeddingFunction[Documents]):
 
         Args:
             model_name: str = "all-MiniLM-L6-v2",  # Deprecated. Will be removed in a future version.
-            preferred_providers: list[str] | None = None,  # Deprecated. Will be removed in a future version.
-                                # The preferred ONNX runtime providers. Defaults to None (uses available providers).
+            preferred_providers: list[str] | None = None,  # Deprecated. MNN does not expose ONNX providers.
         """
         if model_name != self._MODEL_NAME:
             raise ValueError(f"Currently only '{self._MODEL_NAME}' is supported, got '{model_name}'")
         if preferred_providers:
             warnings.warn(
                 "preferred_providers is deprecated and will be removed in a future version. "
-                "Use the preferred_providers argument of OnnxEmbeddingFunction instead.",
+                "MNN does not support ONNX provider selection; the default CPU backend is used.",
                 DeprecationWarning,
                 stacklevel=2,
             )
         self.model_name = self._MODEL_NAME
-        if sys.version_info >= (3, 14):
-            from pyseekdb.utils.embedding_functions.sentence_transformer_embedding_function import (
-                SentenceTransformerEmbeddingFunction,
-            )
+        from pyseekdb.utils.embedding_functions import MnnEmbeddingFunction
 
-            self._backend = SentenceTransformerEmbeddingFunction(model_name=self._MODEL_NAME)
-        else:
-            from pyseekdb.utils.embedding_functions import OnnxEmbeddingFunction
-
-            self._backend = OnnxEmbeddingFunction(
-                model_name=self._MODEL_NAME,
-                hf_model_id=self._HF_MODEL_ID,
-                dimension=self._DIMENSION,
-                preferred_providers=preferred_providers,
-            )
+        self._backend = MnnEmbeddingFunction(
+            model_name=self._MODEL_NAME,
+            hf_model_id=self._HF_MODEL_ID,
+            dimension=self._DIMENSION,
+        )
 
     @property
     def dimension(self) -> int:

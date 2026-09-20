@@ -4,7 +4,7 @@ Embedding functions convert text documents into vector embeddings for similarity
 
 ## 6.1 Default Embedding Function
 
-The `DefaultEmbeddingFunction` uses all-MiniLM-L6-v2 and is the default embedding function if none is specified.
+The `DefaultEmbeddingFunction` uses all-MiniLM-L6-v2 with the MNN runtime and is the default embedding function if none is specified. On first use, pyseekdb downloads the model's ONNX files from Hugging Face, converts the model to MNN, and caches the converted model under `~/.cache/pyseekdb/mnn_models/`.
 
 ```python
 from pyseekdb import DefaultEmbeddingFunction

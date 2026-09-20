@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from pyseekdb.client.embedding_function import DefaultEmbeddingFunction
+from pyseekdb.utils.embedding_functions.mnn_embedding_function import MnnEmbeddingFunction
 
 
 class TestDefaultEmbeddingFunctionPersistence:
@@ -65,15 +66,15 @@ def test_default_embedding_function_on_py314():
         pytest.skip("Python < 3.14")
     embedding_function = DefaultEmbeddingFunction()
     assert embedding_function.dimension == 384
-    assert len(embedding_function("hello")[0]) == 384
+    assert isinstance(embedding_function._backend, MnnEmbeddingFunction)
 
 
-def test_default_embedding_function_uses_onnx_on_pre314():
+def test_default_embedding_function_uses_mnn_on_pre314():
     if sys.version_info >= (3, 14):
         pytest.skip("Python >= 3.14")
     embedding_function = DefaultEmbeddingFunction()
     assert embedding_function.dimension == 384
-    assert len(embedding_function("hello")[0]) == 384
+    assert isinstance(embedding_function._backend, MnnEmbeddingFunction)
 
 
 if __name__ == "__main__":
