@@ -12,7 +12,10 @@ if [[ ! -s "${pytest_log}" ]]; then
   exit 1
 fi
 
-summary="$(awk 'NF { last = $0 } END { print last }' "${pytest_log}")"
+summary="$(grep -E '[[:space:]][0-9]+[[:space:]]+(passed|failed|errors?|skipped|xfailed|xpassed)([,=[:space:]]|$)' "${pytest_log}" | tail -n 1 || true)"
+if [[ -z "${summary}" ]]; then
+  summary="$(awk 'NF { last = $0 } END { print last }' "${pytest_log}")"
+fi
 failure_pattern='(^|[[:space:]])[1-9][0-9]*[[:space:]]+(failed|errors?)([,=[:space:]]|$)'
 success_pattern='(^|[[:space:]])[1-9][0-9]*[[:space:]]+passed([,=[:space:]]|$)'
 

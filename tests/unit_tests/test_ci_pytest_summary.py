@@ -42,3 +42,21 @@ def test_check_pytest_summary_rejects_missing_log(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 1
+
+
+def test_check_pytest_summary_ignores_runtime_output_after_summary(tmp_path: Path) -> None:
+    pytest_log = tmp_path / "pytest.log"
+    pytest_log.write_text(
+        "================ 580 passed, 228 skipped in 47.16s ================\n"
+        "The device supports: i8sdot:0, fp16:0, i8mm: 0, sve2: 0, sme2: 0\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(  # noqa: S603 - execute the repository's fixed CI script
+        ["/bin/bash", str(CHECK_SCRIPT), str(pytest_log)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
