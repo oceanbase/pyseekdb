@@ -45,6 +45,18 @@ def test_empty_input_does_not_download_or_initialize_model(tmp_path: Path) -> No
     assert not (tmp_path / "mnn").exists()
 
 
+def test_local_model_does_not_require_huggingface_metadata(tmp_path: Path) -> None:
+    ef = MnnEmbeddingFunction(
+        model_name="local-model",
+        hf_model_id=None,
+        dimension=3,
+        download_path=tmp_path,
+    )
+
+    assert ef.hf_model_id is None
+    assert ef.hf_revision == "main"
+
+
 def test_hf_endpoint_must_use_https(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ef = _make_embedding_function(tmp_path)
     monkeypatch.setenv("HF_ENDPOINT", "http://example.invalid")

@@ -1,9 +1,10 @@
-"""
-MNN-based embedding function implementation.
+"""Generic MNN-based embedding function implementation.
 
-The default embedding model is downloaded in ONNX format from Hugging Face on
-first use and converted to MNN format locally.  Keeping the source ONNX model
-in the cache makes the conversion reproducible when the MNN runtime changes.
+The runtime accepts a local MNN model and tokenizer cache.  When a Hugging Face
+model ID is supplied, missing ONNX/tokenizer artifacts are downloaded and the
+ONNX model is converted to MNN on first use.  Model-specific revisions and
+integrity manifests are supplied by the caller rather than being embedded in
+this generic runtime.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import numpy as np
@@ -36,15 +37,6 @@ class MnnEmbeddingFunction:
     MNN_MODEL_FILENAME = "model.mnn"
     ONNX_MODEL_FILENAME = "model.onnx"
     MAX_TOKENS = 256
-    _MODEL_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
-    _MODEL_SHA256: ClassVar[dict[str, str]] = {
-        "config.json": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
-        "model.onnx": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
-        "special_tokens_map.json": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
-        "tokenizer_config.json": "acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b",
-        "tokenizer.json": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
-        "vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
-    }
     _CACHE_LOCK_FILENAME = ".cache.lock"
     _MAX_REDIRECTS = 5
 
@@ -60,33 +52,38 @@ class MnnEmbeddingFunction:
     def __init__(
         self,
         model_name: str,
-        hf_model_id: str,
+        hf_model_id: str | None,
         dimension: int,
         download_path: Path | None = None,
+        hf_revision: str = "main",
         expected_sha256: Mapping[str, str] | None = None,
     ):
         """Initialize an MNN embedding function.
 
         Args:
             model_name: Name of the model used for cache directory naming.
-            hf_model_id: Hugging Face model ID used for the first download.
+            hf_model_id: Optional Hugging Face model ID used for downloading
+                missing artifacts.  Existing local cache files can be used
+                without a model ID.
             dimension: Output embedding dimension.
             download_path: Optional cache path override.
+            hf_revision: Hugging Face branch, tag, or commit to download.
             expected_sha256: Expected SHA-256 digests keyed by local model filename.
         """
         if not model_name:
             raise ValueError("model_name must be a non-empty string")
-        if not hf_model_id:
+        if hf_model_id is not None and not hf_model_id:
             raise ValueError("hf_model_id must be a non-empty string")
         if dimension <= 0:
             raise ValueError("dimension must be a positive integer")
+        if not hf_revision:
+            raise ValueError("hf_revision must be a non-empty string")
 
         self.model_name = model_name
         self.hf_model_id = hf_model_id
+        self.hf_revision = hf_revision
         self._dimension = dimension
         self._expected_sha256 = dict(expected_sha256 or {})
-        if not self._expected_sha256 and hf_model_id == "sentence-transformers/all-MiniLM-L6-v2":
-            self._expected_sha256 = dict(self._MODEL_SHA256)
         self.download_path = (
             download_path
             if download_path is not None
@@ -177,10 +174,9 @@ class MnnEmbeddingFunction:
         """Verify a cached or downloaded artifact against its pinned digest."""
         expected = self._expected_sha256.get(filename)
         if expected is None:
-            raise RuntimeError(
-                f"No pinned SHA-256 digest is configured for {self.hf_model_id}/{filename}. "
-                "Pass expected_sha256 when using a custom MNN model."
-            )
+            if self._expected_sha256:
+                raise RuntimeError(f"No pinned SHA-256 digest is configured for {filename}")
+            return
         actual = self._sha256(path)
         if actual != expected:
             raise RuntimeError(f"SHA-256 mismatch for {filename}: expected {expected}, got {actual}")
@@ -241,6 +237,8 @@ class MnnEmbeddingFunction:
 
     def _download_from_huggingface(self) -> bool:
         """Download the ONNX model and tokenizer files from Hugging Face."""
+        if not self.hf_model_id:
+            raise RuntimeError("hf_model_id is required to download an MNN model")
         try:
             self._model_folder.mkdir(parents=True, exist_ok=True)
             hf_endpoint = self._get_hf_endpoint()
@@ -262,7 +260,7 @@ class MnnEmbeddingFunction:
                     except RuntimeError:
                         local_path.unlink(missing_ok=True)
 
-                url = f"{hf_endpoint}/{self.hf_model_id}/resolve/{self._MODEL_REVISION}/{hf_filename}"
+                url = f"{hf_endpoint}/{self.hf_model_id}/resolve/{self.hf_revision}/{hf_filename}"
                 try:
                     self._download(url, local_path)
                 except Exception as exc:
@@ -342,6 +340,11 @@ class MnnEmbeddingFunction:
 
             if not cache_valid:
                 self._model_folder.mkdir(parents=True, exist_ok=True)
+                if not self.hf_model_id:
+                    raise RuntimeError(
+                        f"MNN model files are missing from {self._model_folder}; "
+                        "provide local artifacts or set hf_model_id"
+                    )
                 if not self._download_from_huggingface():
                     raise RuntimeError(
                         f"Failed to download model from Hugging Face (endpoint: {self._get_hf_endpoint()}). "

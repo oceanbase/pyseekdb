@@ -67,6 +67,8 @@ def test_default_embedding_function_on_py314():
     embedding_function = DefaultEmbeddingFunction()
     assert embedding_function.dimension == 384
     assert isinstance(embedding_function._backend, MnnEmbeddingFunction)
+    assert embedding_function._backend.hf_revision == DefaultEmbeddingFunction._HF_REVISION
+    assert embedding_function._backend._expected_sha256 == DefaultEmbeddingFunction._MODEL_SHA256
 
 
 def test_default_embedding_function_uses_mnn_on_pre314():
@@ -75,6 +77,8 @@ def test_default_embedding_function_uses_mnn_on_pre314():
     embedding_function = DefaultEmbeddingFunction()
     assert embedding_function.dimension == 384
     assert isinstance(embedding_function._backend, MnnEmbeddingFunction)
+    assert embedding_function._backend.hf_revision == DefaultEmbeddingFunction._HF_REVISION
+    assert embedding_function._backend._expected_sha256 == DefaultEmbeddingFunction._MODEL_SHA256
 
 
 if __name__ == "__main__":
