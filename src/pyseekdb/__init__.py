@@ -59,6 +59,13 @@ Admin client - Database management:
 """
 
 import importlib.metadata
+import sys
+
+# pylibseekdb and native embedding runtimes may expose incompatible C++ ABI
+# symbols.  Load MNN first on Linux so embedded clients keep the same load
+# order that previously protected them when onnxruntime was the default.
+if sys.platform == "linux" and importlib.util.find_spec("MNN"):
+    import MNN  # noqa: F401
 
 # torch and pylibseekdb both use openmp library, which is conflict on macos.
 if importlib.util.find_spec("torch"):
