@@ -46,6 +46,9 @@ unit-tests = [
     "voyageai",
     "sentence-transformers>=5.0",
     "huggingface-hub>=0.26",
+    # pylibseekdb 1.3.x requires an ABI=1 native runtime to be loaded first
+    # in embedded integration environments. This is not a runtime dependency.
+    "onnxruntime>=1.19.0",
 ]
 
 [tool.uv.workspace]
