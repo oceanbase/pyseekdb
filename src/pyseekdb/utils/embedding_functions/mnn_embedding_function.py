@@ -55,8 +55,8 @@ class MnnEmbeddingFunction:
         hf_model_id: str | None,
         dimension: int,
         download_path: Path | None = None,
-        hf_revision: str = "main",
         expected_sha256: Mapping[str, str] | None = None,
+        hf_revision: str = "main",
     ):
         """Initialize an MNN embedding function.
 
