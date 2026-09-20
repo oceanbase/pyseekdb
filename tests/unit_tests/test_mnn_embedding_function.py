@@ -45,9 +45,33 @@ def test_empty_input_does_not_download_or_initialize_model(tmp_path: Path) -> No
     assert not (tmp_path / "mnn").exists()
 
 
+def test_hf_endpoint_must_use_https(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ef = _make_embedding_function(tmp_path)
+    monkeypatch.setenv("HF_ENDPOINT", "http://example.invalid")
+
+    with pytest.raises(ValueError, match="Only HTTPS model endpoints"):
+        ef._get_hf_endpoint()
+
+
+def test_cached_artifact_digest_is_verified(tmp_path: Path) -> None:
+    ef = MnnEmbeddingFunction(
+        model_name="test-model",
+        hf_model_id="org/test-model",
+        dimension=3,
+        download_path=tmp_path,
+        expected_sha256={"artifact.bin": "0" * 64},
+    )
+    artifact = tmp_path / "artifact.bin"
+    artifact.write_bytes(b"not-the-pinned-content")
+
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        ef._verify_artifact(artifact, "artifact.bin")
+
+
 def test_first_use_downloads_then_converts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ef = _make_embedding_function(tmp_path)
     calls: list[str] = []
+    monkeypatch.setattr(ef, "_verify_artifact", lambda _path, _filename: None)
 
     def fake_download() -> bool:
         calls.append("download")
@@ -123,3 +147,67 @@ def test_forward_uses_mnn_inputs_and_mean_pools(tmp_path: Path, monkeypatch: pyt
     assert embeddings == [[1.0, 1.0, 1.0]]
     assert ef.interpreter.inputs["input_ids"].data.dtype == np.int32
     assert ef.interpreter.inputs["attention_mask"].data.dtype == np.int32
+
+
+def test_forward_resizes_only_when_batch_shape_changes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ef = _make_embedding_function(tmp_path)
+    monkeypatch.setattr(ef, "_download_model_if_not_exists", lambda: None)
+
+    class FakeEncoding:
+        ids: ClassVar[list[int]] = [1, 2]
+        attention_mask: ClassVar[list[int]] = [1, 1]
+
+    class FakeTokenizer:
+        def encode(self, _document: str) -> FakeEncoding:
+            return FakeEncoding()
+
+    class FakeInput:
+        def __init__(self) -> None:
+            self.data = None
+            self.shape: tuple[int, ...] = (1, -1)
+
+        def copyFrom(self, tensor: object) -> bool:
+            self.data = tensor.getNumpyData()  # type: ignore[attr-defined]
+            return True
+
+    class FakeOutput:
+        def __init__(self, interpreter: FakeInterpreter) -> None:
+            self.interpreter = interpreter
+
+        def getNumpyData(self) -> np.ndarray:
+            batch_size = self.interpreter.inputs["input_ids"].shape[0]
+            return np.ones((batch_size, 2, 3), dtype=np.float32)
+
+    class FakeInterpreter:
+        def __init__(self) -> None:
+            self.inputs = {name: FakeInput() for name in ("input_ids", "attention_mask", "token_type_ids")}
+            self.resize_calls: list[tuple[int, ...]] = []
+            self.resize_session_calls = 0
+
+        def getSessionInputAll(self, _session: object) -> dict[str, FakeInput]:
+            return self.inputs
+
+        def resizeTensor(self, tensor: FakeInput, shape: tuple[int, ...]) -> None:
+            tensor.shape = shape
+            self.resize_calls.append(shape)
+
+        def resizeSession(self, _session: object) -> int:
+            self.resize_session_calls += 1
+            return 0
+
+        def runSession(self, _session: object) -> int:
+            return 0
+
+        def getSessionOutputAll(self, _session: object) -> dict[str, FakeOutput]:
+            return {"output": FakeOutput(self)}
+
+    interpreter = FakeInterpreter()
+    ef.__dict__["tokenizer"] = FakeTokenizer()
+    ef.__dict__["model"] = (interpreter, SimpleNamespace())
+
+    embeddings = ef._forward(["one", "two", "three"], batch_size=2)
+
+    assert embeddings.shape == (3, 3)
+    assert np.all(embeddings == 1.0)
+    assert interpreter.resize_session_calls == 2
+    assert interpreter.resize_calls == [(2, 2)] * 3 + [(1, 2)] * 3

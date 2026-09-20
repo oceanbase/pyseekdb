@@ -8,12 +8,17 @@ in the cache makes the conversion reproducible when the MNN runtime changes.
 
 from __future__ import annotations
 
-import contextlib
+import hashlib
 import logging
 import os
+import tempfile
+import time
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
+from urllib.parse import urljoin, urlparse
 
 import numpy as np
 import numpy.typing as npt
@@ -31,6 +36,17 @@ class MnnEmbeddingFunction:
     MNN_MODEL_FILENAME = "model.mnn"
     ONNX_MODEL_FILENAME = "model.onnx"
     MAX_TOKENS = 256
+    _MODEL_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+    _MODEL_SHA256: ClassVar[dict[str, str]] = {
+        "config.json": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
+        "model.onnx": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
+        "special_tokens_map.json": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+        "tokenizer_config.json": "acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b",
+        "tokenizer.json": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
+        "vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+    }
+    _CACHE_LOCK_FILENAME = ".cache.lock"
+    _MAX_REDIRECTS = 5
 
     _MODEL_FILES = (
         "config.json",
@@ -47,6 +63,7 @@ class MnnEmbeddingFunction:
         hf_model_id: str,
         dimension: int,
         download_path: Path | None = None,
+        expected_sha256: Mapping[str, str] | None = None,
     ):
         """Initialize an MNN embedding function.
 
@@ -55,6 +72,7 @@ class MnnEmbeddingFunction:
             hf_model_id: Hugging Face model ID used for the first download.
             dimension: Output embedding dimension.
             download_path: Optional cache path override.
+            expected_sha256: Expected SHA-256 digests keyed by local model filename.
         """
         if not model_name:
             raise ValueError("model_name must be a non-empty string")
@@ -66,6 +84,9 @@ class MnnEmbeddingFunction:
         self.model_name = model_name
         self.hf_model_id = hf_model_id
         self._dimension = dimension
+        self._expected_sha256 = dict(expected_sha256 or {})
+        if not self._expected_sha256 and hf_model_id == "sentence-transformers/all-MiniLM-L6-v2":
+            self._expected_sha256 = dict(self._MODEL_SHA256)
         self.download_path = (
             download_path
             if download_path is not None
@@ -102,37 +123,124 @@ class MnnEmbeddingFunction:
         """Return the downloaded ONNX source model path."""
         return self._model_folder / self.ONNX_MODEL_FILENAME
 
+    @staticmethod
+    def _validate_https_url(url: str) -> str:
+        """Reject non-HTTPS URLs before opening a network connection."""
+        parsed = urlparse(url)
+        if parsed.scheme.lower() != "https" or not parsed.netloc:
+            raise ValueError(f"Only HTTPS model endpoints are supported: {url}")
+        return url
+
+    @contextmanager
+    def _cache_lock(self) -> Iterator[None]:
+        """Serialize downloads and conversions for one model cache."""
+        self._model_folder.mkdir(parents=True, exist_ok=True)
+        lock_path = self._model_folder / self._CACHE_LOCK_FILENAME
+        with lock_path.open("a+") as lock_file:
+            try:
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                yield
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except ImportError:
+                # Windows has no fcntl; use a short-lived exclusive lock file.
+                lock_file.close()
+                acquired = False
+                marker = lock_path.with_suffix(".owner")
+                try:
+                    for _ in range(600):
+                        try:
+                            fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                            os.close(fd)
+                            acquired = True
+                            break
+                        except FileExistsError:
+                            time.sleep(0.1)
+                    if not acquired:
+                        raise TimeoutError(f"Timed out waiting for model cache lock: {marker}")
+                    yield
+                finally:
+                    marker.unlink(missing_ok=True)
+
+    @staticmethod
+    def _sha256(path: Path) -> str:
+        """Return the SHA-256 digest of a local artifact."""
+        digest = hashlib.sha256()
+        with path.open("rb") as file:
+            for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _verify_artifact(self, path: Path, filename: str) -> None:
+        """Verify a cached or downloaded artifact against its pinned digest."""
+        expected = self._expected_sha256.get(filename)
+        if expected is None:
+            raise RuntimeError(
+                f"No pinned SHA-256 digest is configured for {self.hf_model_id}/{filename}. "
+                "Pass expected_sha256 when using a custom MNN model."
+            )
+        actual = self._sha256(path)
+        if actual != expected:
+            raise RuntimeError(f"SHA-256 mismatch for {filename}: expected {expected}, got {actual}")
+
     def _download(self, url: str, fname: Path, chunk_size: int = 8192) -> None:
-        """Download a file from ``url`` to ``fname``."""
+        """Download, verify, and atomically install one HTTPS artifact."""
         logger.info("Downloading from %s", url)
         import httpx
 
-        with httpx.Client(timeout=600.0, follow_redirects=True) as client, client.stream("GET", url) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
-            with (
-                fname.open("wb") as file,
-                self.tqdm(
-                    desc=fname.name,
-                    total=total,
-                    unit="iB",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                ) as bar,
-            ):
-                for data in resp.iter_bytes(chunk_size=chunk_size):
-                    size = file.write(data)
-                    bar.update(size)
+        current_url = self._validate_https_url(url)
+        temp_path: Path | None = None
+        try:
+            with httpx.Client(timeout=600.0, follow_redirects=False) as client:
+                for _ in range(self._MAX_REDIRECTS + 1):
+                    with client.stream("GET", current_url) as resp:
+                        if 300 <= resp.status_code < 400:
+                            location = resp.headers.get("location")
+                            if not location:
+                                raise RuntimeError(f"HTTPS download redirect has no location: {current_url}")
+                            current_url = self._validate_https_url(urljoin(current_url, location))
+                            continue
+
+                        resp.raise_for_status()
+                        total = int(resp.headers.get("content-length", 0))
+                        fd, temp_name = tempfile.mkstemp(
+                            dir=fname.parent,
+                            prefix=f".{fname.name}.",
+                            suffix=".tmp",
+                        )
+                        os.close(fd)
+                        temp_path = Path(temp_name)
+                        with (
+                            temp_path.open("wb") as file,
+                            self.tqdm(
+                                desc=fname.name,
+                                total=total,
+                                unit="iB",
+                                unit_scale=True,
+                                unit_divisor=1024,
+                            ) as bar,
+                        ):
+                            for data in resp.iter_bytes(chunk_size=chunk_size):
+                                size = file.write(data)
+                                bar.update(size)
+                        self._verify_artifact(temp_path, fname.name)
+                        os.replace(temp_path, fname)
+                        temp_path = None
+                        return
+                raise RuntimeError(f"Too many HTTPS redirects while downloading {url}")
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
 
     def _get_hf_endpoint(self) -> str:
         """Get the Hugging Face endpoint, honoring ``HF_ENDPOINT``."""
-        return os.environ.get("HF_ENDPOINT", "https://hf-mirror.com").rstrip("/")
+        endpoint = os.environ.get("HF_ENDPOINT", "https://hf-mirror.com").rstrip("/")
+        return self._validate_https_url(endpoint)
 
     def _download_from_huggingface(self) -> bool:
         """Download the ONNX model and tokenizer files from Hugging Face."""
         try:
-            import httpx
-
             self._model_folder.mkdir(parents=True, exist_ok=True)
             hf_endpoint = self._get_hf_endpoint()
             files_to_download = {
@@ -147,23 +255,17 @@ class MnnEmbeddingFunction:
             logger.info("Downloading model from Hugging Face (endpoint: %s)", hf_endpoint)
             for hf_filename, local_path in files_to_download.items():
                 if local_path.exists():
-                    continue
+                    try:
+                        self._verify_artifact(local_path, local_path.name)
+                        continue
+                    except RuntimeError:
+                        local_path.unlink(missing_ok=True)
 
-                url = f"{hf_endpoint}/{self.hf_model_id}/resolve/main/{hf_filename}"
+                url = f"{hf_endpoint}/{self.hf_model_id}/resolve/{self._MODEL_REVISION}/{hf_filename}"
                 try:
-                    with contextlib.suppress(Exception):
-                        head_resp = httpx.head(url, timeout=10.0, follow_redirects=True)
-                        if head_resp.status_code == 404:
-                            logger.warning("File %s was not found on Hugging Face", hf_filename)
-                            return False
-
                     self._download(url, local_path)
-                except httpx.HTTPStatusError as exc:
-                    logger.warning("HTTP error downloading %s: %s", hf_filename, exc)
-                    local_path.unlink(missing_ok=True)
-                    return False
                 except Exception as exc:
-                    logger.warning("Failed to download %s: %s", hf_filename, exc)
+                    logger.warning("HTTP error downloading %s: %s", hf_filename, exc)
                     local_path.unlink(missing_ok=True)
                     return False
 
@@ -187,7 +289,13 @@ class MnnEmbeddingFunction:
                 "Please install an MNN wheel with converter support."
             ) from exc
 
-        temporary_path = self._mnn_model_path.with_suffix(".mnn.tmp")
+        fd, temporary_name = tempfile.mkstemp(
+            dir=self._mnn_model_path.parent,
+            prefix=f".{self._mnn_model_path.name}.",
+            suffix=".tmp",
+        )
+        os.close(fd)
+        temporary_path = Path(temporary_name)
         temporary_path.unlink(missing_ok=True)
         logger.info("Converting %s to %s", self._onnx_model_path, self._mnn_model_path)
         args = [
@@ -209,7 +317,7 @@ class MnnEmbeddingFunction:
             temporary_path.unlink(missing_ok=True)
             raise RuntimeError(f"Failed to convert the ONNX model to MNN: {exc}") from exc
 
-        if result not in (None, True, 0) or not temporary_path.exists():
+        if result not in (None, True, 0) or not temporary_path.exists() or temporary_path.stat().st_size == 0:
             temporary_path.unlink(missing_ok=True)
             raise RuntimeError("MNN did not produce a converted model")
         temporary_path.replace(self._mnn_model_path)
@@ -217,17 +325,30 @@ class MnnEmbeddingFunction:
 
     def _download_model_if_not_exists(self) -> None:
         """Download the source model and convert it to MNN on first use."""
-        required_files = [self._model_folder / filename for filename in self._MODEL_FILES]
-        if not all(path.exists() for path in required_files):
-            self._model_folder.mkdir(parents=True, exist_ok=True)
-            if not self._download_from_huggingface():
-                raise RuntimeError(
-                    f"Failed to download model from Hugging Face (endpoint: {self._get_hf_endpoint()}). "
-                    "Please check your network connection or set HF_ENDPOINT to use a mirror site. "
-                    f"Model ID: {self.hf_model_id}"
-                )
+        with self._cache_lock():
+            required_files = [self._model_folder / filename for filename in self._MODEL_FILES]
+            cache_valid = True
+            for path in required_files:
+                if not path.exists():
+                    cache_valid = False
+                    break
+                try:
+                    self._verify_artifact(path, path.name)
+                except RuntimeError:
+                    path.unlink(missing_ok=True)
+                    cache_valid = False
+                    break
 
-        self._convert_onnx_to_mnn()
+            if not cache_valid:
+                self._model_folder.mkdir(parents=True, exist_ok=True)
+                if not self._download_from_huggingface():
+                    raise RuntimeError(
+                        f"Failed to download model from Hugging Face (endpoint: {self._get_hf_endpoint()}). "
+                        "Please check your network connection or set HF_ENDPOINT to use a mirror site. "
+                        f"Model ID: {self.hf_model_id}"
+                    )
+
+            self._convert_onnx_to_mnn()
 
     def _make_input_tensor(self, data: npt.NDArray[np.int32]) -> Any:
         """Create an MNN host tensor for token IDs and masks."""
@@ -238,7 +359,7 @@ class MnnEmbeddingFunction:
             self.MNN.Tensor_DimensionType_Tensorflow,
         )
 
-    def _run_model(
+    def _run_model(  # noqa: C901
         self,
         input_ids: npt.NDArray[np.int32],
         attention_mask: npt.NDArray[np.int32],
@@ -251,6 +372,8 @@ class MnnEmbeddingFunction:
             "token_type_ids": token_type_ids,
         }
         inputs = self.interpreter.getSessionInputAll(self.session)
+        input_shape = tuple(input_ids.shape)
+        needs_resize = getattr(self, "_input_shape", None) != input_shape
         for name, data in input_data.items():
             tensor = inputs.get(name)
             if tensor is None:
@@ -260,18 +383,24 @@ class MnnEmbeddingFunction:
             # MNN keeps that dimension as ``-1`` until the session is resized;
             # copying data before resizing returns INPUT_DATA_ERROR (code 3).
             resize_tensor = getattr(self.interpreter, "resizeTensor", None)
-            if resize_tensor is not None:
+            if needs_resize and resize_tensor is not None:
                 resize_tensor(tensor, tuple(data.shape))
 
         resize_session = getattr(self.interpreter, "resizeSession", None)
-        if resize_session is not None and resize_session(self.session) is False:
-            raise RuntimeError("MNN failed to resize the inference session")
+        if needs_resize and resize_session is not None:
+            resize_result = resize_session(self.session)
+            if resize_result not in (None, True, 0):
+                raise RuntimeError("MNN failed to resize the inference session")
+            self._input_shape = input_shape
 
         # Fetch the tensors again because resizeSession replaces their backing
         # storage on dynamic-shape models.
-        inputs = self.interpreter.getSessionInputAll(self.session)
+        if needs_resize:
+            inputs = self.interpreter.getSessionInputAll(self.session)
         for name, data in input_data.items():
-            tensor = inputs[name]
+            tensor = inputs.get(name)
+            if tensor is None:
+                raise RuntimeError(f"MNN model is missing expected input tensor: {name}")
             tensor.copyFrom(self._make_input_tensor(data))
 
         result = self.interpreter.runSession(self.session)
