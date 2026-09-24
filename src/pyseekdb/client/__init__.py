@@ -12,7 +12,7 @@ Database Management (AdminAPI):
 - Returns: _AdminClientProxy (database operations only)
 
 All factories use the underlying ServerAPI implementations:
-- SeekdbEmbeddedClient - Local seekdb (requires pylibseekdb, Linux only)
+- SeekdbEmbeddedClient - Local seekdb (requires seekdb or legacy pylibseekdb)
 - RemoteServerClient - Remote server via pymysql (supports both seekdb Server and OceanBase Server)
 """
 
@@ -136,7 +136,7 @@ def _create_server_client(
         return SeekdbEmbeddedClient(path=default_path, database=database, **kwargs)
 
     raise ValueError(
-        "Default embedded mode is not available because pylibseekdb could not be imported. "
+        "Default embedded mode is not available because a SeekDB Python binding could not be imported. "
         "Please provide host/port parameters to use RemoteServerClient."
     )
 
@@ -145,7 +145,7 @@ def __getattr__(name: str) -> Any:
     """
     Lazily expose optional embedded client symbols.
 
-    This avoids importing pylibseekdb during `import pyseekdb`, which can crash
+    This avoids importing a native embedded binding during `import pyseekdb`, which can crash
     on unsupported interpreter/platform combinations (e.g. some Python 3.14 CI environments).
     """
     if name == "SeekdbEmbeddedClient":

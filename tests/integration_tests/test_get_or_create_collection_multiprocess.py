@@ -144,22 +144,25 @@ def _refresh_collection(client_config: dict[str, Any], collection_name: str) -> 
     collection.refresh_index()
 
 
-def _require_embedded_pylibseekdb() -> None:
-    """Require embedded pylibseekdb."""
+def _require_embedded_seekdb() -> None:
+    """Require the current seekdb binding or its legacy pylibseekdb name."""
+    distribution = "seekdb"
     try:
-        import pylibseekdb  # noqa: F401
+        importlib.import_module(distribution)
     except ImportError:
-        pytest.skip("seekdb embedded package is not installed")
+        distribution = "pylibseekdb"
+        try:
+            importlib.import_module(distribution)
+        except ImportError:
+            pytest.skip("seekdb embedded package is not installed")
 
     try:
-        installed_version = Version(importlib.metadata.version("pylibseekdb"))
+        installed_version = Version(importlib.metadata.version(distribution))
     except importlib.metadata.PackageNotFoundError:
-        pytest.skip("pylibseekdb is not installed")
+        pytest.skip(f"{distribution} is not installed")
 
     if installed_version < MIN_PYLIBSEEKDB_VERSION:
-        pytest.skip(
-            f"embedded multiprocess tests require pylibseekdb >= {MIN_PYLIBSEEKDB_VERSION}, got {installed_version}"
-        )
+        pytest.skip(f"embedded multiprocess tests require seekdb >= {MIN_PYLIBSEEKDB_VERSION}, got {installed_version}")
 
 
 def _run_processes(
@@ -486,7 +489,7 @@ def _build_client_config(mode: str) -> tuple[dict[str, Any], Path | None, Any]:
     temp_db_path: Path | None = None
 
     if mode == "embedded":
-        _require_embedded_pylibseekdb()
+        _require_embedded_seekdb()
         SEEKDB_TEST_DATA_ROOT.mkdir(parents=True, exist_ok=True)
         temp_db_path = Path(tempfile.mkdtemp(prefix="seekdb-mp-", dir=SEEKDB_TEST_DATA_ROOT))
         client_config = {"mode": "embedded", "path": str(temp_db_path), "database": database}

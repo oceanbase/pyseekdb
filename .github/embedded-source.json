@@ -1,0 +1,8 @@
+{
+  "seekdb_repository": "https://github.com/cms-cms/seekdb.git",
+  "seekdb_sha": "b255464c3df78d1b8f769bcb71448e5737940fcc",
+  "bindings_sha": "5e8eece63205dccfa9500f98893c91d1f50eb4f1",
+  "fix_commit": "48b80f5193bcac0afafba4d4820aebdf1103bc69",
+  "platform": "linux-x86_64",
+  "python": "3.11"
+}

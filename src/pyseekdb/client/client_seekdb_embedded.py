@@ -1,8 +1,9 @@
 """
 Embedded mode client - based on seekdb
-Note: Only available when pylibseekdb is installed (Linux only)
+Available when the current ``seekdb`` binding or legacy ``pylibseekdb`` is installed.
 """
 
+import importlib
 import logging
 import os
 import threading
@@ -12,25 +13,30 @@ from typing import Any
 import pymysql
 from pymysql.cursors import DictCursor
 
-# Try to import pylibseekdb - it may not be available on all platforms
-try:
-    import pylibseekdb as seekdb  # type: ignore[import-not-found]
-
-    _PYLIBSEEKDB_AVAILABLE = True
-except ImportError:
-    seekdb = None  # type: ignore[assignment]
-    _PYLIBSEEKDB_AVAILABLE = False
-
 from .admin_client import DEFAULT_TENANT
 from .client_base import BaseClient
 from .database import Database
 from .sql_utils import render_sql_with_params
 
+
+def _load_embedded_runtime() -> tuple[Any | None, str | None]:
+    """Prefer the current ``seekdb`` binding, with legacy compatibility."""
+    for distribution in ("seekdb", "pylibseekdb"):
+        try:
+            return importlib.import_module(distribution), distribution
+        except ImportError:
+            pass
+    return None, None
+
+
+seekdb, _EMBEDDED_RUNTIME_DISTRIBUTION = _load_embedded_runtime()
+_PYLIBSEEKDB_AVAILABLE = seekdb is not None
+
 logger = logging.getLogger(__name__)
 
 
 class _NativeEmbeddedBackend:
-    """Connect through pylibseekdb's native Python connection wrapper."""
+    """Connect through the embedded binding's native connection wrapper."""
 
     supports_dbapi_cursor = False
 
@@ -54,7 +60,7 @@ class _PyMySQLEmbeddedBackend:
     @staticmethod
     def connect(instance: Any, database: str, connection_kwargs: dict[str, Any]) -> pymysql.Connection:
         if instance is None:
-            raise RuntimeError("pylibseekdb returned no SeekdbInstance for a PyMySQL embedded connection")
+            raise RuntimeError("the embedded binding returned no SeekdbInstance for a PyMySQL connection")
 
         options = dict(instance.connection_options())
         kwargs = dict(connection_kwargs)
@@ -80,7 +86,7 @@ class _PyMySQLEmbeddedBackend:
 
 
 def _create_embedded_backend() -> _NativeEmbeddedBackend | _PyMySQLEmbeddedBackend:
-    """Select the safest connection backend from pylibseekdb's capabilities."""
+    """Select the safest connection backend exposed by the installed binding."""
     instance_type = getattr(seekdb, "SeekdbInstance", None)
     if instance_type is not None and callable(getattr(instance_type, "connection_options", None)):
         return _PyMySQLEmbeddedBackend()
@@ -90,7 +96,7 @@ def _create_embedded_backend() -> _NativeEmbeddedBackend | _PyMySQLEmbeddedBacke
 class SeekdbEmbeddedClient(BaseClient):
     """Embedded seekdb client (lazy connection)
 
-    Note: Only available on Linux platforms. pylibseekdb dependency is Linux-only.
+    Availability follows the installed embedded binding and its supported platform.
     """
 
     def __init__(self, path: str = "./seekdb.db", database: str = "test", **kwargs):
@@ -102,13 +108,13 @@ class SeekdbEmbeddedClient(BaseClient):
             database: database name
 
         Raises:
-            RuntimeError: If pylibseekdb is not available
+            RuntimeError: If no embedded binding is available
         """
-        # Check if pylibseekdb is available
+        # Check if an embedded binding is available.
         if not _PYLIBSEEKDB_AVAILABLE or seekdb is None:
             raise RuntimeError(
-                "Embedded Client is not available because pylibseekdb is not available. "
-                "Please install pylibseekdb (Linux only) or use RemoteServerClient (host/port) instead."
+                "Embedded Client is not available because no SeekDB Python binding was found. "
+                "Please install seekdb (or legacy pylibseekdb), or use RemoteServerClient (host/port) instead."
             )
 
         self.path = os.path.abspath(path)
@@ -169,7 +175,7 @@ class SeekdbEmbeddedClient(BaseClient):
             return self._connection
 
     def _cleanup(self) -> None:
-        """Close the connection and its owning pylibseekdb instance."""
+        """Close the connection and its owning embedded runtime instance."""
         with self._connection_lock:
             connection = self._connection
             instance = self._instance
