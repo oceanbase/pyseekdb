@@ -16,6 +16,7 @@ from .validators import (
 )
 
 if TYPE_CHECKING:
+    from .configuration import FulltextIndexConfig
     from .embedding_function import Documents as EmbeddingDocuments
     from .embedding_function import EmbeddingFunction
     from .namespace import Namespace
@@ -713,6 +714,37 @@ class Collection:
             In 1.2.0.0 and earlier, this method is a no-op.
         """
         self._client.refresh_index()
+
+    def create_fulltext_index(self, config: "FulltextIndexConfig | None" = None) -> None:
+        """Create the full-text index on this collection's ``document`` column.
+
+        Useful for collections created with ``Schema(fulltext_index=False)`` that only
+        need full-text search later.
+
+        Note:
+            seekdb provisions a fulltext index on an existing table only when the server
+            parameter ``_ENABLE_ADD_FULLTEXT_INDEX_TO_EXISTING_TABLE`` is enabled.
+
+        Args:
+            config: Fulltext parser configuration. Defaults to the IK parser.
+
+        Examples:
+            >>> collection = client.create_collection("docs")
+            >>> collection.create_fulltext_index(FulltextIndexConfig(analyzer="space"))
+        """
+        if self._use_namespace:
+            raise ValueError("Fulltext index management is not supported for namespace-enabled collections.")
+        self._client.create_fulltext_index(self._id, self._name, config)
+
+    def drop_fulltext_index(self) -> None:
+        """Drop the full-text index of this collection.
+
+        Examples:
+            >>> collection.drop_fulltext_index()
+        """
+        if self._use_namespace:
+            raise ValueError("Fulltext index management is not supported for namespace-enabled collections.")
+        self._client.drop_fulltext_index(self._id, self._name)
 
     # ==================== Collection Info ====================
 

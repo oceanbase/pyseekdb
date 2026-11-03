@@ -1109,8 +1109,13 @@ class BaseClient(BaseConnection, AdminAPI):
         if dimension < 1 or dimension > MAX_HNSW_VECTOR_DIMENSION:
             raise ValueError(f"Dimension must be between 1 and {MAX_HNSW_VECTOR_DIMENSION}, got {dimension}")
 
-        # Extract fulltext parser configuration
-        fulltext_index_clause = _get_fulltext_index_sql(schema.fulltext_index)
+        # The fulltext index is provisioned by default; ``Schema(fulltext_index=False)`` opts out
+        # so collections that never run full-text search do not maintain one.
+        fulltext_index_sql = (
+            f"            FULLTEXT INDEX idx_fts(document) {_get_fulltext_index_sql(schema.fulltext_index)},\n"
+            if schema.fulltext_index is not False
+            else ""
+        )
 
         # Sparse vector index
         sparse_vector_index_config = schema.sparse_vector_index
@@ -1141,8 +1146,7 @@ class BaseClient(BaseConnection, AdminAPI):
             document string,
             embedding vector({dimension}),
             {sparse_field_sql}metadata json,
-            FULLTEXT INDEX idx_fts(document) {fulltext_index_clause},
-            VECTOR INDEX idx_vec (embedding) {_get_vector_index_sql(hnsw_config)}{sparse_index_sql}
+{fulltext_index_sql}            VECTOR INDEX idx_vec (embedding) {_get_vector_index_sql(hnsw_config)}{sparse_index_sql}
         ) ORGANIZATION = HEAP;"""
 
         # Execute SQL to create table
@@ -1230,7 +1234,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 settings["dense_index_type"] = "ivf"
                 if ivf_config.centroids_fresh_mode is not None:
                     settings["centroids_fresh_mode"] = ivf_config.centroids_fresh_mode
-            if schema.fulltext_index is not None:
+            if schema.fulltext_index is not None and schema.fulltext_index is not False:
                 settings["has_fulltext_index"] = True
             if dense_embedding_function is not None and EmbeddingFunction.support_persistence(dense_embedding_function):
                 settings["embedding_function"] = {
@@ -1256,7 +1260,7 @@ class BaseClient(BaseConnection, AdminAPI):
                 collection_id=collection_id,
                 dimension=dimension,
                 ivf_config=ivf_config,
-                fulltext_config=schema.fulltext_index,
+                fulltext_config=None if schema.fulltext_index is False else schema.fulltext_index,
                 is_shared_storage=is_ss,
                 partition_count=pc,
                 # On a fresh create, roll back partial tables so a failure leaves no
@@ -2914,6 +2918,36 @@ class BaseClient(BaseConnection, AdminAPI):
             return
 
         self._execute("CALL dbms_index_manager.refresh();")
+
+    def _collection_table_name(self, collection_id: str | None, collection_name: str) -> str:
+        """[Internal] Resolve the physical table name backing a collection."""
+        if collection_id:
+            return CollectionNames.table_name_v2(collection_id)
+        return CollectionNames.table_name(collection_name)
+
+    def create_fulltext_index(
+        self,
+        collection_id: str | None,
+        collection_name: str,
+        fulltext_config: "FulltextIndexConfig | None" = None,
+    ) -> None:
+        """[Internal] Create the fulltext index on an existing collection table.
+
+        seekdb only provisions a fulltext index on an existing table when the server
+        parameter ``_ENABLE_ADD_FULLTEXT_INDEX_TO_EXISTING_TABLE`` is enabled.
+        """
+        table_name = self._collection_table_name(collection_id, collection_name)
+        clause = _get_fulltext_index_sql(fulltext_config)
+        sql = f"CREATE FULLTEXT INDEX idx_fts ON `{table_name}` (document) {clause}"
+        logger.debug(f"Creating fulltext index on `{table_name}`: {sql}")
+        self._execute(sql)
+
+    def drop_fulltext_index(self, collection_id: str | None, collection_name: str) -> None:
+        """[Internal] Drop the fulltext index of a collection table."""
+        table_name = self._collection_table_name(collection_id, collection_name)
+        sql = f"DROP INDEX idx_fts ON `{table_name}`"
+        logger.debug(f"Dropping fulltext index on `{table_name}`: {sql}")
+        self._execute(sql)
 
     def _get_collection_id(self, collection_name: str) -> str:
         """Resolve the collection id for a collection name."""

@@ -116,6 +116,28 @@ For more information about parser, please refer to [create_index section tokeniz
 
 **Note:** When `embedding_function` is provided, the system will automatically calculate the vector dimension by calling the function. If `configuration.dimension` is also provided, it must match the embedding function's dimension, otherwise a `ValueError` will be raised.
 
+**Skipping the fulltext index:**
+
+Every collection is created with a fulltext index by default. Collections that never run full-text search can opt out and add the index later:
+
+```python
+from pyseekdb import Schema
+
+# No fulltext index: nothing is maintained for `document`
+collection = client.create_collection(
+    name="my_collection",
+    schema=Schema(fulltext_index=False),
+)
+
+# Add the fulltext index when it is needed (choose the parser as usual)
+collection.create_fulltext_index(FulltextIndexConfig(analyzer="space"))
+
+# Remove it again
+collection.drop_fulltext_index()
+```
+
+**Note:** seekdb only creates a fulltext index on an existing table when the server parameter `_ENABLE_ADD_FULLTEXT_INDEX_TO_EXISTING_TABLE` is enabled. Collections created without a fulltext index cannot run `hybrid_search` over the document column until `create_fulltext_index()` succeeds.
+
 ## 3.2 Getting a Collection
 
 ```python

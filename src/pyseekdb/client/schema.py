@@ -46,12 +46,15 @@ class Schema:
     Default behavior:
     - If ``vector_index`` is not specified, a default HNSW index with L2 distance is used.
     - If ``fulltext_index`` is not specified, a default fulltext index with IK analyzer is used.
+      Pass ``fulltext_index=False`` to create the collection without a fulltext index and add
+      one later with ``Collection.create_fulltext_index()``.
     - ``sparse_vector_index`` is optional and defaults to None (no sparse index).
 
     Args:
         vector_index: HNSW configuration for dense vector index (optional).
         sparse_vector_index: Sparse vector index configuration (optional).
-        fulltext_index: Fulltext index configuration (optional).
+        fulltext_index: Fulltext index configuration, or ``False`` to create the
+            collection without a fulltext index.
         embedding_function: Dense embedding function (optional). If provided with
             ``vector_index``, this is associated with the dense vector index.
 
@@ -77,6 +80,9 @@ class Schema:
         ...
         ... )
         >>>
+        >>> # Schema without a fulltext index; add one later when needed
+        >>> schema = Schema(fulltext_index=False)
+        >>>
         >>> # Schema using create_index chaining
         >>> schema = Schema().create_index(
         ...     VectorIndexConfig(
@@ -92,9 +98,18 @@ class Schema:
         self,
         vector_index: VectorIndexConfig | HNSWConfiguration | IVFConfiguration | None = None,
         sparse_vector_index: SparseVectorIndexConfig | None = None,
-        fulltext_index: FulltextIndexConfig | None = None,
+        fulltext_index: FulltextIndexConfig | bool | None = None,
     ):
         """Init."""
+        if (
+            fulltext_index is not None
+            and fulltext_index is not False
+            and not isinstance(fulltext_index, FulltextIndexConfig)
+        ):
+            raise TypeError(
+                f"Unsupported fulltext index configuration type: {type(fulltext_index).__name__}. "
+                f"Expected FulltextIndexConfig, False (no fulltext index), or None (default fulltext index)."
+            )
         if isinstance(vector_index, VectorIndexConfig):
             self.vector_index = vector_index
         elif isinstance(vector_index, HNSWConfiguration):
