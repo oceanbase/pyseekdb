@@ -156,17 +156,6 @@ def _validate_hnsw_base_fields(config: "HNSWConfiguration") -> None:
         raise ValueError(f"lib must be one of {valid_libs}, got {config.lib}")
 
 
-def _reject_sync_mode_property(properties: dict[str, PrimitiveValue] | None, *, index_name: str) -> None:
-    """Reject sync_mode on index types that cannot maintain an HNSW sync mode."""
-    if not properties:
-        return
-    if any(str(key).lower() == "sync_mode" for key in properties):
-        raise ValueError(
-            f"{index_name} does not support sync_mode. "
-            "sync_mode is an HNSW option ('immediate' or 'async') on seekdb >= 1.3.0.0."
-        )
-
-
 def _normalize_hnsw_properties(properties: dict[str, PrimitiveValue]) -> None:
     """Strip reserved HNSW keys from user-supplied property bags."""
     reserved_keys = [
@@ -459,7 +448,6 @@ class IVFConfiguration:
             raise TypeError(f"centroids_fresh_mode must be a str, got {type(self.centroids_fresh_mode).__name__}")
 
         _ensure_primitive_properties(self.properties)
-        _reject_sync_mode_property(self.properties, index_name="IVF")
 
 
 @dataclass
@@ -559,7 +547,6 @@ class SparseVectorIndexConfig:
         if self.refine_k < 1.0 or self.refine_k > 1000.0:
             raise ValueError(f"refine_k must be between 1.0 and 1000.0, got '{self.refine_k}'")
         _ensure_primitive_properties(self.properties)
-        _reject_sync_mode_property(self.properties, index_name="Sparse vector index")
 
         self._validate_source_key()
         if self.embedding_function is None:

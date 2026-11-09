@@ -22,7 +22,7 @@ from pyseekdb import (  # noqa: E402
     NgramProperties,
     SpaceProperties,
 )
-from pyseekdb.client.client_base import _get_vector_index_sql  # noqa: E402
+from pyseekdb.client.client_base import _get_ivf_vector_index_sql, _get_vector_index_sql  # noqa: E402
 
 
 class TestHNSWConfiguration:
@@ -210,11 +210,14 @@ class TestHNSWConfiguration:
         assert "sync_mode='immediate'" not in sql
         assert "quantization='pq'" in sql
 
-    def test_ivf_rejects_sync_mode_property(self):
+    def test_ivf_has_no_sync_mode_field_and_forwards_property(self):
         with pytest.raises(TypeError, match="sync_mode"):
             IVFConfiguration(dimension=8, sync_mode="immediate")
-        with pytest.raises(ValueError, match="IVF does not support sync_mode"):
-            IVFConfiguration(dimension=8, properties={"SYNC_MODE": "immediate"})
+        config = IVFConfiguration(dimension=8, properties={"sync_mode": "immediate", "nlist": 16})
+        assert config.properties["sync_mode"] == "immediate"
+        sql = _get_ivf_vector_index_sql(config)
+        assert "sync_mode='immediate'" in sql
+        assert "nlist=16" in sql
 
 
 class TestFulltextIndexConfig:

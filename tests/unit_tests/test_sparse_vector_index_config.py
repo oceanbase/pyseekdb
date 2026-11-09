@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from pyseekdb.client.client_base import _get_sparse_vector_index_sql
 from pyseekdb.client.configuration import SparseVectorIndexConfig
 from pyseekdb.client.sparse_embedding_function import (
     Documents,
@@ -222,9 +223,12 @@ class TestSparseVectorIndexConfigOptionalParams:
         assert config.drop_ratio_search == 0.2
         assert config.refine_k == 4.0
 
-    def test_sync_mode_property_is_rejected(self):
-        with pytest.raises(ValueError, match="Sparse vector index does not support sync_mode"):
-            _make_config(properties={"sync_mode": "immediate"})
+    def test_sync_mode_property_is_forwarded(self):
+        config = _make_config(properties={"sync_mode": "immediate"})
+        assert config.properties["sync_mode"] == "immediate"
+        sql = _get_sparse_vector_index_sql(config)
+        assert "sync_mode='immediate'" in sql
+        assert "TYPE=sindi" in sql
 
 
 if __name__ == "__main__":
