@@ -39,7 +39,10 @@ dev = [
 
 # Optional deps for unit tests. CI uses `uv run --no-sync pytest` so pip-installed deps persist.
 unit-tests = [
-    "bm25s[full]",
+    # bm25s[full] pulls pytrec-eval 0.5, which fails to compile on GCC 14.
+    # Tokenization only needs bm25s; stemming needs PyStemmer.
+    "bm25s",
+    "PyStemmer",
     "openai",
     "boto3",
     "litellm",
