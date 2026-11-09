@@ -33,6 +33,7 @@ from .configuration import (
     IVFConfiguration,
     IVFIndexType,
     VectorIndexConfig,
+    _validate_hnsw_sync_mode,
 )
 from .database import Database
 from .document_query_builder import (
@@ -90,6 +91,8 @@ _MAX_COLLECTION_NAME_LENGTH = 512
 
 # Minimum LakeBase (OceanBase Database AI) version for namespace-enabled collections.
 NAMESPACE_MIN_LAKEBASE_VERSION = Version("4.6.1.0")
+# seekdb versions that accept HNSW sync_mode on heap tables.
+HNSW_SYNC_MODE_MIN_VERSION = Version("1.3.0.0")
 # Backward-compatible alias used by existing tests and skip helpers.
 NAMESPACE_MIN_OB_VERSION = NAMESPACE_MIN_LAKEBASE_VERSION
 
@@ -114,6 +117,11 @@ def _unquote_json_extract_expressions(query_sql: str) -> str:
 def is_lakebase_version_string(version_str: str) -> bool:
     """Return whether a ``SELECT version()`` string identifies a LakeBase cluster."""
     return _LAKEBASE_VERSION_MARKER in version_str.lower()
+
+
+def _hnsw_sync_mode_supported(db_type: str, version: Version) -> bool:
+    """Return whether this database accepts HNSW ``sync_mode`` on heap tables."""
+    return db_type.lower() == "seekdb" and version >= HNSW_SYNC_MODE_MIN_VERSION
 
 
 def _extract_collection_id_from_sdk_row(row: Any) -> str:
@@ -353,9 +361,14 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     """
     Generate VECTOR INDEX SQL clause from HNSWConfiguration.
     """
+    _validate_hnsw_sync_mode(hnsw_config)
     properties = hnsw_config.properties or {}
     property_parts = []
     for k, v in properties.items():
+        # The dedicated field emits sync_mode unquoted. Skip a same-named
+        # property so a config that sets both does not emit the clause twice.
+        if hnsw_config.sync_mode is not None and str(k).lower() == "sync_mode":
+            continue
         if isinstance(v, str):
             property_parts.append(f"{k}='{v}'")
         else:
@@ -378,6 +391,9 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
                 property_parts.append(f"{key}={str(value).lower()}")
             else:
                 property_parts.append(f"{key}={value}")
+    # Unquoted identifier: seekdb parses sync_mode=immediate / sync_mode=async.
+    if hnsw_config.sync_mode is not None:
+        property_parts.append(f"sync_mode={hnsw_config.sync_mode}")
     property_str = ", ".join(property_parts)
     properties_str = f", {property_str}" if property_str else ""
     return f"WITH (DISTANCE={hnsw_config.distance}, TYPE={hnsw_config.type}, LIB={hnsw_config.lib}{properties_str})"
@@ -1108,6 +1124,11 @@ class BaseClient(BaseConnection, AdminAPI):
         dimension = hnsw_config.dimension
         if dimension < 1 or dimension > MAX_HNSW_VECTOR_DIMENSION:
             raise ValueError(f"Dimension must be between 1 and {MAX_HNSW_VECTOR_DIMENSION}, got {dimension}")
+        # HNSWConfiguration is mutable after construction. Normalize again
+        # before metadata or CREATE TABLE so a later assignment cannot reach DDL.
+        _validate_hnsw_sync_mode(hnsw_config)
+        if hnsw_config.sync_mode is not None:
+            self._assert_hnsw_sync_mode_supported(hnsw_config.sync_mode)
 
         # Extract fulltext parser configuration
         fulltext_index_clause = _get_fulltext_index_sql(schema.fulltext_index)
@@ -2902,6 +2923,18 @@ class BaseClient(BaseConnection, AdminAPI):
         version_130 = Version("1.3.0.0")
         logger.debug(f"db_type: {db_type}, version: {version}")
         return db_type.lower() == "seekdb" and version >= version_130
+
+    def _assert_hnsw_sync_mode_supported(self, sync_mode: str) -> None:
+        """Raise before CREATE when the connected database rejects HNSW sync_mode."""
+        db_type, version = self.detect_db_type_and_version()
+        if _hnsw_sync_mode_supported(db_type, version):
+            return
+        raise ValueError(
+            f"HNSW sync_mode='{sync_mode}' requires seekdb >= {HNSW_SYNC_MODE_MIN_VERSION}. "
+            f"Connected database is {db_type} {version}. "
+            "Omit sync_mode to keep that server's default index maintenance. "
+            "The collection was not created."
+        )
 
     def refresh_index(self) -> None:
         """

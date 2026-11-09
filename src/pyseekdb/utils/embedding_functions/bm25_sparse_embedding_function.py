@@ -8,10 +8,7 @@ weights — the query-independent part of BM25 (no IDF), suitable for building
 a sparse vector index.
 
 Install:
-    pip install "bm25s[full]"
-
-    # Optional, for better stemming performance:
-    pip install PyStemmer
+    pip install bm25s PyStemmer
 
 Example:
     >>> from pyseekdb.utils.embedding_functions import BM25SparseEmbeddingFunction
@@ -156,7 +153,7 @@ class BM25SparseEmbeddingFunction(SparseEmbeddingFunction):
             import bm25s  # noqa: F401
         except ImportError as exc:
             raise ValueError(
-                "The bm25s package is not installed. Please install it with `pip install bm25s[full]`"
+                "The bm25s package is not installed. Please install it with `pip install bm25s PyStemmer`"
             ) from exc
         if k < 0:
             raise ValueError("k must be greater than or equal to 0")

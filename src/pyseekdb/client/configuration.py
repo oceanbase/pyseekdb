@@ -1,7 +1,7 @@
 """Index and analyzer configuration types for collection and schema creation."""
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from typing import Any, TypedDict
 
@@ -181,6 +181,16 @@ def _normalize_hnsw_properties(properties: dict[str, PrimitiveValue]) -> None:
         properties.pop(key)
 
 
+def _validate_hnsw_sync_mode(config: "HNSWConfiguration") -> None:
+    """Validate and normalize an explicit HNSW sync_mode."""
+    if config.sync_mode is None:
+        return
+    config.sync_mode = _normalize_str_enum(config.sync_mode, field_name="sync_mode")
+    valid_sync_modes = [mode.value for mode in HNSWSyncMode]
+    if config.sync_mode not in valid_sync_modes:
+        raise ValueError(f"sync_mode must be one of {valid_sync_modes}, got {config.sync_mode}")
+
+
 def _validate_hnsw_configuration(config: "HNSWConfiguration") -> None:
     """Validate optional HNSW tuning parameters."""
     if config.M is not None:
@@ -202,6 +212,7 @@ def _validate_hnsw_configuration(config: "HNSWConfiguration") -> None:
         raise ValueError(f"bq_bits_query must be one of [0, 4, 32], got '{config.bq_bits_query}'")
     if config.bq_use_fht is not None and not isinstance(config.bq_use_fht, bool):
         raise TypeError(f"bq_use_fht must be a bool, got {type(config.bq_use_fht).__name__}")
+    _validate_hnsw_sync_mode(config)
 
 
 class DistanceMetric(StrEnum):
@@ -228,6 +239,18 @@ class HNSWIndexLib(StrEnum):
     """Supported HNSW index libraries."""
 
     VSAG = "vsag"
+
+
+class HNSWSyncMode(StrEnum):
+    """HNSW index maintenance mode on seekdb 1.3 and later.
+
+    ``immediate`` updates the index inside each write. ``async`` lets a
+    background change stream catch up. Omit the option to keep the server
+    default, which is ``async`` for heap HNSW indexes on seekdb 1.3+.
+    """
+
+    IMMEDIATE = "immediate"
+    ASYNC = "async"
 
 
 class IVFIndexType(StrEnum):
@@ -312,6 +335,10 @@ class HNSWConfiguration:
         dimension: Vector dimension (number of elements in each vector)
         distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
         properties: Optional dictionary of properties for the HNSW index (key: string, value: primitive type)
+        sync_mode: Keyword-only HNSW maintenance mode, ``'immediate'`` or ``'async'``.
+            ``None`` (the default) omits the clause and keeps the server default. On
+            seekdb 1.3 and later, heap HNSW indexes default to ``async``. ``immediate``
+            maintains the index inside each write. Requires seekdb >= 1.3.0.0.
         Please refer to [HNSW configuration](https://en.oceanbase.com/docs/common-oceanbase-database-10000000003351043) for detailed information.
     """
 
@@ -328,6 +355,7 @@ class HNSWConfiguration:
     bq_bits_query: int | None = None
     bq_use_fht: bool | None = None
     properties: dict[str, PrimitiveValue] | None = None
+    sync_mode: str | HNSWSyncMode | None = field(default=None, kw_only=True)
 
     def __post_init__(self):
         """Validate HNSW configuration fields and normalize properties."""

@@ -1,8 +1,8 @@
 ################################################################################
 # Sparse Vector Index Example
 # install dependencies first:
-# pip install "bm25s[full]" sentence-transformers
-# Note: bm25s[full] is used for bm25 embedding function,
+# pip install bm25s PyStemmer sentence-transformers
+# Note: bm25s and PyStemmer are used for the bm25 embedding function,
 # sentence-transformers is used for hugging face embedding function and
 # reranking with model
 ################################################################################

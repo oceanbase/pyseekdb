@@ -15,12 +15,14 @@ from pyseekdb import (  # noqa: E402
     Configuration,
     FulltextIndexConfig,
     HNSWConfiguration,
+    HNSWSyncMode,
     IKProperties,
+    IVFConfiguration,
     Ngram2Properties,
     NgramProperties,
     SpaceProperties,
 )
-from pyseekdb.client.client_base import _get_vector_index_sql  # noqa: E402
+from pyseekdb.client.client_base import _get_ivf_vector_index_sql, _get_vector_index_sql  # noqa: E402
 
 
 class TestHNSWConfiguration:
@@ -166,6 +168,76 @@ class TestHNSWConfiguration:
         assert "refine_type='sq8'" in sql
         assert "bq_bits_query=32" in sql
         assert "bq_use_fht=" in sql
+
+    def test_legacy_positional_signature(self):
+        """Positional arguments keep the meaning they had before sync_mode existed."""
+        config = HNSWConfiguration(128, "l2", "hnsw", "vsag", 16, 200, 32)
+        assert config.dimension == 128
+        assert config.distance == "l2"
+        assert config.type == "hnsw"
+        assert config.lib == "vsag"
+        assert config.M == 16
+        assert config.ef_construction == 200
+        assert config.ef_search == 32
+        assert config.sync_mode is None
+
+        configured = HNSWConfiguration(128, "l2", "hnsw", "vsag", 16, sync_mode="immediate")
+        assert configured.M == 16
+        assert configured.sync_mode == "immediate"
+        assert "sync_mode=immediate" in _get_vector_index_sql(configured)
+
+        with pytest.raises(TypeError, match="M must be an integer"):
+            HNSWConfiguration(128, "l2", "hnsw", "vsag", "immediate")
+
+    def test_sync_mode_defaults_to_omitted(self):
+        config = HNSWConfiguration(dimension=128, distance="l2")
+        assert config.sync_mode is None
+        assert "sync_mode" not in _get_vector_index_sql(config)
+
+    def test_sync_mode_sql_is_unquoted(self):
+        immediate = HNSWConfiguration(dimension=128, sync_mode="immediate")
+        async_mode = HNSWConfiguration(dimension=128, sync_mode=HNSWSyncMode.ASYNC)
+        upper = HNSWConfiguration(dimension=128, sync_mode="IMMEDIATE")
+        assert immediate.sync_mode == "immediate"
+        assert async_mode.sync_mode == "async"
+        assert upper.sync_mode == "immediate"
+        assert "sync_mode=immediate" in _get_vector_index_sql(immediate)
+        assert "sync_mode='immediate'" not in _get_vector_index_sql(immediate)
+        assert "sync_mode=async" in _get_vector_index_sql(async_mode)
+        assert "DISTANCE=cosine" in _get_vector_index_sql(immediate)
+
+    def test_sync_mode_rejects_unknown_values(self):
+        with pytest.raises(ValueError, match="sync_mode must be one of"):
+            HNSWConfiguration(sync_mode="manual")
+        with pytest.raises(TypeError, match="sync_mode must be a string"):
+            HNSWConfiguration(sync_mode=True)
+
+    def test_sync_mode_property_is_forwarded(self):
+        config = HNSWConfiguration(dimension=128, properties={"sync_mode": "immediate", "quantization": "pq"})
+        assert config.properties["sync_mode"] == "immediate"
+        sql = _get_vector_index_sql(config)
+        assert "sync_mode='immediate'" in sql
+        assert "quantization='pq'" in sql
+
+    def test_sync_mode_field_replaces_same_property(self):
+        config = HNSWConfiguration(
+            dimension=128,
+            sync_mode="async",
+            properties={"SYNC_MODE": "immediate", "quantization": "pq"},
+        )
+        sql = _get_vector_index_sql(config)
+        assert "sync_mode=async" in sql
+        assert sql.lower().count("sync_mode=") == 1
+        assert "quantization='pq'" in sql
+
+    def test_ivf_has_no_sync_mode_field_and_forwards_property(self):
+        with pytest.raises(TypeError, match="sync_mode"):
+            IVFConfiguration(dimension=8, sync_mode="immediate")
+        config = IVFConfiguration(dimension=8, properties={"sync_mode": "immediate", "nlist": 16})
+        assert config.properties["sync_mode"] == "immediate"
+        sql = _get_ivf_vector_index_sql(config)
+        assert "sync_mode='immediate'" in sql
+        assert "nlist=16" in sql
 
 
 class TestFulltextIndexConfig:

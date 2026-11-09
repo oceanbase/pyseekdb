@@ -10,15 +10,18 @@ this generic runtime.
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import logging
 import os
+import struct
 import tempfile
+import threading
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 from urllib.parse import urljoin, urlparse
 
 import numpy as np
@@ -28,6 +31,166 @@ logger = logging.getLogger(__name__)
 
 Documents = str | list[str]
 Embeddings = list[list[float]]
+
+# PT_GNU_STACK. PF_X is the executable bit glibc 2.41+ refuses to honor on dlopen.
+_PT_GNU_STACK = 0x6474E551
+_PF_X = 0x1
+_ELF_MAGIC = b"\x7fELF"
+_MAX_PROGRAM_HEADERS = 128
+_prepare_lock = threading.Lock()
+_mnn_native_libraries_prepared = False
+
+
+def _parse_elf_program_header_table(header: bytes, file_size: int) -> tuple[str, int, int, int, int] | None:
+    """Return endian, program-header offset, entry size, count, and flags offset."""
+    if len(header) < 64 or header[:4] != _ELF_MAGIC:
+        return None
+    elf_class = header[4]
+    ei_data = header[5]
+    if ei_data not in (1, 2):
+        return None
+    endian = "<" if ei_data == 1 else ">"
+    if elf_class == 2:
+        e_phoff = struct.unpack_from(endian + "Q", header, 32)[0]
+        e_phentsize, e_phnum = struct.unpack_from(endian + "HH", header, 54)
+        flags_offset = 4
+    elif elf_class == 1:
+        e_phoff = struct.unpack_from(endian + "I", header, 28)[0]
+        e_phentsize, e_phnum = struct.unpack_from(endian + "HH", header, 42)
+        flags_offset = 24
+    else:
+        return None
+    table_end = e_phoff + e_phnum * e_phentsize
+    if (
+        e_phnum == 0
+        or e_phnum > _MAX_PROGRAM_HEADERS
+        or e_phentsize < flags_offset + 4
+        or e_phentsize > 4096
+        or table_end > file_size
+    ):
+        return None
+    return endian, e_phoff, e_phentsize, e_phnum, flags_offset
+
+
+def _gnu_stack_is_executable(path: Path) -> bool:
+    """Report whether an ELF object asks the loader for an executable stack."""
+    try:
+        with path.open("rb") as handle:
+            file_size = handle.seek(0, os.SEEK_END)
+            handle.seek(0)
+            parsed = _parse_elf_program_header_table(handle.read(64), file_size)
+            if parsed is None:
+                return False
+            endian, e_phoff, e_phentsize, e_phnum, flags_offset = parsed
+            for index in range(e_phnum):
+                handle.seek(e_phoff + index * e_phentsize)
+                entry = handle.read(e_phentsize)
+                if len(entry) < e_phentsize:
+                    return False
+                p_type = struct.unpack_from(endian + "I", entry, 0)[0]
+                if p_type != _PT_GNU_STACK:
+                    continue
+                p_flags = struct.unpack_from(endian + "I", entry, flags_offset)[0]
+                if p_flags & _PF_X:
+                    return True
+    except OSError:
+        logger.debug("Unable to read GNU_STACK flags from %s", path, exc_info=True)
+    return False
+
+
+def _clear_executable_gnu_stack_in_handle(handle: BinaryIO) -> bool:
+    """Clear PF_X on every PT_GNU_STACK header in an open ELF file."""
+    file_size = handle.seek(0, os.SEEK_END)
+    handle.seek(0)
+    parsed = _parse_elf_program_header_table(handle.read(64), file_size)
+    if parsed is None:
+        return False
+    endian, e_phoff, e_phentsize, e_phnum, flags_offset = parsed
+    changed = False
+    for index in range(e_phnum):
+        entry_offset = e_phoff + index * e_phentsize
+        handle.seek(entry_offset)
+        entry = handle.read(e_phentsize)
+        if len(entry) < e_phentsize:
+            return changed
+        p_type = struct.unpack_from(endian + "I", entry, 0)[0]
+        if p_type != _PT_GNU_STACK:
+            continue
+        p_flags = struct.unpack_from(endian + "I", entry, flags_offset)[0]
+        if not p_flags & _PF_X:
+            continue
+        handle.seek(entry_offset + flags_offset)
+        handle.write(struct.pack(endian + "I", p_flags & ~_PF_X))
+        changed = True
+    return changed
+
+
+def _clear_executable_gnu_stack(path: Path) -> bool:
+    """Clear the executable-stack flag. Return True when the file changed."""
+    try:
+        with path.open("r+b") as handle:
+            return _clear_executable_gnu_stack_in_handle(handle)
+    except OSError:
+        if _gnu_stack_is_executable(path):
+            logger.warning(
+                "MNN library %s is marked with an executable stack and could not be updated. "
+                "Importing it fails on glibc 2.41 and newer.",
+                path,
+            )
+        return False
+
+
+def _is_shared_library(path: Path) -> bool:
+    """Return True when the filename is a native shared library."""
+    return ".so" in path.name
+
+
+def _mnn_native_library_paths() -> list[Path]:
+    """Return shared libraries recorded by the installed ``mnn`` distribution.
+
+    The list comes from that distribution's installed-file record. Each path
+    must also stay inside the distribution directory. An unrelated
+    ``_tools*.so`` in ``site-packages`` is not opened or rewritten.
+    """
+    try:
+        distribution = importlib.metadata.distribution("mnn")
+    except importlib.metadata.PackageNotFoundError:
+        return []
+    root = Path(distribution.locate_file("")).resolve()
+    libraries: list[Path] = []
+    for record in distribution.files or ():
+        located = Path(record.locate())
+        if not _is_shared_library(located) or not located.is_file():
+            continue
+        try:
+            located.resolve().relative_to(root)
+        except ValueError:
+            logger.debug("Skipping %s because it is outside the mnn distribution directory", located)
+            continue
+        libraries.append(located)
+    return libraries
+
+
+def _prepare_mnn_native_libraries() -> None:
+    """Make the installed MNN extensions loadable on glibc 2.41 and newer.
+
+    The manylinux wheels mark ``_mnncengine`` and ``_tools`` with an executable
+    GNU stack because some assembly objects omit ``.note.GNU-stack``. The runtime
+    does not execute code on the stack. glibc 2.41, including Ubuntu 26.04, refuses
+    that request during ``dlopen`` and ``import MNN`` fails. Only shared libraries
+    recorded by the installed ``mnn`` distribution are rewritten.
+    """
+    global _mnn_native_libraries_prepared
+    with _prepare_lock:
+        if _mnn_native_libraries_prepared:
+            return
+        cleared = [path for path in _mnn_native_library_paths() if _clear_executable_gnu_stack(path)]
+        if cleared:
+            logger.info(
+                "Cleared the executable-stack flag on MNN libraries so they can load: %s",
+                ", ".join(path.name for path in cleared),
+            )
+        _mnn_native_libraries_prepared = True
 
 
 class MnnEmbeddingFunction:
@@ -92,6 +255,7 @@ class MnnEmbeddingFunction:
 
         # These imports are intentionally lazy so importing pyseekdb does not
         # initialize the native MNN runtime until embeddings are requested.
+        _prepare_mnn_native_libraries()
         import MNN
         import tokenizers
         import tqdm
