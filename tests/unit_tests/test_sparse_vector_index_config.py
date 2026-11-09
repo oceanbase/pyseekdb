@@ -222,6 +222,10 @@ class TestSparseVectorIndexConfigOptionalParams:
         assert config.drop_ratio_search == 0.2
         assert config.refine_k == 4.0
 
+    def test_sync_mode_property_is_rejected(self):
+        with pytest.raises(ValueError, match="Sparse vector index does not support sync_mode"):
+            _make_config(properties={"sync_mode": "immediate"})
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

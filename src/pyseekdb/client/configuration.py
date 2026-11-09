@@ -156,6 +156,17 @@ def _validate_hnsw_base_fields(config: "HNSWConfiguration") -> None:
         raise ValueError(f"lib must be one of {valid_libs}, got {config.lib}")
 
 
+def _reject_sync_mode_property(properties: dict[str, PrimitiveValue] | None, *, index_name: str) -> None:
+    """Reject sync_mode on index types that cannot maintain an HNSW sync mode."""
+    if not properties:
+        return
+    if any(str(key).lower() == "sync_mode" for key in properties):
+        raise ValueError(
+            f"{index_name} does not support sync_mode. "
+            "sync_mode is an HNSW option ('immediate' or 'async') on seekdb >= 1.3.0.0."
+        )
+
+
 def _normalize_hnsw_properties(properties: dict[str, PrimitiveValue]) -> None:
     """Strip reserved HNSW keys from user-supplied property bags."""
     reserved_keys = [
@@ -176,9 +187,22 @@ def _normalize_hnsw_properties(properties: dict[str, PrimitiveValue]) -> None:
             "bq_use_fht",
         }
     ]
+    for key in list(properties):
+        if key.lower() == "sync_mode":
+            raise ValueError("Set sync_mode on HNSWConfiguration(sync_mode='immediate' or 'async'), not in properties.")
     for key in reserved_keys:
         warnings.warn(f"{key} is a reserved keyword in properties, it will be ignored", stacklevel=2)
         properties.pop(key)
+
+
+def _validate_hnsw_sync_mode(config: "HNSWConfiguration") -> None:
+    """Validate and normalize an explicit HNSW sync_mode."""
+    if config.sync_mode is None:
+        return
+    config.sync_mode = _normalize_str_enum(config.sync_mode, field_name="sync_mode")
+    valid_sync_modes = [mode.value for mode in HNSWSyncMode]
+    if config.sync_mode not in valid_sync_modes:
+        raise ValueError(f"sync_mode must be one of {valid_sync_modes}, got {config.sync_mode}")
 
 
 def _validate_hnsw_configuration(config: "HNSWConfiguration") -> None:
@@ -202,6 +226,7 @@ def _validate_hnsw_configuration(config: "HNSWConfiguration") -> None:
         raise ValueError(f"bq_bits_query must be one of [0, 4, 32], got '{config.bq_bits_query}'")
     if config.bq_use_fht is not None and not isinstance(config.bq_use_fht, bool):
         raise TypeError(f"bq_use_fht must be a bool, got {type(config.bq_use_fht).__name__}")
+    _validate_hnsw_sync_mode(config)
 
 
 class DistanceMetric(StrEnum):
@@ -228,6 +253,18 @@ class HNSWIndexLib(StrEnum):
     """Supported HNSW index libraries."""
 
     VSAG = "vsag"
+
+
+class HNSWSyncMode(StrEnum):
+    """HNSW index maintenance mode on seekdb 1.3 and later.
+
+    ``immediate`` updates the index inside each write. ``async`` lets a
+    background change stream catch up. Omit the option to keep the server
+    default, which is ``async`` for heap HNSW indexes on seekdb 1.3+.
+    """
+
+    IMMEDIATE = "immediate"
+    ASYNC = "async"
 
 
 class IVFIndexType(StrEnum):
@@ -311,6 +348,10 @@ class HNSWConfiguration:
     Args:
         dimension: Vector dimension (number of elements in each vector)
         distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
+        sync_mode: HNSW maintenance mode, ``'immediate'`` or ``'async'``. ``None``
+            (the default) omits the clause and keeps the server default. On seekdb
+            1.3 and later, heap HNSW indexes default to ``async``. ``immediate``
+            maintains the index inside each write. Requires seekdb >= 1.3.0.0.
         properties: Optional dictionary of properties for the HNSW index (key: string, value: primitive type)
         Please refer to [HNSW configuration](https://en.oceanbase.com/docs/common-oceanbase-database-10000000003351043) for detailed information.
     """
@@ -319,6 +360,7 @@ class HNSWConfiguration:
     distance: str | DistanceMetric = DistanceMetric.COSINE.value
     type: str | HNSWIndexType = HNSWIndexType.HNSW.value
     lib: str | HNSWIndexLib = HNSWIndexLib.VSAG.value
+    sync_mode: str | HNSWSyncMode | None = None
     M: int | None = None
     ef_construction: int | None = None
     ef_search: int | None = None
@@ -420,6 +462,7 @@ class IVFConfiguration:
             raise TypeError(f"centroids_fresh_mode must be a str, got {type(self.centroids_fresh_mode).__name__}")
 
         _ensure_primitive_properties(self.properties)
+        _reject_sync_mode_property(self.properties, index_name="IVF")
 
 
 @dataclass
@@ -519,6 +562,7 @@ class SparseVectorIndexConfig:
         if self.refine_k < 1.0 or self.refine_k > 1000.0:
             raise ValueError(f"refine_k must be between 1.0 and 1000.0, got '{self.refine_k}'")
         _ensure_primitive_properties(self.properties)
+        _reject_sync_mode_property(self.properties, index_name="Sparse vector index")
 
         self._validate_source_key()
         if self.embedding_function is None:

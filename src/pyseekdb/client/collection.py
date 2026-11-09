@@ -11,7 +11,6 @@ Design Pattern:
 from typing import TYPE_CHECKING, Any, Optional
 
 from .validators import (
-    _apply_sync_index_refresh,
     _validate_n_results,
     _validate_namespace_name,
 )
@@ -264,8 +263,6 @@ class Collection:
         embeddings: list[float] | list[list[float]] | None = None,
         metadatas: dict | list[dict] | None = None,
         documents: str | list[str] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -277,17 +274,6 @@ class Collection:
             metadatas: Single metadata dict or list of metadata dicts (optional)
             documents: Single document or list of documents (optional)
                        If provided without embeddings, embedding_function will be used to generate embeddings
-            sync: When True, return only after this write commits and asynchronous
-                index refresh finishes via ``CALL dbms_index_manager.refresh()``.
-                Defaults to False, which returns after the primary-table write.
-                Requires seekdb >= 1.3.0.0 (embedded or server). On older seekdb
-                and on OceanBase, True raises ``ValueError`` before the write.
-                The wait covers pending change-stream index refresh for the
-                connected database, the same scope as ``refresh_index()``. There
-                is no separate timeout argument; the session ``ob_query_timeout``
-                applies, and a timeout or refresh error propagates after the
-                write has committed. ``sync`` is a boolean wait flag. Index
-                creation options such as HNSW ``sync_mode`` are unchanged.
             **kwargs: Additional parameters
 
         Examples:
@@ -307,25 +293,18 @@ class Collection:
                 documents=["Hello world", "How are you?"],
                 metadatas=[{"tag": "A"}, {"tag": "B"}]
             )
-
-            # Wait until approximate search can see the new row
-            collection.add(ids="1", embeddings=[0.1, 0.2, 0.3], sync=True)
         """
         self._guard_collection_data_api()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._collection_add(
-                collection_id=self._id,
-                collection_name=self._name,
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents,
-                embedding_function=self._embedding_function,
-                sparse_vector_index_config=self._sparse_vector_index_config,
-                **kwargs,
-            ),
+        return self._client._collection_add(
+            collection_id=self._id,
+            collection_name=self._name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents,
+            embedding_function=self._embedding_function,
+            sparse_vector_index_config=self._sparse_vector_index_config,
+            **kwargs,
         )
 
     def update(
@@ -334,8 +313,6 @@ class Collection:
         embeddings: list[float] | list[list[float]] | None = None,
         metadatas: dict | list[dict] | None = None,
         documents: str | list[str] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -346,10 +323,6 @@ class Collection:
             embeddings: New embeddings (optional)
             metadatas: New metadata (optional)
             documents: New documents (optional)
-            sync: When True, wait for asynchronous index refresh before returning.
-                See ``add`` for the default, supported versions, waiting scope,
-                and timeout behavior. ``delete`` accepts the same option so
-                removed vectors leave approximate search before the call returns.
             **kwargs: Additional parameters
 
         Note:
@@ -364,25 +337,18 @@ class Collection:
                 ids=["1", "2"],
                 embeddings=[[0.9, 0.8], [0.7, 0.6]]
             )
-
-            # Wait until approximate search sees the updated vectors
-            collection.update(ids="1", embeddings=[0.9, 0.8, 0.7], sync=True)
         """
         self._guard_collection_data_api()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._collection_update(
-                collection_id=self._id,
-                collection_name=self._name,
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents,
-                embedding_function=self._embedding_function,
-                sparse_vector_index_config=self._sparse_vector_index_config,
-                **kwargs,
-            ),
+        return self._client._collection_update(
+            collection_id=self._id,
+            collection_name=self._name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents,
+            embedding_function=self._embedding_function,
+            sparse_vector_index_config=self._sparse_vector_index_config,
+            **kwargs,
         )
 
     def upsert(
@@ -391,8 +357,6 @@ class Collection:
         embeddings: list[float] | list[list[float]] | None = None,
         metadatas: dict | list[dict] | None = None,
         documents: str | list[str] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -403,9 +367,6 @@ class Collection:
             embeddings: embeddings (optional if documents provided)
             metadatas: Metadata (optional)
             documents: Documents (optional)
-            sync: When True, wait for asynchronous index refresh before returning.
-                See ``add`` for the default, supported versions, waiting scope,
-                and timeout behavior.
             **kwargs: Additional parameters
 
         Note:
@@ -420,25 +381,18 @@ class Collection:
                 ids=["1", "2", "3"],
                 embeddings=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
             )
-
-            # Wait until approximate search can see the upserted row
-            collection.upsert(ids="1", embeddings=[0.1, 0.2, 0.3], sync=True)
         """
         self._guard_collection_data_api()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._collection_upsert(
-                collection_id=self._id,
-                collection_name=self._name,
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents,
-                embedding_function=self._embedding_function,
-                sparse_vector_index_config=self._sparse_vector_index_config,
-                **kwargs,
-            ),
+        return self._client._collection_upsert(
+            collection_id=self._id,
+            collection_name=self._name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents,
+            embedding_function=self._embedding_function,
+            sparse_vector_index_config=self._sparse_vector_index_config,
+            **kwargs,
         )
 
     def delete(
@@ -446,8 +400,6 @@ class Collection:
         ids: str | list[str] | None = None,
         where: dict[str, Any] | None = None,
         where_document: dict[str, Any] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -457,9 +409,6 @@ class Collection:
             ids: Single ID or list of IDs to delete (optional)
             where: Filter condition on metadata (optional)
             where_document: Filter condition on documents (optional)
-            sync: When True, wait for asynchronous index refresh before returning
-                so removed rows drop out of approximate search. See ``add`` for
-                the default, supported versions, waiting scope, and timeout behavior.
             **kwargs: Additional parameters
 
         Note:
@@ -474,22 +423,15 @@ class Collection:
 
             # Delete by document filter
             collection.delete(where_document={"$contains": "keyword"})
-
-            # Wait until approximate search no longer returns the deleted ids
-            collection.delete(ids=["1"], sync=True)
         """
         self._guard_collection_data_api()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._collection_delete(
-                collection_id=self._id,
-                collection_name=self._name,
-                ids=ids,
-                where=where,
-                where_document=where_document,
-                **kwargs,
-            ),
+        return self._client._collection_delete(
+            collection_id=self._id,
+            collection_name=self._name,
+            ids=ids,
+            where=where,
+            where_document=where_document,
+            **kwargs,
         )
 
     # ==================== DQL Operations ====================
@@ -764,15 +706,11 @@ class Collection:
         Flush async vector index build tasks.
 
         This executes ``CALL dbms_index_manager.refresh();`` and returns only
-        after the database completes the refresh procedure. The procedure waits
-        for change-stream refresh in the connected database and uses the session
-        ``ob_query_timeout``.
+        after the database completes the refresh procedure.
 
         Note:
-            This method runs the refresh procedure on seekdb 1.3.0.0 or higher.
-            On 1.2.0.0 and earlier, and on OceanBase, this method is a no-op.
-            Pass ``sync=True`` to ``add``, ``update``, ``upsert``, or ``delete``
-            when the write itself must fail if that wait is unavailable.
+            This method is only available for seekdb version 1.3.0.0 or higher.
+            In 1.2.0.0 and earlier, this method is a no-op.
         """
         self._client.refresh_index()
 

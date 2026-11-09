@@ -15,7 +15,9 @@ from pyseekdb import (  # noqa: E402
     Configuration,
     FulltextIndexConfig,
     HNSWConfiguration,
+    HNSWSyncMode,
     IKProperties,
+    IVFConfiguration,
     Ngram2Properties,
     NgramProperties,
     SpaceProperties,
@@ -166,6 +168,39 @@ class TestHNSWConfiguration:
         assert "refine_type='sq8'" in sql
         assert "bq_bits_query=32" in sql
         assert "bq_use_fht=" in sql
+
+    def test_sync_mode_defaults_to_omitted(self):
+        config = HNSWConfiguration(dimension=128, distance="l2")
+        assert config.sync_mode is None
+        assert "sync_mode" not in _get_vector_index_sql(config)
+
+    def test_sync_mode_sql_is_unquoted(self):
+        immediate = HNSWConfiguration(dimension=128, sync_mode="immediate")
+        async_mode = HNSWConfiguration(dimension=128, sync_mode=HNSWSyncMode.ASYNC)
+        upper = HNSWConfiguration(dimension=128, sync_mode="IMMEDIATE")
+        assert immediate.sync_mode == "immediate"
+        assert async_mode.sync_mode == "async"
+        assert upper.sync_mode == "immediate"
+        assert "sync_mode=immediate" in _get_vector_index_sql(immediate)
+        assert "sync_mode='immediate'" not in _get_vector_index_sql(immediate)
+        assert "sync_mode=async" in _get_vector_index_sql(async_mode)
+        assert "DISTANCE=cosine" in _get_vector_index_sql(immediate)
+
+    def test_sync_mode_rejects_unknown_values(self):
+        with pytest.raises(ValueError, match="sync_mode must be one of"):
+            HNSWConfiguration(sync_mode="manual")
+        with pytest.raises(TypeError, match="sync_mode must be a string"):
+            HNSWConfiguration(sync_mode=True)
+
+    def test_sync_mode_in_hnsw_properties_is_rejected(self):
+        with pytest.raises(ValueError, match="not in properties"):
+            HNSWConfiguration(properties={"sync_mode": "immediate"})
+
+    def test_ivf_rejects_sync_mode_property(self):
+        with pytest.raises(TypeError, match="sync_mode"):
+            IVFConfiguration(dimension=8, sync_mode="immediate")
+        with pytest.raises(ValueError, match="IVF does not support sync_mode"):
+            IVFConfiguration(dimension=8, properties={"SYNC_MODE": "immediate"})
 
 
 class TestFulltextIndexConfig:

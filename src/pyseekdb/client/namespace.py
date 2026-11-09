@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from .validators import _apply_sync_index_refresh, _validate_include, _validate_n_results
+from .validators import _validate_include, _validate_n_results
 
 if TYPE_CHECKING:
     from .collection import Collection
@@ -87,43 +87,22 @@ class Namespace:
         embeddings: list[float] | list[list[float]] | None = None,
         metadatas: dict | list[dict] | None = None,
         documents: str | list[str] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
-        """Insert records into this namespace.
-
-        Args:
-            ids: Single record id or list of record ids.
-            embeddings: Single embedding or list of embeddings.
-            metadatas: Single metadata dict or list of metadata dicts.
-            documents: Single document or list of documents.
-            sync: When True, return only after this write commits and
-                asynchronous index refresh finishes. Defaults to False.
-                The wait has the same scope, timeout, and version rules as
-                ``Collection.add(sync=True)``: seekdb >= 1.3.0.0 runs
-                ``CALL dbms_index_manager.refresh()``; other backends raise
-                ``ValueError`` before the write. LakeBase does not provide
-                that procedure, so ``sync=True`` raises there.
-            **kwargs: Additional parameters forwarded to the client.
-        """
+        """Insert records into this namespace."""
         self._guard_exists()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._namespace_add(
-                collection_id=self._collection.id,
-                collection_name=self._collection.name,
-                namespace_id=self._namespace_id,
-                namespace_name=self._name,
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents,
-                embedding_function=self._collection.embedding_function,
-                **self._dml_collection_context(),
-                **kwargs,
-            ),
+        return self._client._namespace_add(
+            collection_id=self._collection.id,
+            collection_name=self._collection.name,
+            namespace_id=self._namespace_id,
+            namespace_name=self._name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents,
+            embedding_function=self._collection.embedding_function,
+            **self._dml_collection_context(),
+            **kwargs,
         )
 
     def update(
@@ -132,32 +111,22 @@ class Namespace:
         embeddings: list[float] | list[list[float]] | None = None,
         metadatas: dict | list[dict] | None = None,
         documents: str | list[str] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
-        """Update existing records in this namespace.
-
-        ``sync`` matches ``add``: True waits for asynchronous index refresh,
-        and unsupported backends raise ``ValueError`` before the write.
-        """
+        """Update existing records in this namespace."""
         self._guard_exists()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._namespace_update(
-                collection_id=self._collection.id,
-                collection_name=self._collection.name,
-                namespace_id=self._namespace_id,
-                namespace_name=self._name,
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents,
-                embedding_function=self._collection.embedding_function,
-                **self._dml_collection_context(),
-                **kwargs,
-            ),
+        return self._client._namespace_update(
+            collection_id=self._collection.id,
+            collection_name=self._collection.name,
+            namespace_id=self._namespace_id,
+            namespace_name=self._name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents,
+            embedding_function=self._collection.embedding_function,
+            **self._dml_collection_context(),
+            **kwargs,
         )
 
     def upsert(
@@ -166,32 +135,22 @@ class Namespace:
         embeddings: list[float] | list[list[float]] | None = None,
         metadatas: dict | list[dict] | None = None,
         documents: str | list[str] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
-        """Insert or update records in this namespace.
-
-        ``sync`` matches ``add``. The refresh runs once after the upsert,
-        including when the upsert mixes inserts and updates.
-        """
+        """Insert or update records in this namespace."""
         self._guard_exists()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._namespace_upsert(
-                collection_id=self._collection.id,
-                collection_name=self._collection.name,
-                namespace_id=self._namespace_id,
-                namespace_name=self._name,
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents,
-                embedding_function=self._collection.embedding_function,
-                **self._dml_collection_context(),
-                **kwargs,
-            ),
+        return self._client._namespace_upsert(
+            collection_id=self._collection.id,
+            collection_name=self._collection.name,
+            namespace_id=self._namespace_id,
+            namespace_name=self._name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents,
+            embedding_function=self._collection.embedding_function,
+            **self._dml_collection_context(),
+            **kwargs,
         )
 
     def delete(
@@ -199,30 +158,19 @@ class Namespace:
         ids: str | list[str] | None = None,
         where: dict[str, Any] | None = None,
         where_document: dict[str, Any] | None = None,
-        *,
-        sync: bool = False,
         **kwargs,
     ) -> None:
-        """Delete records from this namespace by ids or filters.
-
-        ``sync=True`` waits for asynchronous index refresh so removed records
-        leave approximate search before the call returns. See ``add`` for
-        version and timeout behavior.
-        """
+        """Delete records from this namespace by ids or filters."""
         self._guard_exists()
-        return _apply_sync_index_refresh(
-            self._client,
-            sync,
-            lambda: self._client._namespace_delete(
-                collection_id=self._collection.id,
-                collection_name=self._collection.name,
-                namespace_id=self._namespace_id,
-                namespace_name=self._name,
-                ids=ids,
-                where=where,
-                where_document=where_document,
-                **kwargs,
-            ),
+        return self._client._namespace_delete(
+            collection_id=self._collection.id,
+            collection_name=self._collection.name,
+            namespace_id=self._namespace_id,
+            namespace_name=self._name,
+            ids=ids,
+            where=where,
+            where_document=where_document,
+            **kwargs,
         )
 
     # ==================== DQL Operations ====================

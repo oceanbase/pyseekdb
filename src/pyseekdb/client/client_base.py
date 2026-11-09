@@ -90,10 +90,10 @@ _MAX_COLLECTION_NAME_LENGTH = 512
 
 # Minimum LakeBase (OceanBase Database AI) version for namespace-enabled collections.
 NAMESPACE_MIN_LAKEBASE_VERSION = Version("4.6.1.0")
+# seekdb versions that accept HNSW sync_mode on heap tables.
+HNSW_SYNC_MODE_MIN_VERSION = Version("1.3.0.0")
 # Backward-compatible alias used by existing tests and skip helpers.
 NAMESPACE_MIN_OB_VERSION = NAMESPACE_MIN_LAKEBASE_VERSION
-# seekdb versions that implement CALL dbms_index_manager.refresh().
-INDEX_REFRESH_MIN_VERSION = Version("1.3.0.0")
 
 _LAKEBASE_VERSION_MARKER = "database ai"
 
@@ -118,9 +118,9 @@ def is_lakebase_version_string(version_str: str) -> bool:
     return _LAKEBASE_VERSION_MARKER in version_str.lower()
 
 
-def _index_refresh_supported(db_type: str, version: Version) -> bool:
-    """Return whether this database can wait for asynchronous index refresh."""
-    return db_type.lower() == "seekdb" and version >= INDEX_REFRESH_MIN_VERSION
+def _hnsw_sync_mode_supported(db_type: str, version: Version) -> bool:
+    """Return whether this database accepts HNSW ``sync_mode`` on heap tables."""
+    return db_type.lower() == "seekdb" and version >= HNSW_SYNC_MODE_MIN_VERSION
 
 
 def _extract_collection_id_from_sdk_row(row: Any) -> str:
@@ -385,6 +385,9 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
                 property_parts.append(f"{key}={str(value).lower()}")
             else:
                 property_parts.append(f"{key}={value}")
+    # Unquoted identifier: seekdb parses sync_mode=immediate / sync_mode=async.
+    if hnsw_config.sync_mode is not None:
+        property_parts.append(f"sync_mode={hnsw_config.sync_mode}")
     property_str = ", ".join(property_parts)
     properties_str = f", {property_str}" if property_str else ""
     return f"WITH (DISTANCE={hnsw_config.distance}, TYPE={hnsw_config.type}, LIB={hnsw_config.lib}{properties_str})"
@@ -1115,6 +1118,8 @@ class BaseClient(BaseConnection, AdminAPI):
         dimension = hnsw_config.dimension
         if dimension < 1 or dimension > MAX_HNSW_VECTOR_DIMENSION:
             raise ValueError(f"Dimension must be between 1 and {MAX_HNSW_VECTOR_DIMENSION}, got {dimension}")
+        if hnsw_config.sync_mode is not None:
+            self._assert_hnsw_sync_mode_supported(hnsw_config.sync_mode)
 
         # Extract fulltext parser configuration
         fulltext_index_clause = _get_fulltext_index_sql(schema.fulltext_index)
@@ -2906,39 +2911,28 @@ class BaseClient(BaseConnection, AdminAPI):
     def _refresh_enabled(self) -> bool:
         """Return whether index refresh is enabled on the backend."""
         db_type, version = self.detect_db_type_and_version()
+        version_130 = Version("1.3.0.0")
         logger.debug(f"db_type: {db_type}, version: {version}")
-        return _index_refresh_supported(db_type, version)
+        return db_type.lower() == "seekdb" and version >= version_130
 
-    def _assert_index_refresh_supported(self) -> None:
-        """Raise when ``sync=True`` cannot wait for asynchronous index completion.
-
-        ``refresh_index()`` stays a no-op on unsupported backends so existing
-        callers keep working. A synchronous write must not report success there.
-        """
+    def _assert_hnsw_sync_mode_supported(self, sync_mode: str) -> None:
+        """Raise before CREATE when the connected database rejects HNSW sync_mode."""
         db_type, version = self.detect_db_type_and_version()
-        if _index_refresh_supported(db_type, version):
+        if _hnsw_sync_mode_supported(db_type, version):
             return
         raise ValueError(
-            "sync=True cannot wait for asynchronous index completion on "
-            f"{db_type} {version}. Waiting requires seekdb >= {INDEX_REFRESH_MIN_VERSION} "
-            "and runs CALL dbms_index_manager.refresh() until change-stream refresh finishes. "
-            "Omit sync to keep the default asynchronous write. The write was not performed."
+            f"HNSW sync_mode='{sync_mode}' requires seekdb >= {HNSW_SYNC_MODE_MIN_VERSION}. "
+            f"Connected database is {db_type} {version}. "
+            "Omit sync_mode to keep that server's default index maintenance. "
+            "The collection was not created."
         )
 
     def refresh_index(self) -> None:
         """
         Flush async vector index build tasks when supported.
 
-        On seekdb >= 1.3.0.0 this executes ``CALL dbms_index_manager.refresh()``
-        and returns after the procedure finishes. The procedure waits for
-        change-stream refresh of asynchronous indexes in the connected database.
-        It has no timeout argument; the session ``ob_query_timeout`` applies, and
-        database errors such as ``OB_TIMEOUT`` (4012) propagate.
-
-        On older seekdb versions and on OceanBase this method is a no-op so
-        existing callers stay compatible. Pass ``sync=True`` to ``add``,
-        ``update``, ``upsert``, or ``delete`` when the caller must fail instead
-        of continuing without a wait.
+        For unsupported database versions, this method is a no-op to keep
+        collection-level API calls backward compatible.
         """
         if not self._refresh_enabled():
             return

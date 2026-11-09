@@ -100,6 +100,7 @@ collection = client.get_or_create_collection(
   - `HNSWConfiguration`: Vector index configuration with `dimension` and `distance` metric (backward compatibility)
   - If not provided, uses default (dimension=384, distance='cosine', analyzer='ik')
   - If set to `None`, dimension will be calculated from `embedding_function`
+  - `sync_mode` (`'immediate'` or `'async'`, optional): HNSW index maintenance mode, passed through as `sync_mode=immediate` or `sync_mode=async` on `CREATE VECTOR INDEX`. Omit it to keep the server default. On seekdb 1.3 and later, heap HNSW indexes default to `async`: writes return after the primary table commits, and approximate search sees new rows after the background index catches up (`collection.refresh_index()` waits for that). `immediate` updates the index inside each write. Setting `sync_mode` requires seekdb >= 1.3.0.0. Older seekdb and OceanBase raise `ValueError` before the collection is created. IVF and sparse indexes do not accept `sync_mode`.
 - `embedding_function` (EmbeddingFunction, optional): Function to convert documents to embeddings
   - If not provided, uses `DefaultEmbeddingFunction()` (384 dimensions)
   - If set to `None`, collection will not have an embedding function
@@ -115,6 +116,16 @@ collection = client.get_or_create_collection(
 For more information about parser, please refer to [create_index section tokenizer_option](https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000004479548#tokenizer_option).
 
 **Note:** When `embedding_function` is provided, the system will automatically calculate the vector dimension by calling the function. If `configuration.dimension` is also provided, it must match the embedding function's dimension, otherwise a `ValueError` will be raised.
+
+**HNSW `sync_mode`:**
+
+```python
+from pyseekdb import HNSWConfiguration, HNSWSyncMode
+
+config = HNSWConfiguration(dimension=128, distance="l2", sync_mode="immediate")
+# or: sync_mode=HNSWSyncMode.ASYNC
+collection = client.create_collection("docs", configuration=config, embedding_function=None)
+```
 
 ## 3.2 Getting a Collection
 

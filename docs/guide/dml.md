@@ -67,7 +67,6 @@ collection.add(
 - `documents` (str or List[str], optional): Single document or list of documents
   - If `embeddings` not provided, `documents` will be converted to embeddings using collection's `embedding_function`
 - `metadatas` (dict or List[dict], optional): Single metadata dict or list of metadata dicts
-- `sync` (bool, optional): Wait for asynchronous index refresh before returning. Default `False`. See [Wait for asynchronous indexing](#45-wait-for-asynchronous-indexing).
 
 **Note:** The `embedding_function` used is the one associated with the collection (set during `create_collection()` or `get_collection()`). You cannot override it per-operation.
 
@@ -120,7 +119,6 @@ collection.update(
 - `documents` (str or List[str], optional): New documents
   - If `embeddings` not provided, `documents` will be converted to embeddings using collection's `embedding_function`
 - `metadatas` (dict or List[dict], optional): New metadata
-- `sync` (bool, optional): Wait for asynchronous index refresh before returning. Default `False`. See [Wait for asynchronous indexing](#45-wait-for-asynchronous-indexing).
 
 **Note:** Metadata-only updates (no embeddings, no documents) are allowed. The `embedding_function` used is the one associated with the collection.
 
@@ -179,7 +177,6 @@ collection.upsert(
 - `documents` (str or List[str], optional): Documents
   - If `embeddings` not provided, `documents` will be converted to embeddings using collection's `embedding_function`
 - `metadatas` (dict or List[dict], optional): Metadata
-- `sync` (bool, optional): Wait for asynchronous index refresh before returning. Default `False`. See [Wait for asynchronous indexing](#45-wait-for-asynchronous-indexing).
 
 **Note:** Metadata-only upserts (no embeddings, no documents) are allowed. The `embedding_function` used is the one associated with the collection.
 
@@ -214,37 +211,5 @@ collection.delete(
 - `ids` (str or List[str], optional): Single ID or list of IDs to delete
 - `where` (dict, optional): Metadata filter conditions (see Filter Operators section)
 - `where_document` (dict, optional): Document filter conditions
-- `sync` (bool, optional): Wait for asynchronous index refresh before returning, so removed rows drop out of approximate search. Default `False`. See [Wait for asynchronous indexing](#45-wait-for-asynchronous-indexing).
 
 **Note:** At least one of `ids`, `where`, or `where_document` must be provided.
-
-## 4.5 Wait for asynchronous indexing
-
-On seekdb 1.3 and later, HNSW vector indexes default to asynchronous maintenance. `add()`, `update()`, `upsert()`, and `delete()` commit the primary-table change and return while a background change stream updates the index. Approximate search (`query()` and hybrid vector search) can miss that change until the index catches up. `collection.refresh_index()` waits for the catch-up by running `CALL dbms_index_manager.refresh()`.
-
-Pass `sync=True` to do that wait inside the write call:
-
-```python
-collection.add(
-    ids="item1",
-    embeddings=[0.1, 0.2, 0.3],
-    documents="Visible to the next query",
-    sync=True,
-)
-results = collection.query(query_embeddings=[0.1, 0.2, 0.3], n_results=1)
-```
-
-The same keyword is available on `update()`, `upsert()`, and `delete()`, and on the matching `Namespace` methods.
-
-| Item | Behavior |
-| --- | --- |
-| Parameter | `sync` |
-| Default | `False`. The call returns after the primary-table write and leaves index refresh to the background. |
-| Waiting scope | The same work as `refresh_index()`: `CALL dbms_index_manager.refresh()` waits until change-stream refresh of asynchronous indexes finishes for the connected database. The procedure's scope is the database's pending async index work, which can include more than the rows in this call. |
-| Supported databases | seekdb **1.3.0.0** or newer, in embedded mode and server mode. |
-| Unsupported databases | Older seekdb releases and OceanBase (including LakeBase) have no such wait. `sync=True` raises `ValueError` **before** the write. `refresh_index()` on those databases stays a no-op. |
-| Timeout | The wait uses the session `ob_query_timeout`. There is no separate timeout argument. When the server stops the call, the database error (typically `OB_TIMEOUT`, errno 4012) propagates from the write method. |
-| Refresh errors | Any refresh failure propagates after the write has committed (`autocommit` is on). The rows are stored, and approximate search may still be catching up. Call `refresh_index()` again to finish the wait. |
-| Relation to other options | `sync` is a boolean on the write call. HNSW `sync_mode` still controls how the index is created. Python `async` / `await` is a separate language feature. |
-
-`delete(..., sync=True)` uses the same wait so a removed vector leaves approximate search before the call returns. Namespace writes accept `sync` with the same rules. Today's namespace collections run on LakeBase, which does not implement `dbms_index_manager.refresh()`, so `Namespace.add(..., sync=True)` raises `ValueError` before inserting.
