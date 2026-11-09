@@ -2719,6 +2719,22 @@ class BaseClient(BaseConnection, AdminAPI):
         collections = self.list_collections()
         return len(collections)
 
+    def flush(self, wait: bool = True, reclaim_memory: bool = True, timeout: float = 30.0) -> Any:
+        """Explicitly flush MemStore memory after a batch of committed writes.
+
+        Only the embedded client implements this operation today. See
+        ``SeekdbEmbeddedClient.flush`` for the supported semantics.
+
+        Raises:
+            ValueError: Always, in client modes without instance-level flush
+                support (remote server mode and OceanBase).
+        """
+        raise ValueError(
+            "flush() is only supported by the embedded client (SeekdbEmbeddedClient); "
+            "the connected mode does not expose an instance-level explicit flush. "
+            "Server-mode flush support is tracked separately in issue #288."
+        )
+
     def has_collection(self, name: str) -> bool:
         """Check if a collection exists.
 
