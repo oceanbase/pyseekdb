@@ -10,7 +10,7 @@ this generic runtime.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
+import importlib.metadata
 import logging
 import os
 import struct
@@ -140,18 +140,35 @@ def _clear_executable_gnu_stack(path: Path) -> bool:
         return False
 
 
+def _is_shared_library(path: Path) -> bool:
+    """Return True when the filename is a native shared library."""
+    return ".so" in path.name
+
+
 def _mnn_native_library_paths() -> list[Path]:
-    """Return native libraries shipped beside the installed MNN package."""
-    spec = importlib.util.find_spec("MNN")
-    if spec is None or not spec.submodule_search_locations:
+    """Return shared libraries recorded by the installed ``mnn`` distribution.
+
+    The list comes from that distribution's installed-file record. Each path
+    must also stay inside the distribution directory. An unrelated
+    ``_tools*.so`` in ``site-packages`` is not opened or rewritten.
+    """
+    try:
+        distribution = importlib.metadata.distribution("mnn")
+    except importlib.metadata.PackageNotFoundError:
         return []
-    package_dir = Path(next(iter(spec.submodule_search_locations)))
-    site_dir = package_dir.parent
-    paths = [path for pattern in ("_mnncengine*.so", "_tools*.so") for path in site_dir.glob(pattern) if path.is_file()]
-    libs_dir = site_dir / "mnn.libs"
-    if libs_dir.is_dir():
-        paths.extend(path for path in libs_dir.rglob("*") if path.is_file() and ".so" in path.name)
-    return paths
+    root = Path(distribution.locate_file("")).resolve()
+    libraries: list[Path] = []
+    for record in distribution.files or ():
+        located = Path(record.locate())
+        if not _is_shared_library(located) or not located.is_file():
+            continue
+        try:
+            located.resolve().relative_to(root)
+        except ValueError:
+            logger.debug("Skipping %s because it is outside the mnn distribution directory", located)
+            continue
+        libraries.append(located)
+    return libraries
 
 
 def _prepare_mnn_native_libraries() -> None:
@@ -160,7 +177,8 @@ def _prepare_mnn_native_libraries() -> None:
     The manylinux wheels mark ``_mnncengine`` and ``_tools`` with an executable
     GNU stack because some assembly objects omit ``.note.GNU-stack``. The runtime
     does not execute code on the stack. glibc 2.41, including Ubuntu 26.04, refuses
-    that request during ``dlopen`` and ``import MNN`` fails.
+    that request during ``dlopen`` and ``import MNN`` fails. Only shared libraries
+    recorded by the installed ``mnn`` distribution are rewritten.
     """
     global _mnn_native_libraries_prepared
     with _prepare_lock:

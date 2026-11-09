@@ -1,7 +1,7 @@
 """Index and analyzer configuration types for collection and schema creation."""
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from typing import Any, TypedDict
 
@@ -334,11 +334,11 @@ class HNSWConfiguration:
     Args:
         dimension: Vector dimension (number of elements in each vector)
         distance: Distance metric for similarity calculation (e.g., 'l2', 'cosine', 'inner_product')
-        sync_mode: HNSW maintenance mode, ``'immediate'`` or ``'async'``. ``None``
-            (the default) omits the clause and keeps the server default. On seekdb
-            1.3 and later, heap HNSW indexes default to ``async``. ``immediate``
-            maintains the index inside each write. Requires seekdb >= 1.3.0.0.
         properties: Optional dictionary of properties for the HNSW index (key: string, value: primitive type)
+        sync_mode: Keyword-only HNSW maintenance mode, ``'immediate'`` or ``'async'``.
+            ``None`` (the default) omits the clause and keeps the server default. On
+            seekdb 1.3 and later, heap HNSW indexes default to ``async``. ``immediate``
+            maintains the index inside each write. Requires seekdb >= 1.3.0.0.
         Please refer to [HNSW configuration](https://en.oceanbase.com/docs/common-oceanbase-database-10000000003351043) for detailed information.
     """
 
@@ -346,7 +346,6 @@ class HNSWConfiguration:
     distance: str | DistanceMetric = DistanceMetric.COSINE.value
     type: str | HNSWIndexType = HNSWIndexType.HNSW.value
     lib: str | HNSWIndexLib = HNSWIndexLib.VSAG.value
-    sync_mode: str | HNSWSyncMode | None = None
     M: int | None = None
     ef_construction: int | None = None
     ef_search: int | None = None
@@ -356,6 +355,7 @@ class HNSWConfiguration:
     bq_bits_query: int | None = None
     bq_use_fht: bool | None = None
     properties: dict[str, PrimitiveValue] | None = None
+    sync_mode: str | HNSWSyncMode | None = field(default=None, kw_only=True)
 
     def __post_init__(self):
         """Validate HNSW configuration fields and normalize properties."""

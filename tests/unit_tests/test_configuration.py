@@ -169,6 +169,26 @@ class TestHNSWConfiguration:
         assert "bq_bits_query=32" in sql
         assert "bq_use_fht=" in sql
 
+    def test_legacy_positional_signature(self):
+        """Positional arguments keep the meaning they had before sync_mode existed."""
+        config = HNSWConfiguration(128, "l2", "hnsw", "vsag", 16, 200, 32)
+        assert config.dimension == 128
+        assert config.distance == "l2"
+        assert config.type == "hnsw"
+        assert config.lib == "vsag"
+        assert config.M == 16
+        assert config.ef_construction == 200
+        assert config.ef_search == 32
+        assert config.sync_mode is None
+
+        configured = HNSWConfiguration(128, "l2", "hnsw", "vsag", 16, sync_mode="immediate")
+        assert configured.M == 16
+        assert configured.sync_mode == "immediate"
+        assert "sync_mode=immediate" in _get_vector_index_sql(configured)
+
+        with pytest.raises(TypeError, match="M must be an integer"):
+            HNSWConfiguration(128, "l2", "hnsw", "vsag", "immediate")
+
     def test_sync_mode_defaults_to_omitted(self):
         config = HNSWConfiguration(dimension=128, distance="l2")
         assert config.sync_mode is None

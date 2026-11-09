@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import importlib.util
 import struct
 from pathlib import Path
 
 import pytest
 
+from pyseekdb.utils.embedding_functions import mnn_embedding_function
 from pyseekdb.utils.embedding_functions.mnn_embedding_function import (
     _PT_GNU_STACK,
     _clear_executable_gnu_stack,
@@ -100,8 +102,60 @@ def test_missing_file_does_not_raise(tmp_path: Path) -> None:
     assert not _clear_executable_gnu_stack(path)
 
 
+class _DistributionFile:
+    def __init__(self, root: Path, relative: str):
+        self._path = root / relative
+
+    def locate(self) -> Path:
+        return self._path
+
+
+class _Distribution:
+    def __init__(self, root: Path, relatives: list[str]):
+        self._root = root
+        self.files = [_DistributionFile(root, relative) for relative in relatives]
+
+    def locate_file(self, relative: str) -> Path:
+        return self._root / relative
+
+
+def test_unrelated_tools_library_is_not_rewritten(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    site = tmp_path / "site-packages"
+    site.mkdir()
+    owned = site / "_tools.cpython-311-x86_64-linux-gnu.so"
+    unrelated = site / "_tools_other.cpython-311-x86_64-linux-gnu.so"
+    outside_root = tmp_path / "outside"
+    outside_root.mkdir()
+    outside = outside_root / "_tools.cpython-311-x86_64-linux-gnu.so"
+    owned.write_bytes(_build_elf(2, stack_flags=7))
+    unrelated_bytes = _build_elf(2, stack_flags=7)
+    outside_bytes = _build_elf(2, stack_flags=7)
+    unrelated.write_bytes(unrelated_bytes)
+    outside.write_bytes(outside_bytes)
+    distribution = _Distribution(
+        site,
+        [
+            "_tools.cpython-311-x86_64-linux-gnu.so",
+            "../outside/_tools.cpython-311-x86_64-linux-gnu.so",
+            "MNN/__init__.py",
+        ],
+    )
+    monkeypatch.setattr(importlib.metadata, "distribution", lambda name: distribution)
+    monkeypatch.setattr(mnn_embedding_function, "_mnn_native_libraries_prepared", False)
+
+    paths = _mnn_native_library_paths()
+    assert paths == [owned]
+
+    _prepare_mnn_native_libraries()
+
+    assert not _gnu_stack_is_executable(owned)
+    assert unrelated.read_bytes() == unrelated_bytes
+    assert outside.read_bytes() == outside_bytes
+
+
 @pytest.mark.skipif(importlib.util.find_spec("MNN") is None, reason="MNN is not available")
 def test_installed_mnn_libraries_load_without_executable_stack() -> None:
+    mnn_embedding_function._mnn_native_libraries_prepared = False
     paths = _mnn_native_library_paths()
     names = {path.name for path in paths}
 
