@@ -187,9 +187,6 @@ def _normalize_hnsw_properties(properties: dict[str, PrimitiveValue]) -> None:
             "bq_use_fht",
         }
     ]
-    for key in list(properties):
-        if key.lower() == "sync_mode":
-            raise ValueError("Set sync_mode on HNSWConfiguration(sync_mode='immediate' or 'async'), not in properties.")
     for key in reserved_keys:
         warnings.warn(f"{key} is a reserved keyword in properties, it will be ignored", stacklevel=2)
         properties.pop(key)

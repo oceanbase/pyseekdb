@@ -192,9 +192,23 @@ class TestHNSWConfiguration:
         with pytest.raises(TypeError, match="sync_mode must be a string"):
             HNSWConfiguration(sync_mode=True)
 
-    def test_sync_mode_in_hnsw_properties_is_rejected(self):
-        with pytest.raises(ValueError, match="not in properties"):
-            HNSWConfiguration(properties={"sync_mode": "immediate"})
+    def test_sync_mode_property_is_forwarded(self):
+        config = HNSWConfiguration(dimension=128, properties={"sync_mode": "immediate", "quantization": "pq"})
+        assert config.properties["sync_mode"] == "immediate"
+        sql = _get_vector_index_sql(config)
+        assert "sync_mode='immediate'" in sql
+        assert "quantization='pq'" in sql
+
+    def test_sync_mode_field_replaces_same_property(self):
+        config = HNSWConfiguration(
+            dimension=128,
+            sync_mode="async",
+            properties={"SYNC_MODE": "immediate", "quantization": "pq"},
+        )
+        sql = _get_vector_index_sql(config)
+        assert "sync_mode=async" in sql
+        assert "sync_mode='immediate'" not in sql
+        assert "quantization='pq'" in sql
 
     def test_ivf_rejects_sync_mode_property(self):
         with pytest.raises(TypeError, match="sync_mode"):

@@ -33,6 +33,7 @@ from .configuration import (
     IVFConfiguration,
     IVFIndexType,
     VectorIndexConfig,
+    _validate_hnsw_sync_mode,
 )
 from .database import Database
 from .document_query_builder import (
@@ -360,9 +361,14 @@ def _get_vector_index_sql(hnsw_config: HNSWConfiguration) -> str:
     """
     Generate VECTOR INDEX SQL clause from HNSWConfiguration.
     """
+    _validate_hnsw_sync_mode(hnsw_config)
     properties = hnsw_config.properties or {}
     property_parts = []
     for k, v in properties.items():
+        # The dedicated field emits sync_mode unquoted. Skip a same-named
+        # property so a config that sets both does not emit the clause twice.
+        if hnsw_config.sync_mode is not None and str(k).lower() == "sync_mode":
+            continue
         if isinstance(v, str):
             property_parts.append(f"{k}='{v}'")
         else:
@@ -1118,6 +1124,9 @@ class BaseClient(BaseConnection, AdminAPI):
         dimension = hnsw_config.dimension
         if dimension < 1 or dimension > MAX_HNSW_VECTOR_DIMENSION:
             raise ValueError(f"Dimension must be between 1 and {MAX_HNSW_VECTOR_DIMENSION}, got {dimension}")
+        # HNSWConfiguration is mutable after construction. Normalize again
+        # before metadata or CREATE TABLE so a later assignment cannot reach DDL.
+        _validate_hnsw_sync_mode(hnsw_config)
         if hnsw_config.sync_mode is not None:
             self._assert_hnsw_sync_mode_supported(hnsw_config.sync_mode)
 
