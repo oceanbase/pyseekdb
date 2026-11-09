@@ -13,4 +13,5 @@ namespace
 dml
 dql
 embedding-functions
+flush
 ```
