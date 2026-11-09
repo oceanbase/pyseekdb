@@ -5,16 +5,19 @@ from __future__ import annotations
 import importlib.metadata
 import importlib.util
 import struct
+import sys
 from pathlib import Path
 
 import pytest
 
 from pyseekdb.utils.embedding_functions import mnn_embedding_function
 from pyseekdb.utils.embedding_functions.mnn_embedding_function import (
+    _PF_X,
     _PT_GNU_STACK,
     _clear_executable_gnu_stack,
     _gnu_stack_is_executable,
     _mnn_native_library_paths,
+    _parse_elf_program_header_table,
     _prepare_mnn_native_libraries,
 )
 
@@ -153,21 +156,53 @@ def test_unrelated_tools_library_is_not_rewritten(tmp_path: Path, monkeypatch: p
     assert outside.read_bytes() == outside_bytes
 
 
+def _mark_gnu_stack_executable(path: Path) -> None:
+    """Set PF_X on PT_GNU_STACK in a writable ELF copy."""
+    data = bytearray(path.read_bytes())
+    parsed = _parse_elf_program_header_table(bytes(data[:64]), len(data))
+    assert parsed is not None, path
+    endian, e_phoff, e_phentsize, e_phnum, flags_offset = parsed
+    marked = False
+    for index in range(e_phnum):
+        entry_offset = e_phoff + index * e_phentsize
+        p_type = struct.unpack_from(endian + "I", data, entry_offset)[0]
+        if p_type != _PT_GNU_STACK:
+            continue
+        flags = struct.unpack_from(endian + "I", data, entry_offset + flags_offset)[0]
+        struct.pack_into(endian + "I", data, entry_offset + flags_offset, flags | _PF_X)
+        marked = True
+    assert marked, path
+    path.write_bytes(data)
+
+
 @pytest.mark.skipif(importlib.util.find_spec("MNN") is None, reason="MNN is not available")
-def test_installed_mnn_libraries_load_without_executable_stack() -> None:
+def test_installed_mnn_imports() -> None:
     mnn_embedding_function._mnn_native_libraries_prepared = False
-    paths = _mnn_native_library_paths()
-    names = {path.name for path in paths}
-
-    assert any(name.startswith("_mnncengine") for name in names)
-    assert any(name.startswith("_tools") for name in names)
-
     _prepare_mnn_native_libraries()
-
-    for path in paths:
-        assert not _gnu_stack_is_executable(path), path
 
     import MNN
 
     tensor = MNN.Tensor([1, 4], MNN.Halide_Type_Int, MNN.Tensor_DimensionType_Tensorflow)
     assert tensor is not None
+
+
+@pytest.mark.skipif(importlib.util.find_spec("MNN") is None, reason="MNN is not available")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows MNN extensions are .pyd files, so ELF .so discovery does not apply",
+)
+def test_installed_mnn_executable_stack_clears_on_writable_copies(tmp_path: Path) -> None:
+    paths = _mnn_native_library_paths()
+    names = {path.name for path in paths}
+    assert any(name.startswith("_mnncengine") for name in names)
+    assert any(name.startswith("_tools") for name in names)
+
+    for index, source in enumerate(paths):
+        original = source.read_bytes()
+        copy = tmp_path / f"{index}-{source.name}"
+        copy.write_bytes(original)
+        _mark_gnu_stack_executable(copy)
+        assert _gnu_stack_is_executable(copy)
+        assert _clear_executable_gnu_stack(copy)
+        assert not _gnu_stack_is_executable(copy)
+        assert source.read_bytes() == original

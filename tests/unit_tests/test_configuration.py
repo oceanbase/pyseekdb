@@ -227,7 +227,7 @@ class TestHNSWConfiguration:
         )
         sql = _get_vector_index_sql(config)
         assert "sync_mode=async" in sql
-        assert "sync_mode='immediate'" not in sql
+        assert sql.lower().count("sync_mode=") == 1
         assert "quantization='pq'" in sql
 
     def test_ivf_has_no_sync_mode_field_and_forwards_property(self):
