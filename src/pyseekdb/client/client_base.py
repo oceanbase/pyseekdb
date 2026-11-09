@@ -92,6 +92,8 @@ _MAX_COLLECTION_NAME_LENGTH = 512
 NAMESPACE_MIN_LAKEBASE_VERSION = Version("4.6.1.0")
 # Backward-compatible alias used by existing tests and skip helpers.
 NAMESPACE_MIN_OB_VERSION = NAMESPACE_MIN_LAKEBASE_VERSION
+# seekdb versions that implement CALL dbms_index_manager.refresh().
+INDEX_REFRESH_MIN_VERSION = Version("1.3.0.0")
 
 _LAKEBASE_VERSION_MARKER = "database ai"
 
@@ -114,6 +116,11 @@ def _unquote_json_extract_expressions(query_sql: str) -> str:
 def is_lakebase_version_string(version_str: str) -> bool:
     """Return whether a ``SELECT version()`` string identifies a LakeBase cluster."""
     return _LAKEBASE_VERSION_MARKER in version_str.lower()
+
+
+def _index_refresh_supported(db_type: str, version: Version) -> bool:
+    """Return whether this database can wait for asynchronous index refresh."""
+    return db_type.lower() == "seekdb" and version >= INDEX_REFRESH_MIN_VERSION
 
 
 def _extract_collection_id_from_sdk_row(row: Any) -> str:
@@ -2899,16 +2906,39 @@ class BaseClient(BaseConnection, AdminAPI):
     def _refresh_enabled(self) -> bool:
         """Return whether index refresh is enabled on the backend."""
         db_type, version = self.detect_db_type_and_version()
-        version_130 = Version("1.3.0.0")
         logger.debug(f"db_type: {db_type}, version: {version}")
-        return db_type.lower() == "seekdb" and version >= version_130
+        return _index_refresh_supported(db_type, version)
+
+    def _assert_index_refresh_supported(self) -> None:
+        """Raise when ``sync=True`` cannot wait for asynchronous index completion.
+
+        ``refresh_index()`` stays a no-op on unsupported backends so existing
+        callers keep working. A synchronous write must not report success there.
+        """
+        db_type, version = self.detect_db_type_and_version()
+        if _index_refresh_supported(db_type, version):
+            return
+        raise ValueError(
+            "sync=True cannot wait for asynchronous index completion on "
+            f"{db_type} {version}. Waiting requires seekdb >= {INDEX_REFRESH_MIN_VERSION} "
+            "and runs CALL dbms_index_manager.refresh() until change-stream refresh finishes. "
+            "Omit sync to keep the default asynchronous write. The write was not performed."
+        )
 
     def refresh_index(self) -> None:
         """
         Flush async vector index build tasks when supported.
 
-        For unsupported database versions, this method is a no-op to keep
-        collection-level API calls backward compatible.
+        On seekdb >= 1.3.0.0 this executes ``CALL dbms_index_manager.refresh()``
+        and returns after the procedure finishes. The procedure waits for
+        change-stream refresh of asynchronous indexes in the connected database.
+        It has no timeout argument; the session ``ob_query_timeout`` applies, and
+        database errors such as ``OB_TIMEOUT`` (4012) propagate.
+
+        On older seekdb versions and on OceanBase this method is a no-op so
+        existing callers stay compatible. Pass ``sync=True`` to ``add``,
+        ``update``, ``upsert``, or ``delete`` when the caller must fail instead
+        of continuing without a wait.
         """
         if not self._refresh_enabled():
             return

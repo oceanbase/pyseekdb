@@ -66,6 +66,8 @@ rows = ns.get(ids=["doc_1"], include=["documents", "metadatas"])
 hits = ns.query(query_embeddings=[[0.1, 0.2, 0.3]], n_results=5)
 ```
 
+`Namespace.add()`, `update()`, `upsert()`, and `delete()` accept `sync=True` with the same meaning as collection writes: wait for `dbms_index_manager.refresh()` before returning. The default is `False`. LakeBase does not implement that refresh procedure, so `sync=True` raises `ValueError` before the write. See [Wait for asynchronous indexing](dml.md#45-wait-for-asynchronous-indexing).
+
 **Record id rules (namespace path)**
 
 - Must be non-empty strings

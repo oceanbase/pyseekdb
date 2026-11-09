@@ -1,6 +1,11 @@
-"""Input validators for namespace names and record identifiers."""
+"""Input validators for namespace names, record identifiers, and write options."""
 
+import logging
 import re
+from collections.abc import Callable
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 _MAX_NAME_LENGTH = 512
@@ -17,6 +22,33 @@ _VALID_INCLUDE_FIELDS = frozenset({
     "distances",
     "distance",
 })
+
+
+def _validate_sync_option(sync: bool) -> None:
+    """Reject values other than ``True`` or ``False`` for the write-time sync option."""
+    if not isinstance(sync, bool):
+        raise TypeError(f"sync must be a bool, got {type(sync).__name__}")
+
+
+def _apply_sync_index_refresh(client: Any, sync: bool, write: Callable[[], Any]) -> Any:
+    """Run ``write`` and, when requested, wait for asynchronous index refresh.
+
+    Support is checked before ``write`` so a backend that cannot wait does not
+    commit the change. Refresh uses ``client.refresh_index()``. If that call
+    fails, the database error propagates: the write is already committed, and
+    approximate search may not reflect it yet.
+    """
+    _validate_sync_option(sync)
+    if sync:
+        client._assert_index_refresh_supported()
+    result = write()
+    if sync:
+        try:
+            client.refresh_index()
+        except Exception:
+            logger.exception("Write committed, but waiting for asynchronous index refresh failed")
+            raise
+    return result
 
 
 def _validate_include(include: list[str] | None) -> None:
