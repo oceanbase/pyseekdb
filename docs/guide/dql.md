@@ -301,11 +301,8 @@ Weights do not need to sum to one. They do not change either route's candidates 
 - Weighted multi-KNN requests are unsupported, including multiple vectors in `knn.query_embeddings` or `knn.query_texts`.
   Unweighted multi-KNN requests keep their existing score-sum behavior.
 
-Server mode requires a SeekDB engine build containing
-[seekdb PR #2382](https://github.com/oceanbase/seekdb/pull/2382), merged into `master` on November 2, 2026
-(merge commit `cfdb1d850f77957151cbca67986bd89585fdf8bb`). The published SeekDB v1.4.0 release predates this change.
-Embedded mode requires a `pylibseekdb` package whose bundled engine contains the same change.
-Upgrading `pyseekdb` alone does not add engine support. OceanBase deployments also need explicit backend support for this option.
+Weighted RRF requires support from the connected server or, in embedded mode,
+the engine bundled with `pylibseekdb`.
 
 The SDK forwards `rank` unchanged and propagates engine validation and unsupported-feature errors.
 It never retries a weighted request as unweighted fusion. Incorrect weight counts and weighted multi-KNN requests

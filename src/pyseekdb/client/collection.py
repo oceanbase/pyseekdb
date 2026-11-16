@@ -636,8 +636,8 @@ class Collection:
                 Weights multiply rank contributions, independently of query.boost and knn.boost.
                 Omit weights for equal weighting. Weights must be two finite, non-negative
                 numbers with at least one positive value. Weighted multi-KNN is unsupported.
-                Requires an engine containing seekdb PR #2382 in server mode, or a
-                pylibseekdb build containing that change in embedded mode. Unsupported
+                Requires weighted RRF support from the connected server or, in embedded
+                mode, the engine bundled with pylibseekdb. Unsupported
                 engines and invalid configurations raise errors without an unweighted retry.
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
@@ -673,7 +673,7 @@ class Collection:
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
 
-            # Favor vector retrieval while retaining RRF (requires seekdb PR #2382)
+            # Favor vector retrieval while retaining RRF
             results = collection.hybrid_search(
                 query={"where_document": {"$contains": "machine learning"}},
                 knn={"query_texts": ["AI research"], "n_results": 10},
