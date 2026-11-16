@@ -630,7 +630,15 @@ class Collection:
                 - query_embeddings: Query vector(s) (optional if query_texts provided)
                 - where: Metadata filter conditions (optional)
                 - n_results: Number of results for vector search (optional)
-            rank: Ranking configuration dict (e.g., {"rrf": {"rank_window_size": 60, "rank_constant": 60}})
+            rank: Ranking configuration dict, forwarded unchanged to the engine.
+                RRF accepts rank_constant, rank_window_size, and optional weights in
+                [full-text, vector] order, e.g., {"rrf": {"rank_constant": 60, "weights": [0.5, 1.0]}}.
+                Weights multiply rank contributions, independently of query.boost and knn.boost.
+                Omit weights for equal weighting. Weights must be two finite, non-negative
+                numbers with at least one positive value. Weighted multi-KNN is unsupported.
+                Requires an engine containing seekdb PR #2382 in server mode, or a
+                pylibseekdb build containing that change in embedded mode. Unsupported
+                engines and invalid configurations raise errors without an unweighted retry.
             n_results: Final number of results to return after ranking (default: 10)
             include: Fields to include in results (e.g., ["documents", "metadatas", "embeddings"])
             query_hint: Query optimization hints for database execution (optional)
@@ -664,6 +672,14 @@ class Collection:
             # results["ids"][0] contains IDs for the hybrid search
             # results["documents"][0] contains documents for the hybrid search
             # results["distances"][0] contains distances for the hybrid search
+
+            # Favor vector retrieval while retaining RRF (requires seekdb PR #2382)
+            results = collection.hybrid_search(
+                query={"where_document": {"$contains": "machine learning"}},
+                knn={"query_texts": ["AI research"], "n_results": 10},
+                rank={"rrf": {"rank_constant": 60, "weights": [0.5, 1.0]}},
+                n_results=5,
+            )
 
             # Hybrid search with query hint
             from pyseekdb.client.query_types import QueryHint

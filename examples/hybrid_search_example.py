@@ -6,6 +6,19 @@ Key advantages of hybrid_search():
 - Independent filters for each search type
 - Intelligent result fusion using RRF (Reciprocal Rank Fusion)
 - Handles complex scenarios that query() cannot
+
+On an engine containing seekdb PR #2382, favor vector retrieval with:
+
+    collection.hybrid_search(
+        query={"where_document": {"$contains": "machine learning"}},
+        knn={"query_texts": ["AI research"], "n_results": 10},
+        rank={"rrf": {"rank_constant": 60, "weights": [0.5, 1.0]}},
+        n_results=5,
+    )
+
+Weights are [full-text, vector] and multiply rank contributions. Omit them for
+equal weighting. Server engines and embedded pylibseekdb engines must include
+that change; older engines raise an error without an unweighted fallback.
 """
 
 import os
