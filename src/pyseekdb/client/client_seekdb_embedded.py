@@ -17,15 +17,12 @@ from pymysql.cursors import DictCursor
 from .admin_client import DEFAULT_TENANT
 from .client_base import BaseClient
 from .database import Database
-from .flush import (
+from .memory import (
     _POLL_INTERVAL_SECONDS,
-    FlushError,
-    FlushHandle,
-    FlushResult,
-    FlushTracker,
-    FlushUnsupportedError,
+    MemoryReleaseResult,
+    MemoryReleaseTracker,
     make_connection_sql_runner,
-    validate_flush_options,
+    validate_release_memory_options,
 )
 from .sql_utils import render_sql_with_params
 
@@ -312,79 +309,70 @@ class SeekdbEmbeddedClient(BaseClient):
         finally:
             cursor.close()
 
-    # ==================== Explicit Flush (embedded only) ====================
+    # ==================== Explicit Memory Release (embedded only) ====================
 
-    def flush(self, wait: bool = True, reclaim_memory: bool = True, timeout: float = 30.0) -> FlushResult | FlushHandle:
-        """Explicitly flush committed writes and reclaim eligible MemStore memory.
+    def release_memory(self, timeout: float = 30.0) -> MemoryReleaseResult:
+        """Release engine memory held by recent committed writes.
 
-        Intended for the end of a write-heavy batch or business phase: the
-        instance-wide freeze covers every MemTable that was active when the
-        boundary was submitted (data tables and their associated index
-        MemTables), and concurrent writes continue into newly created active
-        MemTables. The flush never implicitly commits an application
-        transaction; the freeze command runs on a dedicated session.
+        After a batch of inserts or updates, the engine keeps those writes in
+        memory until they are written to disk and their in-memory tables are
+        released. This operation triggers that release for the whole instance
+        and blocks until it completes, so an application can hand memory back
+        at the end of a write-heavy phase without closing the database.
 
         Usage: call this once per batch/phase, not as an automatic
-        memory-pressure handler. Frequent small flushes create many small
-        SSTables and increase read amplification; automatic threshold-based
-        freezing still covers applications that do not call flush().
+        memory-pressure handler. Frequent small releases create many small
+        on-disk tables and increase read amplification; the engine's automatic
+        threshold-based release still covers applications that never call this.
 
-        Args:
-            wait: With ``True`` (default), block until the target stage is
-                reached or ``timeout`` expires. With ``False``, submit the
-                freeze and return a :class:`FlushHandle` immediately.
-            reclaim_memory: With ``True`` (default), also wait for the
-                boundary MemTables to be released, reclaiming their MemStore
-                memory, and report before/after usage. With ``False``, stop
-                once every boundary MemTable is flushed to SSTables.
-            timeout: Seconds to wait (default 30). Applies to freeze
-                confirmation and stage completion.
-
-        Returns:
-            FlushResult when ``wait=True``; FlushHandle when ``wait=False``.
-
-        Raises:
-            FlushTimeoutError: The target stage was not reached in time. The
-                error reports the incomplete stage and pending MemTables.
-                Committed writes are never undone and background flushing
-                continues.
-            FlushUnsupportedError: The installed engine/binding does not
-                expose the MemStore observability required by the flush
-                completion contract.
-            TypeError / ValueError: Unsupported argument values.
+        Concurrent writes committed after this call starts continue into new
+        in-memory tables and are not waited for. The freeze command runs on a
+        dedicated session and never implicitly commits an application
+        transaction.
 
         Note:
-            Reclaiming MemStore memory is a logical/held-memory guarantee:
-            the engine's MemStore accounting drops once MemTables are
-            released, but process RSS may stay higher because allocators
-            legitimately retain cached pages.
+            This releases memory held by recent writes in the engine. It is
+            not a process-RSS guarantee: allocators legitimately retain freed
+            pages in their caches, so process RSS may stay higher than the
+            released amount.
+
+        Args:
+            timeout: Seconds to wait (default 30).
+
+        Returns:
+            MemoryReleaseResult with engine memory accounting before and
+            after the release.
+
+        Raises:
+            MemoryReleaseTimeoutError: The release did not complete within
+                ``timeout``. The error reports what is still held; committed
+                writes are unaffected and background release continues.
+            ValueError: The connected mode does not support this operation,
+                the installed engine/binding does not expose the required
+                engine views, or ``timeout`` is not a positive number.
         """
-        validate_flush_options(wait, reclaim_memory, timeout)
+        validate_release_memory_options(timeout)
         self._ensure_connection()
 
-        admin_connection = self._open_flush_admin_connection()
+        deadline = time.monotonic() + timeout
+        admin_connection = self._open_release_admin_connection()
         try:
             admin_runner = make_connection_sql_runner(
                 admin_connection, use_context_manager=self._backend.supports_dbapi_cursor
             )
-            tracker = FlushTracker(admin_runner, reclaim_memory=reclaim_memory)
+            tracker = MemoryReleaseTracker(admin_runner)
             try:
                 tracker.capture_boundary()
-            except FlushError:
-                raise
             except Exception as exc:
-                raise FlushUnsupportedError(
-                    "the embedded engine does not expose the MemStore observability views required by "
-                    "flush() (oceanbase.GV$OB_MEMSTORE / GV$OB_MEMSTORE_INFO); the installed seekdb "
-                    f"binding or engine version does not support the flush completion contract: {exc}"
+                raise ValueError(
+                    "release_memory() is not supported by the installed seekdb binding or engine "
+                    f"version: it does not expose the required engine views: {exc}"
                 ) from exc
             try:
                 tracker.submit()
-            except FlushError:
-                raise
             except Exception as exc:
-                raise FlushError(f"flush failed to submit the minor freeze (ALTER SYSTEM MINOR FREEZE): {exc}") from exc
-            tracker.confirm_freeze(time.monotonic() + timeout, timeout)
+                raise ValueError(f"release_memory failed to submit the engine minor freeze: {exc}") from exc
+            tracker.confirm_freeze(deadline, timeout)
         finally:
             self._quietly_close(admin_connection)
 
@@ -393,39 +381,31 @@ class SeekdbEmbeddedClient(BaseClient):
         tracker.run_sql = make_connection_sql_runner(
             self._ensure_connection(), use_context_manager=self._use_context_manager_for_cursor()
         )
-        if not wait:
-            return FlushHandle(self._flush_wait, tracker, timeout_seconds=timeout)
-        return self._flush_wait(tracker, timeout)
-
-    def _flush_wait(self, tracker: FlushTracker, timeout: float) -> FlushResult:
-        """Poll until the tracker's target stage is reached or the timeout expires."""
-        deadline = time.monotonic() + timeout
         while True:
-            stage = tracker.poll()
-            if stage == tracker.target_stage:
-                return tracker.build_result(stage)
+            if tracker.released():
+                return tracker.build_result()
             if time.monotonic() >= deadline:
-                raise tracker.timeout_error(stage, timeout)
+                raise tracker.timeout_error(timeout)
             time.sleep(_POLL_INTERVAL_SECONDS)
 
-    def _open_flush_admin_connection(self) -> Any:
-        """Open a dedicated session for freeze submission.
+    def _open_release_admin_connection(self) -> Any:
+        """Open a dedicated session for the freeze command.
 
-        The flush command must never run on the client's main session: if the
+        The freeze must never run on the client's main session: if the
         application holds an open transaction there (via get_raw_connection()),
         an ALTER on that session could implicitly commit it.
         """
         try:
             return self._backend.connect(self._instance, self.database, self._connection_kwargs)
         except Exception as exc:
-            raise FlushUnsupportedError(f"flush could not open a dedicated engine session: {exc}") from exc
+            raise ValueError(f"release_memory could not open a dedicated engine session: {exc}") from exc
 
     @staticmethod
     def _quietly_close(connection: Any) -> None:
         try:
             connection.close()
         except Exception as exc:
-            logger.debug("flush: failed to close dedicated session: %s", exc)
+            logger.debug("release_memory: failed to close dedicated session: %s", exc)
 
     # ==================== Collection Management (framework) ====================
 

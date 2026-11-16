@@ -48,13 +48,9 @@ from .embedding_function import (
     get_default_embedding_function,
     register_embedding_function,
 )
-from .flush import (
-    FlushError,
-    FlushHandle,
-    FlushResult,
-    FlushStage,
-    FlushTimeoutError,
-    FlushUnsupportedError,
+from .memory import (
+    MemoryReleaseResult,
+    MemoryReleaseTimeoutError,
 )
 from .query_types import QueryHint
 from .schema import Schema
@@ -176,12 +172,6 @@ __all__ = [
     "Database",
     "DefaultEmbeddingFunction",
     "EmbeddingFunction",
-    "FlushError",
-    "FlushHandle",
-    "FlushResult",
-    "FlushStage",
-    "FlushTimeoutError",
-    "FlushUnsupportedError",
     "FulltextIndexConfig",
     "HNSWConfiguration",
     "HNSWSyncMode",
@@ -191,6 +181,8 @@ __all__ = [
     "IVFIndexLib",
     "IVFIndexType",
     "K",
+    "MemoryReleaseResult",
+    "MemoryReleaseTimeoutError",
     "Ngram2Properties",
     "NgramProperties",
     "QueryHint",
