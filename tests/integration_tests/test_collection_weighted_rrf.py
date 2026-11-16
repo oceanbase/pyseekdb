@@ -1,21 +1,15 @@
-"""RRF route weights against real engines.
+"""RRF route weights require SeekDB versions strictly greater than 1.4.0.0."""
 
-Set SEEKDB_REQUIRE_WEIGHTED_RRF=1 when testing an engine containing seekdb #2382.
-This makes missing support a failure instead of a skip on older CI engines.
-"""
-
-import os
 import uuid
 
 import pytest
 
 from pyseekdb import HNSWConfiguration
-from pyseekdb.client.client_base import _has_database_error_code
+from pyseekdb.client.client_base import _has_database_error_code, _weighted_rrf_supported
 
 QUERY = {"where_document": {"$contains": "quasar"}}
 KNN = {"query_embeddings": [0.0, 0.0, 0.0], "n_results": 3}
 RRF = {"rank_constant": 60, "rank_window_size": 10}
-UNSUPPORTED_RRF_CODES = (1064, 1149, 1235, 5006, 4007, -5006, -4007)
 
 
 def _search(collection, weights=None):
@@ -54,17 +48,9 @@ def rrf_collection(db_client):
 
 @pytest.fixture
 def weighted_rrf_collection(rrf_collection):
-    # Verify the same request works without weights before identifying old engines.
-    _search(rrf_collection)
-    try:
-        _search(rrf_collection, [1, 1])
-    except Exception as exc:
-        if os.environ.get("SEEKDB_REQUIRE_WEIGHTED_RRF") == "1":
-            raise
-        # MySQL and embedded error codes for unsupported options/parser syntax.
-        if not _has_database_error_code(exc, UNSUPPORTED_RRF_CODES):
-            raise
-        pytest.skip("Engine lacks weighted RRF; use a build containing seekdb #2382")
+    db_type, version = rrf_collection._client.detect_db_type_and_version()
+    if not _weighted_rrf_supported(db_type, version):
+        pytest.skip(f"Weighted RRF requires SeekDB > 1.4.0.0; connected to {db_type} {version}")
     return rrf_collection
 
 
@@ -79,17 +65,16 @@ def test_unweighted_rrf_and_multiknn_remain_available(rrf_collection):
     assert set(result["ids"][0]) == {"text_first", "shared", "vector_first", "vector_second"}
 
 
-def test_weighted_request_propagates_unsupported_engine_error(rrf_collection):
+def test_weighted_request_checks_engine_version(rrf_collection):
     default = _search(rrf_collection)
-    try:
-        unit = _search(rrf_collection, [1, 1])
-    except Exception as exc:
-        assert _has_database_error_code(exc, UNSUPPORTED_RRF_CODES), str(exc)
-        if os.environ.get("SEEKDB_REQUIRE_WEIGHTED_RRF") == "1":
-            raise
+    db_type, version = rrf_collection._client.detect_db_type_and_version()
+    if not _weighted_rrf_supported(db_type, version):
+        with pytest.raises(ValueError, match=r"requires SeekDB > 1\.4\.0\.0") as caught:
+            _search(rrf_collection, [1, 1])
+        assert f"{db_type} {version}" in str(caught.value)
         assert _search(rrf_collection) == default
     else:
-        assert unit == default
+        assert _search(rrf_collection, [1, 1]) == default
 
 
 def test_unweighted_candidates_and_scores(rrf_collection):
