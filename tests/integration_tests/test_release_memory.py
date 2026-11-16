@@ -202,11 +202,11 @@ class TestEmbeddedReleaseMemory:
         finally:
             client_server._execute(f"DROP TABLE `{probe_table}`")
 
-    def test_release_memory_unsupported_in_remote_mode(self):
-        """Remote server mode returns a clear error instead of a partial release."""
+    def test_release_memory_is_noop_in_remote_mode(self):
+        """Non-embedded modes log a warning and do nothing instead of raising."""
         remote = pyseekdb.Client(host="127.0.0.1", port=2881, user="root", password="")
         try:
-            with pytest.raises(ValueError, match="embedded client"):
-                remote.release_memory()
+            # No exception and no connection attempt: a plain no-op.
+            assert remote.release_memory() is None
         finally:
             remote.close()

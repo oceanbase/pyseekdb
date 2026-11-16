@@ -255,7 +255,7 @@ class _ClientProxy:
         """Proxy to server implementation - request the engine to release memory.
 
         See ``SeekdbEmbeddedClient.release_memory`` for semantics; non-embedded
-        clients raise a clear error.
+        clients log a warning and do nothing.
         """
         return self._server.release_memory()
 

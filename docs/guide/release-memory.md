@@ -19,7 +19,7 @@ collection.add(ids=["d1", "d2"], embeddings=[[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.
 client.release_memory()
 ```
 
-`release_memory()` is an **instance-level, embedded-mode** operation. Server-mode clients raise a clear `ValueError`; server-mode support is evaluated separately ([issue #288](https://github.com/oceanbase/pyseekdb/issues/288)).
+`release_memory()` is an **instance-level, embedded-mode** operation. Other connection modes (remote server, OceanBase) log a warning and do nothing, so applications can call it unconditionally after a write phase; server-mode support is evaluated separately ([issue #288](https://github.com/oceanbase/pyseekdb/issues/288)).
 
 ## 7.1 API
 
@@ -27,7 +27,7 @@ client.release_memory()
 client.release_memory() -> None
 ```
 
-The call just submits the request and returns immediately. The engine completes the release in the background; there is nothing to wait for and no result to inspect. If the engine rejects the request, a `ValueError` is raised.
+The call just submits the request and returns immediately. The engine completes the release in the background; there is nothing to wait for and no result to inspect. If the engine rejects the request, a `ValueError` is raised. In non-embedded modes the call is a logged no-op — it returns `None` without raising, so the same application code works in every connection mode.
 
 ## 7.2 Semantics
 
@@ -41,7 +41,9 @@ The call just submits the request and returns immediately. The engine completes 
 
 | Error | Raised when |
 | --- | --- |
-| `ValueError` | The connected mode does not support this operation (remote server mode), the engine rejected the release request, or a dedicated engine session could not be opened. |
+| `ValueError` | The engine rejected the release request, or a dedicated engine session could not be opened for it (embedded mode). |
+
+Non-embedded connection modes never raise: `release_memory()` logs a warning and does nothing, so callers do not need to branch on the connection mode.
 
 ## 7.4 What it releases — and what it does not
 

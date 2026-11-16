@@ -339,8 +339,8 @@ class SeekdbEmbeddedClient(BaseClient):
             than the released amount.
 
         Raises:
-            ValueError: The connected mode does not support this operation, or
-                the engine rejected the release request.
+            ValueError: The engine rejected the release request, or a
+                dedicated engine session could not be opened for it.
         """
         self._ensure_connection()
 

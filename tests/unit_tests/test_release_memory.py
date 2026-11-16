@@ -179,10 +179,16 @@ def test_embedded_release_memory_rejection_raises_value_error(tmp_path, monkeypa
 # ==================== unsupported modes and proxy delegation ====================
 
 
-def test_remote_server_client_release_memory_raises_clear_error() -> None:
+def test_remote_server_client_release_memory_is_noop_with_warning(caplog) -> None:
     client = RemoteServerClient(host="127.0.0.1", port=2881)
-    with pytest.raises(ValueError, match="embedded client"):
-        client.release_memory()
+
+    with caplog.at_level("WARNING"):
+        result = client.release_memory()
+
+    # Non-embedded modes never raise: the request is a logged no-op.
+    assert result is None
+    assert any("release_memory() is only supported" in message for message in caplog.messages)
+    assert any("RemoteServerClient" in message for message in caplog.messages)
 
 
 def test_client_proxy_release_memory_delegates_to_server() -> None:
