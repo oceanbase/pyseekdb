@@ -7,7 +7,6 @@ import importlib
 import logging
 import os
 import threading
-import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -18,11 +17,8 @@ from .admin_client import DEFAULT_TENANT
 from .client_base import BaseClient
 from .database import Database
 from .memory import (
-    _POLL_INTERVAL_SECONDS,
-    MemoryReleaseResult,
-    MemoryReleaseTracker,
     make_connection_sql_runner,
-    validate_release_memory_options,
+    submit_memory_release,
 )
 from .sql_utils import render_sql_with_params
 
@@ -311,14 +307,21 @@ class SeekdbEmbeddedClient(BaseClient):
 
     # ==================== Explicit Memory Release (embedded only) ====================
 
-    def release_memory(self, timeout: float = 30.0) -> MemoryReleaseResult:
-        """Release engine memory held by recent committed writes.
+    def release_memory(self) -> None:
+        """Request the engine to release reclaimable memory.
 
         After a batch of inserts or updates, the engine keeps those writes in
         memory until they are written to disk and their in-memory tables are
-        released. This operation triggers that release for the whole instance
-        and blocks until it completes, so an application can hand memory back
-        at the end of a write-heavy phase without closing the database.
+        released. This operation asks the engine to do that now, for the whole
+        instance, so an application can hand memory back at the end of a
+        write-heavy phase without closing the database.
+
+        The call just submits the request and returns immediately: the engine
+        completes the release in the background, and there is nothing to wait
+        for and no result to inspect. Today the request releases the memory
+        held by recent committed writes; future versions may extend it to
+        other reclaimable engine memory, so do not rely on measured reclaim
+        amounts.
 
         Usage: call this once per batch/phase, not as an automatic
         memory-pressure handler. Frequent small releases create many small
@@ -326,74 +329,37 @@ class SeekdbEmbeddedClient(BaseClient):
         threshold-based release still covers applications that never call this.
 
         Concurrent writes committed after this call starts continue into new
-        in-memory tables and are not waited for. The freeze command runs on a
-        dedicated session and never implicitly commits an application
-        transaction.
+        in-memory tables and are untouched by it. The underlying engine
+        command runs on a dedicated session and never implicitly commits an
+        application transaction.
 
         Note:
-            This releases memory held by recent writes in the engine. It is
-            not a process-RSS guarantee: allocators legitimately retain freed
-            pages in their caches, so process RSS may stay higher than the
-            released amount.
-
-        Args:
-            timeout: Seconds to wait (default 30).
-
-        Returns:
-            MemoryReleaseResult with engine memory accounting before and
-            after the release.
+            This is not a process-RSS guarantee: allocators legitimately
+            retain freed pages in their caches, so process RSS may stay higher
+            than the released amount.
 
         Raises:
-            MemoryReleaseTimeoutError: The release did not complete within
-                ``timeout``. The error reports what is still held; committed
-                writes are unaffected and background release continues.
-            ValueError: The connected mode does not support this operation,
-                the installed engine/binding does not expose the required
-                engine views, or ``timeout`` is not a positive number.
+            ValueError: The connected mode does not support this operation, or
+                the engine rejected the release request.
         """
-        validate_release_memory_options(timeout)
         self._ensure_connection()
 
-        deadline = time.monotonic() + timeout
         admin_connection = self._open_release_admin_connection()
         try:
-            admin_runner = make_connection_sql_runner(
+            runner = make_connection_sql_runner(
                 admin_connection, use_context_manager=self._backend.supports_dbapi_cursor
             )
-            tracker = MemoryReleaseTracker(admin_runner)
-            try:
-                tracker.capture_boundary()
-            except Exception as exc:
-                raise ValueError(
-                    "release_memory() is not supported by the installed seekdb binding or engine "
-                    f"version: it does not expose the required engine views: {exc}"
-                ) from exc
-            try:
-                tracker.submit()
-            except Exception as exc:
-                raise ValueError(f"release_memory failed to submit the engine minor freeze: {exc}") from exc
-            tracker.confirm_freeze(deadline, timeout)
+            submit_memory_release(runner)
         finally:
             self._quietly_close(admin_connection)
 
-        # Read-only completion polls can share the client's main session;
-        # they cannot commit an application transaction.
-        tracker.run_sql = make_connection_sql_runner(
-            self._ensure_connection(), use_context_manager=self._use_context_manager_for_cursor()
-        )
-        while True:
-            if tracker.released():
-                return tracker.build_result()
-            if time.monotonic() >= deadline:
-                raise tracker.timeout_error(timeout)
-            time.sleep(_POLL_INTERVAL_SECONDS)
-
     def _open_release_admin_connection(self) -> Any:
-        """Open a dedicated session for the freeze command.
+        """Open a dedicated session for the engine memory release command.
 
-        The freeze must never run on the client's main session: if the
-        application holds an open transaction there (via get_raw_connection()),
-        an ALTER on that session could implicitly commit it.
+        The release command must never run on the client's main session: if
+        the application holds an open transaction there (via
+        get_raw_connection()), an ALTER on that session could implicitly
+        commit it.
         """
         try:
             return self._backend.connect(self._instance, self.database, self._connection_kwargs)

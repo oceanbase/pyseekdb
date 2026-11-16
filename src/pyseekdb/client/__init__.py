@@ -48,10 +48,6 @@ from .embedding_function import (
     get_default_embedding_function,
     register_embedding_function,
 )
-from .memory import (
-    MemoryReleaseResult,
-    MemoryReleaseTimeoutError,
-)
 from .query_types import QueryHint
 from .schema import Schema
 from .sparse_embedding_function import (
@@ -181,8 +177,6 @@ __all__ = [
     "IVFIndexLib",
     "IVFIndexType",
     "K",
-    "MemoryReleaseResult",
-    "MemoryReleaseTimeoutError",
     "Ngram2Properties",
     "NgramProperties",
     "QueryHint",

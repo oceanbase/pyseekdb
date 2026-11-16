@@ -2719,8 +2719,8 @@ class BaseClient(BaseConnection, AdminAPI):
         collections = self.list_collections()
         return len(collections)
 
-    def release_memory(self, timeout: float = 30.0) -> Any:
-        """Release engine memory held by recent committed writes.
+    def release_memory(self) -> None:
+        """Request the engine to release reclaimable memory.
 
         Only the embedded client implements this operation today. See
         ``SeekdbEmbeddedClient.release_memory`` for the supported semantics.

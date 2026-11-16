@@ -251,13 +251,13 @@ class _ClientProxy:
         """Proxy to server implementation - collection operations only"""
         return self._server.count_collection()
 
-    def release_memory(self, timeout: float = 30.0):
-        """Proxy to server implementation - release engine memory after batch writes.
+    def release_memory(self):
+        """Proxy to server implementation - request the engine to release memory.
 
         See ``SeekdbEmbeddedClient.release_memory`` for semantics; non-embedded
         clients raise a clear error.
         """
-        return self._server.release_memory(timeout=timeout)
+        return self._server.release_memory()
 
     def close(self) -> None:
         """Close the underlying client and release its resources."""
