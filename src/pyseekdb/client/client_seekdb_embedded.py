@@ -16,6 +16,10 @@ from pymysql.cursors import DictCursor
 from .admin_client import DEFAULT_TENANT
 from .client_base import BaseClient
 from .database import Database
+from .memory import (
+    make_connection_sql_runner,
+    submit_memory_release,
+)
 from .sql_utils import render_sql_with_params
 
 
@@ -300,6 +304,79 @@ class SeekdbEmbeddedClient(BaseClient):
             return normalized_rows
         finally:
             cursor.close()
+
+    # ==================== Explicit Memory Release (embedded only) ====================
+
+    def release_memory(self) -> None:
+        """Request the engine to release reclaimable memory.
+
+        After a batch of inserts or updates, the engine keeps those writes in
+        memory until they are written to disk and their in-memory tables are
+        released. This operation asks the engine to do that now, for the whole
+        instance, so an application can hand memory back at the end of a
+        write-heavy phase without closing the database.
+
+        The call just submits the request and returns immediately: the engine
+        completes the release in the background, and there is nothing to wait
+        for and no result to inspect. The request is best-effort: the engine
+        may skip scheduling a new release while a freeze is already in
+        progress, so a successful call does not guarantee that all writes
+        committed before it are covered; remaining writes are picked up by
+        the engine's automatic release or by a later call — do not retry or
+        force a release on this account. Today the request releases the memory
+        held by recent committed writes; future versions may extend it to
+        other reclaimable engine memory, so do not rely on measured reclaim
+        amounts.
+
+        Usage: call this once per batch/phase, not as an automatic
+        memory-pressure handler. Frequent small releases create many small
+        on-disk tables and increase read amplification; the engine's automatic
+        threshold-based release still covers applications that never call this.
+
+        Concurrent writes committed after this call starts continue into new
+        in-memory tables and are untouched by it. The underlying engine
+        command runs on a dedicated session and never implicitly commits an
+        application transaction.
+
+        Note:
+            This is not a process-RSS guarantee: allocators legitimately
+            retain freed pages in their caches, so process RSS may stay higher
+            than the released amount.
+
+        Raises:
+            ValueError: The engine rejected the release request, or a
+                dedicated engine session could not be opened for it.
+        """
+        self._ensure_connection()
+
+        admin_connection = self._open_release_admin_connection()
+        try:
+            runner = make_connection_sql_runner(
+                admin_connection, use_context_manager=self._backend.supports_dbapi_cursor
+            )
+            submit_memory_release(runner)
+        finally:
+            self._quietly_close(admin_connection)
+
+    def _open_release_admin_connection(self) -> Any:
+        """Open a dedicated session for the engine memory release command.
+
+        The release command must never run on the client's main session: if
+        the application holds an open transaction there (via
+        get_raw_connection()), an ALTER on that session could implicitly
+        commit it.
+        """
+        try:
+            return self._backend.connect(self._instance, self.database, self._connection_kwargs)
+        except Exception as exc:
+            raise ValueError(f"release_memory could not open a dedicated engine session: {exc}") from exc
+
+    @staticmethod
+    def _quietly_close(connection: Any) -> None:
+        try:
+            connection.close()
+        except Exception as exc:
+            logger.debug("release_memory: failed to close dedicated session: %s", exc)
 
     # ==================== Collection Management (framework) ====================
 

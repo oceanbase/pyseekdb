@@ -2719,6 +2719,25 @@ class BaseClient(BaseConnection, AdminAPI):
         collections = self.list_collections()
         return len(collections)
 
+    def release_memory(self) -> None:
+        """Request the engine to release reclaimable memory.
+
+        Only the embedded client implements this operation today. Other
+        client modes log a warning and do nothing, so applications can call
+        ``release_memory()`` unconditionally after a write phase regardless
+        of the connection mode.
+
+        See ``SeekdbEmbeddedClient.release_memory`` for the embedded
+        semantics; that implementation raises ``ValueError`` when the engine
+        rejects the request.
+        """
+        logger.warning(
+            "release_memory() is only supported by the embedded client (SeekdbEmbeddedClient); "
+            "the connected mode (%s) does not expose this operation, doing nothing",
+            self.mode,
+        )
+        return None
+
     def has_collection(self, name: str) -> bool:
         """Check if a collection exists.
 

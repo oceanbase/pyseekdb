@@ -251,6 +251,14 @@ class _ClientProxy:
         """Proxy to server implementation - collection operations only"""
         return self._server.count_collection()
 
+    def release_memory(self):
+        """Proxy to server implementation - request the engine to release memory.
+
+        See ``SeekdbEmbeddedClient.release_memory`` for semantics; non-embedded
+        clients log a warning and do nothing.
+        """
+        return self._server.release_memory()
+
     def close(self) -> None:
         """Close the underlying client and release its resources."""
         self._server.close()
