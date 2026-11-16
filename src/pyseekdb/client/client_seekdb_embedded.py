@@ -318,7 +318,12 @@ class SeekdbEmbeddedClient(BaseClient):
 
         The call just submits the request and returns immediately: the engine
         completes the release in the background, and there is nothing to wait
-        for and no result to inspect. Today the request releases the memory
+        for and no result to inspect. The request is best-effort: the engine
+        may skip scheduling a new release while a freeze is already in
+        progress, so a successful call does not guarantee that all writes
+        committed before it are covered; remaining writes are picked up by
+        the engine's automatic release or by a later call — do not retry or
+        force a release on this account. Today the request releases the memory
         held by recent committed writes; future versions may extend it to
         other reclaimable engine memory, so do not rely on measured reclaim
         amounts.

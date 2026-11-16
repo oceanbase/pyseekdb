@@ -6,10 +6,18 @@ after a batch of committed writes, an embedded application can ask the engine
 to release the memory those writes still occupy, without closing and reopening
 the database.
 
-The contract is deliberately minimal — a request, not a measurement:
+The contract is deliberately minimal — a best-effort request, not a
+measurement:
 
 - The call submits the request and returns immediately; the engine completes
   the release in the background. There is no result and nothing to wait for.
+- The request is best-effort: seekdb 1.3.0 may skip scheduling a new minor
+  freeze when one is already in progress, so a successful call does not
+  guarantee that all writes committed before it are covered, and the release
+  boundary is not necessarily established when the call returns. Remaining
+  writes are picked up by the engine's automatic threshold-based release or by
+  a later request; callers should not retry or force a release on this
+  account, and should avoid frequent requests.
 - Today the request releases the memory held by recent committed writes
   (the engine's in-memory tables). Future versions may extend the request to
   other reclaimable engine memory (block caches and similar pools), so
