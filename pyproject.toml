@@ -37,6 +37,11 @@ dev = [
     "ruff>=0.11.5",
 ]
 
+# Optional deps for runnable examples (CI runs examples/*_example.py).
+examples = [
+    "sqlalchemy>=2.0",
+]
+
 # Optional deps for unit tests. CI uses `uv run --no-sync pytest` so pip-installed deps persist.
 unit-tests = [
     # bm25s[full] pulls pytrec-eval 0.5, which fails to compile on GCC 14.
