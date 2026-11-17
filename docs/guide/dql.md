@@ -276,6 +276,10 @@ results = collection.hybrid_search(
 )
 ```
 
+**Using SQLAlchemy:** if your application manages its own tables with SQLAlchemy, you can run the same
+hybrid search with `DBMS_HYBRID_SEARCH.GET_SQL` and execute the generated SQL through SQLAlchemy. See
+[`examples/sqlalchemy_hybrid_search_example.py`](https://github.com/oceanbase/pyseekdb/blob/develop/examples/sqlalchemy_hybrid_search_example.py).
+
 ## 5.4 Filter Operators
 
 ### Metadata Filters (`where` parameter)
