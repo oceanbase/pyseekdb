@@ -636,7 +636,7 @@ class Collection:
                 Weights multiply rank contributions, independently of query.boost and knn.boost.
                 Omit weights for equal weighting. Weights must be two finite, non-negative
                 numbers with at least one positive value. Weighted multi-KNN is unsupported.
-                Requires SeekDB > 1.4.0.0, including the engine bundled with pylibseekdb
+                Requires SeekDB >= 1.4.1.0, including the engine bundled with pylibseekdb
                 in embedded mode. Earlier versions and OceanBase raise ValueError before
                 the weighted search is sent. Engine validation errors propagate without
                 an unweighted retry.

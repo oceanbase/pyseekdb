@@ -1,4 +1,4 @@
-"""RRF route weights require SeekDB versions strictly greater than 1.4.0.0."""
+"""RRF route weights require SeekDB 1.4.1.0 or later."""
 
 import uuid
 
@@ -50,7 +50,7 @@ def rrf_collection(db_client):
 def weighted_rrf_collection(rrf_collection):
     db_type, version = rrf_collection._client.detect_db_type_and_version()
     if not _weighted_rrf_supported(db_type, version):
-        pytest.skip(f"Weighted RRF requires SeekDB > 1.4.0.0; connected to {db_type} {version}")
+        pytest.skip(f"Weighted RRF requires SeekDB >= 1.4.1.0; connected to {db_type} {version}")
     return rrf_collection
 
 
@@ -69,7 +69,7 @@ def test_weighted_request_checks_engine_version(rrf_collection):
     default = _search(rrf_collection)
     db_type, version = rrf_collection._client.detect_db_type_and_version()
     if not _weighted_rrf_supported(db_type, version):
-        with pytest.raises(ValueError, match=r"requires SeekDB > 1\.4\.0\.0") as caught:
+        with pytest.raises(ValueError, match=r"requires SeekDB >= 1\.4\.1\.0") as caught:
             _search(rrf_collection, [1, 1])
         assert f"{db_type} {version}" in str(caught.value)
         assert _search(rrf_collection) == default

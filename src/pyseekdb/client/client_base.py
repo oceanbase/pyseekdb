@@ -93,8 +93,8 @@ _MAX_COLLECTION_NAME_LENGTH = 512
 NAMESPACE_MIN_LAKEBASE_VERSION = Version("4.6.1.0")
 # seekdb versions that accept HNSW sync_mode on heap tables.
 HNSW_SYNC_MODE_MIN_VERSION = Version("1.3.0.0")
-# Weighted RRF is enabled only for SeekDB versions strictly above this boundary.
-WEIGHTED_RRF_VERSION_THRESHOLD = Version("1.4.0.0")
+# Minimum SeekDB engine version for weighted RRF.
+WEIGHTED_RRF_MIN_VERSION = Version("1.4.1.0")
 # Backward-compatible alias used by existing tests and skip helpers.
 NAMESPACE_MIN_OB_VERSION = NAMESPACE_MIN_LAKEBASE_VERSION
 
@@ -128,7 +128,7 @@ def _hnsw_sync_mode_supported(db_type: str, version: Version) -> bool:
 
 def _weighted_rrf_supported(db_type: str, version: Version) -> bool:
     """Return whether the database version supports RRF route weights."""
-    return db_type.lower() == "seekdb" and version > WEIGHTED_RRF_VERSION_THRESHOLD
+    return db_type.lower() == "seekdb" and version >= WEIGHTED_RRF_MIN_VERSION
 
 
 def _extract_collection_id_from_sdk_row(row: Any) -> str:
@@ -2967,7 +2967,7 @@ class BaseClient(BaseConnection, AdminAPI):
         db_type, version = self.detect_db_type_and_version()
         if not _weighted_rrf_supported(db_type, version):
             raise ValueError(
-                f"Weighted RRF (rank.rrf.weights) requires SeekDB > {WEIGHTED_RRF_VERSION_THRESHOLD}. "
+                f"Weighted RRF (rank.rrf.weights) requires SeekDB >= {WEIGHTED_RRF_MIN_VERSION}. "
                 f"Connected database is {db_type} {version}."
             )
 
