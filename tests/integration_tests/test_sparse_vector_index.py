@@ -419,6 +419,24 @@ class TestCollectionQueryWithSparse:
         finally:
             _cleanup_collection(db_client, name)
 
+    def test_sparse_query_ranks_highest_score_first(self, db_client):
+        name = _unique_name("query_sparse_rank")
+        try:
+            collection = _create_sparse_collection(db_client, name)
+            collection.add(
+                ids=["match", "weaker"],
+                embeddings=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+                documents=["alpha", "prefix alpha"],
+            )
+            collection.refresh_index()
+
+            result = collection.query(query_texts="alpha", query_key=K.SPARSE_EMBEDDING, n_results=1)
+
+            assert result["ids"] == [["match"]]
+            assert result["distances"][0] == pytest.approx([1.0])
+        finally:
+            _cleanup_collection(db_client, name)
+
     def test_sparse_query_with_sparse_vector_directly(self, db_client):
         """Direct sparse vector query should be rejected."""
         name = _unique_name("query_sparse_vec")

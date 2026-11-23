@@ -213,6 +213,25 @@ class TestCollectionQuery:
         # No cleanup needed - the fixture handles it automatically!
         print("   ✅ All tests passed (cleanup will be automatic)")
 
+    @pytest.mark.parametrize(("metric", "expected_score"), [("l2", 0.0), ("cosine", 0.0), ("inner_product", 1.0)])
+    def test_dense_query_orders_by_metric(self, db_client, metric, expected_score):
+        name = f"query_rank_{uuid.uuid4().hex}"
+        collection = db_client.create_collection(
+            name=name,
+            configuration=HNSWConfiguration(dimension=3, distance=metric),
+            embedding_function=None,
+        )
+        try:
+            collection.add(ids=["match", "other"], embeddings=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+            collection.refresh_index()
+
+            result = collection.query(query_embeddings=[1.0, 0.0, 0.0], n_results=1)
+
+            assert result["ids"] == [["match"]]
+            assert result["distances"][0] == pytest.approx([expected_score])
+        finally:
+            db_client.delete_collection(name)
+
     def test_collection_query_with_query_hint(self, db_client):
         """
         Test collection.query() with QueryHint for database optimization.
