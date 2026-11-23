@@ -174,12 +174,15 @@ def test_invalid_weights_raise(weighted_rrf_collection, weights):
 
 
 @pytest.mark.parametrize("multiple_knn_dicts", [False, True])
-def test_weighted_multiknn_rejected(weighted_rrf_collection, multiple_knn_dicts):
+@pytest.mark.parametrize("query", [None, QUERY], ids=["without_text", "with_text"])
+def test_weighted_multiknn_rejected(weighted_rrf_collection, multiple_knn_dicts, query):
     knn = (
         [KNN, {**KNN, "query_embeddings": [3.0, 0.0, 0.0]}]
         if multiple_knn_dicts
         else {**KNN, "query_embeddings": [[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]]}
     )
+    unweighted = weighted_rrf_collection.hybrid_search(query=query, knn=knn, rank={"rrf": RRF}, include=[])
+    assert unweighted["ids"][0]
     with pytest.raises(Exception) as caught:
-        weighted_rrf_collection.hybrid_search(query=QUERY, knn=knn, rank={"rrf": {**RRF, "weights": [1, 1]}})
+        weighted_rrf_collection.hybrid_search(query=query, knn=knn, rank={"rrf": {**RRF, "weights": [1, 1]}})
     assert _has_database_error_code(caught.value, (1235, 4007, -4007)), str(caught.value)

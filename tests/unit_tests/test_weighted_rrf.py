@@ -2,7 +2,7 @@
 
 import copy
 import json
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from pymysql import err
@@ -132,3 +132,71 @@ def test_backend_rejection_propagates_without_retry(client, error_code):
 
     assert caught.value is rejection
     assert client._execute_query_with_cursor.call_count == 2
+
+
+@pytest.mark.parametrize("rank", [[], ["rrf"], "", "rrf", 0, 1, False])
+def test_non_dict_rank_raises_type_error_before_search(client, rank):
+    collection = Collection(client=client, name="rrf", dimension=3, embedding_function=None)
+    with pytest.raises(TypeError, match="rank must be a dict or None"):
+        collection.hybrid_search(query={"where_document": {"$contains": "quasar"}}, rank=rank)
+    client.detect_db_type_and_version.assert_not_called()
+    client._execute_query_with_cursor.assert_not_called()
+
+
+@pytest.fixture
+def versioned_client(monkeypatch):
+    client = RemoteServerClient()
+    connections = [MagicMock(open=True), MagicMock(open=True)]
+    for connection, version in zip(connections, ["seekdb-v1.4.1.0", "seekdb-v1.4.0.0"], strict=True):
+        connection.cursor.return_value.__enter__.return_value.fetchall.return_value = [{"version": version}]
+    client._connection = connections[0]
+    client._use_catalog_database = Mock()
+    client._execute = Mock(wraps=client._execute)
+    monkeypatch.setattr("pyseekdb.client.client_seekdb_server.pymysql.connect", Mock(return_value=connections[1]))
+
+    def execute(connection, sql, *args):
+        if "DBMS_HYBRID_SEARCH.GET_SQL" in sql:
+            return [{"query_sql": "SELECT _id, _score FROM results"}]
+        if sql.startswith("SELECT "):
+            return [{"_id": "doc", "_score": 0.02}]
+        return []
+
+    client._execute_query_with_cursor = Mock(side_effect=execute)
+    return client
+
+
+def _weighted_search(client):
+    collection = Collection(client=client, name="rrf", dimension=3, embedding_function=None)
+    return collection.hybrid_search(
+        query={"where_document": {"$contains": "quasar"}}, rank={"rrf": {"weights": [1, 1]}}, include=[]
+    )
+
+
+def _version_queries(client):
+    return [call for call in client._execute.call_args_list if call.args[0] == "SELECT version() as version"]
+
+
+def test_weighted_search_checks_version_once_per_connection(versioned_client):
+    for _ in range(2):
+        assert _weighted_search(versioned_client) == {"ids": [["doc"]], "distances": [[0.02]]}
+    assert len(_version_queries(versioned_client)) == 1
+
+
+def test_weighted_search_rechecks_version_after_reconnect(versioned_client):
+    _weighted_search(versioned_client)
+    versioned_client._connection.open = False
+    for _ in range(2):
+        with pytest.raises(ValueError, match=r"Connected database is seekdb 1\.4\.0\.0"):
+            _weighted_search(versioned_client)
+    assert len(_version_queries(versioned_client)) == 2
+
+
+def test_weighted_search_retries_failed_version_detection(versioned_client):
+    cursor = versioned_client._connection.cursor.return_value.__enter__.return_value
+    fetch = cursor.fetchall.side_effect
+    cursor.fetchall.side_effect = [[{"version": "seekdb-unparseable"}]]
+    with pytest.raises(ValueError, match="failed to extract version"):
+        _weighted_search(versioned_client)
+    cursor.fetchall.side_effect = fetch
+    assert _weighted_search(versioned_client) == {"ids": [["doc"]], "distances": [[0.02]]}
+    assert len(_version_queries(versioned_client)) == 2

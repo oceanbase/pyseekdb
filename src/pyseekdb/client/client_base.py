@@ -2964,7 +2964,13 @@ class BaseClient(BaseConnection, AdminAPI):
 
     def _assert_weighted_rrf_supported(self) -> None:
         """Reject weighted RRF before sending the search to an unsupported engine."""
-        db_type, version = self.detect_db_type_and_version()
+        connection = self._ensure_connection()
+        cached = getattr(self, "_weighted_rrf_version_cache", None)
+        if cached is None or cached[0] is not connection:
+            db_type, version = self.detect_db_type_and_version()
+            self._weighted_rrf_version_cache = (connection, db_type, version)
+        else:
+            _, db_type, version = cached
         if not _weighted_rrf_supported(db_type, version):
             raise ValueError(
                 f"Weighted RRF (rank.rrf.weights) requires SeekDB >= {WEIGHTED_RRF_MIN_VERSION}. "
@@ -4792,6 +4798,8 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             search_parm dictionary
         """
+        if rank is not None and not isinstance(rank, dict):
+            raise TypeError(f"rank must be a dict or None, got {type(rank).__name__}")
         search_parm = {}
 
         # Build query part (full-text search or scalar query)
