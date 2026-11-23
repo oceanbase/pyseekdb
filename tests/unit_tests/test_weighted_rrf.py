@@ -15,7 +15,7 @@ from pyseekdb.client.version import Version
 @pytest.fixture
 def client():
     client = RemoteServerClient()
-    client.detect_db_type_and_version = Mock(return_value=("seekdb", Version("1.4.0.1")))
+    client.detect_db_type_and_version = Mock(return_value=("seekdb", Version("1.4.1.0")))
     client._ensure_connection = Mock()
     client._execute_query_with_cursor = Mock(
         side_effect=[[], [{"query_sql": "SELECT _id, _score FROM results"}], [{"_id": "doc", "_score": 0.02}]]
@@ -62,14 +62,20 @@ def test_omitting_rank_preserves_request(client):
 
 @pytest.mark.parametrize(
     ("db_type", "version"),
-    [("seekdb", "1.3.0.0"), ("seekdb", "1.4.0.0"), ("SeekDB", "1.4.0"), ("oceanbase", "4.6.1.0")],
+    [
+        ("seekdb", "1.3.0.0"),
+        ("seekdb", "1.4.0.0"),
+        ("SeekDB", "1.4.0"),
+        ("seekdb", "1.4.0.1"),
+        ("oceanbase", "4.6.1.0"),
+    ],
 )
 @pytest.mark.parametrize("rank", [{"rrf": {"weights": [0.5, 1.0]}}, {"RRF": {"WEIGHTS": [0.5, 1.0]}}])
 def test_weighted_rrf_rejects_unsupported_version_before_search(client, db_type, version, rank):
     client.detect_db_type_and_version.return_value = (db_type, Version(version))
     collection = Collection(client=client, name="rrf", dimension=3, embedding_function=None)
 
-    with pytest.raises(ValueError, match=r"requires SeekDB > 1\.4\.0\.0") as caught:
+    with pytest.raises(ValueError, match=r"requires SeekDB >= 1\.4\.1\.0") as caught:
         collection.hybrid_search(
             query={"where_document": {"$contains": "quasar"}},
             knn={"query_embeddings": [1.0, 0.0, 0.0]},
@@ -80,7 +86,7 @@ def test_weighted_rrf_rejects_unsupported_version_before_search(client, db_type,
     client._execute_query_with_cursor.assert_not_called()
 
 
-@pytest.mark.parametrize("version", ["1.4.0.1", "1.4.1.0", "1.5.0.0", "2.0.0.0"])
+@pytest.mark.parametrize("version", ["1.4.1.0", "1.4.1.1", "1.5.0.0", "2.0.0.0"])
 def test_weighted_rrf_allows_newer_seekdb(client, version):
     client.detect_db_type_and_version.return_value = ("SeekDB", Version(version))
     collection = Collection(client=client, name="rrf", dimension=3, embedding_function=None)
