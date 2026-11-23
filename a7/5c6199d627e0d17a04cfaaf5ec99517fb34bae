@@ -1,0 +1,23 @@
+tests/integration_tests/test_sparse_vector_index.py
+  s_2c04b60c9842ec::t_d64fe1487112cf 422-439
+tests/integration_tests/test_collection_query.py
+  s_2c04b60c9842ec::t_d64fe1487112cf 216-234
+src/pyseekdb/client/client_base.py
+  s_2c04b60c9842ec::t_e83e1040e6646c 4260-4262,4288,4440,4443
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a75c6199d627e0d17a04cfaaf5ec99517fb34bae",
+  "prompts": {},
+  "sessions": {
+    "s_2c04b60c9842ec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20896-8854-70e1-b7c0-f586a79edb2f",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "wangyunlai.wyl <wangyunlai.wyl@U-Y44N21LQ-2319.local>"
+    }
+  }
+}
