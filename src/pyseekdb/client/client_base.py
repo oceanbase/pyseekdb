@@ -4257,6 +4257,9 @@ class BaseClient(BaseConnection, AdminAPI):
         if distance not in distance_function_map:
             logger.warning(f"Unknown distance metric '{distance}', defaulting to 'l2_distance'")
 
+        # Sort inner products highest-first through the vector index while returning raw scores.
+        order_func = "negative_inner_product" if distance_func == "inner_product" else distance_func
+
         use_context_manager = self._use_context_manager_for_cursor()
 
         # Collect results for each query vector separately
@@ -4282,7 +4285,7 @@ class BaseClient(BaseConnection, AdminAPI):
                        {distance_func}(embedding, {vector_str}) AS distance
                 FROM `{table_name}`
                 {where_clause}
-                ORDER BY {distance_func}(embedding, {vector_str})
+                ORDER BY {order_func}(embedding, {vector_str})
                 APPROXIMATE
                 LIMIT %s
             """
@@ -4418,9 +4421,6 @@ class BaseClient(BaseConnection, AdminAPI):
         # Build WHERE clause from filters
         where_clause, params = self._build_where_clause(where, where_document)
 
-        # Sparse vector queries always use inner_product distance
-        distance_func = "inner_product"
-
         use_context_manager = self._use_context_manager_for_cursor()
 
         # Collect results for each sparse query vector separately
@@ -4437,10 +4437,10 @@ class BaseClient(BaseConnection, AdminAPI):
             # Build SQL query with sparse vector distance calculation
             sql = f"""
                 SELECT {hint_sql} {select_clause},
-                       {distance_func}(sparse_embedding, {sv_sql}) AS distance
+                       inner_product(sparse_embedding, {sv_sql}) AS distance
                 FROM `{table_name}`
                 {where_clause}
-                ORDER BY {distance_func}(sparse_embedding, {sv_sql})
+                ORDER BY negative_inner_product(sparse_embedding, {sv_sql})
                 APPROXIMATE
                 LIMIT %s
             """.strip()
