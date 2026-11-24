@@ -1,0 +1,23 @@
+src/pyseekdb/client/__init__.py
+  s_2c04b60c9842ec::t_7bc3d8645b1c0f 15
+src/pyseekdb/client/client_seekdb_embedded.py
+  s_2c04b60c9842ec::t_acb0bfa1710686 3,24-29,115
+tests/unit_tests/test_embedded_client_lifecycle.py
+  s_2c04b60c9842ec::t_0dd5697b54310a 133,136-138,145-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0e4121eb43b258063584f652055883a4c2d8cc06",
+  "prompts": {},
+  "sessions": {
+    "s_2c04b60c9842ec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20896-8854-70e1-b7c0-f586a79edb2f",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "宁封 宁封 <wangyunlai.wyl@oceanbase.com>"
+    }
+  }
+}
