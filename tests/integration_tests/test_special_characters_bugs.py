@@ -240,15 +240,16 @@ class TestSpecialCharactersBugs:
         config = HNSWConfiguration(dimension=dimension, distance="cosine")
         collection = db_client.create_collection(name=collection_name, configuration=config, embedding_function=None)
 
-        print("\n🔍 Testing all special characters combined")
-        test_id = "id_with_%_percent"
-        test_document = "Path: C:\\Users\\Documents\\file.txt"
-        test_metadata = {
-            "title": 'Book "The Great Gatsby"',
-            "path": "C:\\Users\\Documents",
-        }
-
         try:
+            print("\n🔍 Testing all special characters combined")
+            test_id = "id_with_%_percent_😀"
+            test_document = "Path: C:\\Users\\Documents\\file.txt\n中文 😀 'quote' %"
+            test_metadata = {
+                "title_%_中文": 'Book "The Great Gatsby"',
+                "path": "C:\\Users\\Documents",
+                "notes": "line\nwith unicode 😀",
+            }
+
             collection.add(
                 ids=test_id,
                 embeddings=[1.0, 2.0, 3.0],
@@ -267,6 +268,8 @@ class TestSpecialCharactersBugs:
             print("    ❌ FAILED to insert with all special characters combined")
             print(f"       Error: {e}")
             raise
+        finally:
+            db_client.delete_collection(name=collection_name)
 
 
 if __name__ == "__main__":
