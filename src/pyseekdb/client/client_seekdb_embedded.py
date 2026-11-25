@@ -1,9 +1,8 @@
 """
 Embedded mode client - based on seekdb
-Available when the current ``seekdb`` binding or legacy ``pylibseekdb`` is installed.
+Available when ``pylibseekdb`` is installed.
 """
 
-import importlib
 import logging
 import os
 import threading
@@ -22,19 +21,14 @@ from .memory import (
 )
 from .sql_utils import render_sql_with_params
 
-
-def _load_embedded_runtime() -> tuple[Any | None, str | None]:
-    """Prefer ``seekdb``; fall back only when the top-level binding is absent."""
-    for distribution in ("seekdb", "pylibseekdb"):
-        try:
-            return importlib.import_module(distribution), distribution
-        except ModuleNotFoundError as exc:
-            if exc.name != distribution:
-                raise
-    return None, None
+try:
+    import pylibseekdb as seekdb  # type: ignore[import-not-found]
+except ModuleNotFoundError as exc:
+    if exc.name != "pylibseekdb":
+        raise
+    seekdb = None
 
 
-seekdb, _EMBEDDED_RUNTIME_DISTRIBUTION = _load_embedded_runtime()
 _PYLIBSEEKDB_AVAILABLE = seekdb is not None
 
 logger = logging.getLogger(__name__)
@@ -118,8 +112,7 @@ class SeekdbEmbeddedClient(BaseClient):
         # Check if an embedded binding is available.
         if not _PYLIBSEEKDB_AVAILABLE or seekdb is None:
             raise RuntimeError(
-                "Embedded Client is not available because no SeekDB Python binding was found. "
-                "Please install seekdb (or legacy pylibseekdb), or use RemoteServerClient (host/port) instead."
+                "Embedded mode requires pylibseekdb. Supply host and port to connect to a remote server."
             )
 
         self.path = os.path.abspath(path)
