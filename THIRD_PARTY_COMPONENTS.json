@@ -4,7 +4,7 @@
     "name": "pyseekdb",
     "license": "Apache-2.0"
   },
-  "note": "All components are separately installed runtime dependencies; none is bundled in the pyseekdb wheel.",
+  "scope": "Direct runtime dependencies declared in pyproject.toml. Transitive dependencies are resolved at install time and ship their own license texts.",
   "components": [
     {
       "name": "pylibseekdb",
@@ -13,8 +13,9 @@
       "source": "https://github.com/oceanbase/seekdb-bindings",
       "license": "Apache-2.0",
       "bundled": false,
-      "text_location": "pylibseekdb/licenses/ and pylibseekdb-<version>.dist-info/licenses/",
-      "redistribution": "Retain the complete pylibseekdb/licenses/ bundle shipped in the pylibseekdb wheel, including the engine inventory and license texts."
+      "text_location": "none in 1.3.0; pylibseekdb/licenses/ and pylibseekdb-<version>.dist-info/licenses/ in >=1.4.1",
+      "notes": "The 1.3.0 wheel ships no license text. The complete engine and bindings bundle ships under pylibseekdb/licenses/ from 1.4.1 (oceanbase/seekdb-bindings#95).",
+      "redistribution": "Retain the complete pylibseekdb/licenses/ bundle shipped in the pylibseekdb wheel (>=1.4.1), including the engine inventory and license texts."
     },
     {
       "name": "PyMySQL",
@@ -23,7 +24,8 @@
       "source": "https://github.com/PyMySQL/PyMySQL",
       "license": "MIT",
       "bundled": false,
-      "text_location": "pymysql-<version>.dist-info/licenses/",
+      "text_location": "pymysql-<version>.dist-info/licenses/LICENSE",
+      "notes": "",
       "redistribution": "Retain the license text from the resolved pymysql distribution."
     },
     {
@@ -33,8 +35,9 @@
       "source": "https://github.com/alibaba/MNN",
       "license": "BSD-3-Clause (declared in the PyPI metadata)",
       "bundled": false,
-      "text_location": "mnn-<version>.dist-info/licenses/",
-      "redistribution": "Retain the license text from the resolved MNN distribution."
+      "text_location": "no license file in the 3.6.1 wheel; upstream https://github.com/alibaba/MNN/blob/master/LICENSE",
+      "notes": "The resolved wheel bundles no license text; take it from the upstream repository.",
+      "redistribution": "Retain the upstream MNN license text; the resolved wheel does not bundle one."
     },
     {
       "name": "tokenizers",
@@ -43,8 +46,9 @@
       "source": "https://github.com/huggingface/tokenizers",
       "license": "Apache-2.0",
       "bundled": false,
-      "text_location": "tokenizers-<version>.dist-info/licenses/",
-      "redistribution": "Retain the license text from the resolved tokenizers distribution."
+      "text_location": "no license file in the 0.22.2 wheel; upstream https://github.com/huggingface/tokenizers/blob/main/LICENSE",
+      "notes": "The resolved wheel bundles no license text; take it from the upstream repository.",
+      "redistribution": "Retain the upstream tokenizers license text; the resolved wheel does not bundle one."
     },
     {
       "name": "httpx",
@@ -53,7 +57,8 @@
       "source": "https://github.com/encode/httpx",
       "license": "BSD-3-Clause",
       "bundled": false,
-      "text_location": "httpx-<version>.dist-info/licenses/",
+      "text_location": "httpx-<version>.dist-info/licenses/LICENSE.md",
+      "notes": "",
       "redistribution": "Retain the license text from the resolved httpx distribution."
     },
     {
@@ -63,8 +68,9 @@
       "source": "https://github.com/tqdm/tqdm",
       "license": "MPL-2.0 AND MIT",
       "bundled": false,
-      "text_location": "tqdm-<version>.dist-info/licenses/",
-      "redistribution": "Retain the MPL-2.0 and MIT texts from the resolved tqdm distribution."
+      "text_location": "tqdm-<version>.dist-info/LICENCE",
+      "notes": "The locked wheel stores the license at LICENCE, not under licenses/.",
+      "redistribution": "Retain the MPL-2.0 and MIT texts from the resolved tqdm distribution (dist-info/LICENCE)."
     },
     {
       "name": "tenacity",
@@ -73,7 +79,8 @@
       "source": "https://github.com/jd/tenacity",
       "license": "Apache-2.0",
       "bundled": false,
-      "text_location": "tenacity-<version>.dist-info/licenses/",
+      "text_location": "tenacity-<version>.dist-info/licenses/LICENSE",
+      "notes": "",
       "redistribution": "Retain the license text from the resolved tenacity distribution."
     },
     {
@@ -81,10 +88,11 @@
       "constraint": "numpy>=1.26,!=2.4.0",
       "locked_version": "2.4.2",
       "source": "https://github.com/numpy/numpy",
-      "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 (core only)",
       "bundled": false,
-      "text_location": "numpy-<version>.dist-info/licenses/",
-      "redistribution": "Retain the license texts from the resolved numpy distribution."
+      "text_location": "numpy-<version>.dist-info/licenses/ (core)",
+      "notes": "The expression covers the numpy core without vendored libraries. The 2.4.2 Linux wheels bundle OpenBLAS (BSD-3-Clause AND BSD-3-Clause-Attribution), libgfortran (GPL-3.0-with-GCC-exception) and libquadmath (LGPL-2.1-or-later) under numpy.libs/; their texts are not in dist-info/licenses/.",
+      "redistribution": "Retain the core license texts. If you redistribute the Linux wheels, also satisfy the vendored library licenses, including the LGPL-2.1 section 6 source conditions for libquadmath."
     }
   ]
 }
