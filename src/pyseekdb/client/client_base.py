@@ -93,6 +93,8 @@ _MAX_COLLECTION_NAME_LENGTH = 512
 NAMESPACE_MIN_LAKEBASE_VERSION = Version("4.6.1.0")
 # seekdb versions that accept HNSW sync_mode on heap tables.
 HNSW_SYNC_MODE_MIN_VERSION = Version("1.3.0.0")
+# Minimum SeekDB engine version for weighted RRF.
+WEIGHTED_RRF_MIN_VERSION = Version("1.4.1.0")
 # Backward-compatible alias used by existing tests and skip helpers.
 NAMESPACE_MIN_OB_VERSION = NAMESPACE_MIN_LAKEBASE_VERSION
 
@@ -122,6 +124,11 @@ def is_lakebase_version_string(version_str: str) -> bool:
 def _hnsw_sync_mode_supported(db_type: str, version: Version) -> bool:
     """Return whether this database accepts HNSW ``sync_mode`` on heap tables."""
     return db_type.lower() == "seekdb" and version >= HNSW_SYNC_MODE_MIN_VERSION
+
+
+def _weighted_rrf_supported(db_type: str, version: Version) -> bool:
+    """Return whether the database version supports RRF route weights."""
+    return db_type.lower() == "seekdb" and version >= WEIGHTED_RRF_MIN_VERSION
 
 
 def _extract_collection_id_from_sdk_row(row: Any) -> str:
@@ -2955,6 +2962,21 @@ class BaseClient(BaseConnection, AdminAPI):
             "The collection was not created."
         )
 
+    def _assert_weighted_rrf_supported(self) -> None:
+        """Reject weighted RRF before sending the search to an unsupported engine."""
+        connection = self._ensure_connection()
+        cached = getattr(self, "_weighted_rrf_version_cache", None)
+        if cached is None or cached[0] is not connection:
+            db_type, version = self.detect_db_type_and_version()
+            self._weighted_rrf_version_cache = (connection, db_type, version)
+        else:
+            _, db_type, version = cached
+        if not _weighted_rrf_supported(db_type, version):
+            raise ValueError(
+                f"Weighted RRF (rank.rrf.weights) requires SeekDB >= {WEIGHTED_RRF_MIN_VERSION}. "
+                f"Connected database is {db_type} {version}."
+            )
+
     def refresh_index(self) -> None:
         """
         Flush async vector index build tasks when supported.
@@ -4776,6 +4798,8 @@ class BaseClient(BaseConnection, AdminAPI):
         Returns:
             search_parm dictionary
         """
+        if rank is not None and not isinstance(rank, dict):
+            raise TypeError(f"rank must be a dict or None, got {type(rank).__name__}")
         search_parm = {}
 
         # Build query part (full-text search or scalar query)
@@ -4809,6 +4833,14 @@ class BaseClient(BaseConnection, AdminAPI):
 
         # Build rank part
         if rank:
+            for method, config in rank.items():
+                if (
+                    method.lower() == "rrf"
+                    and isinstance(config, dict)
+                    and any(key.lower() == "weights" for key in config)
+                ):
+                    self._assert_weighted_rrf_supported()
+                    break
             search_parm["rank"] = rank
 
         # Always infer a minimal `_source` allowlist from include to reduce response payload.
