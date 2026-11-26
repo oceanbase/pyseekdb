@@ -28,9 +28,8 @@ def distribution_files(version):
 
 
 def published_digests(version):
-    url = f"https://pypi.org/pypi/{PROJECT}/{quote(str(version), safe='')}/json"
     try:
-        with urlopen(url, timeout=30) as response:
+        with urlopen(f"https://pypi.org/pypi/{PROJECT}/{quote(str(version), safe='')}/json", timeout=30) as response:
             return {item["filename"]: item["digests"]["sha256"] for item in json.load(response)["urls"]}
     except HTTPError as error:
         if error.code == 404:
