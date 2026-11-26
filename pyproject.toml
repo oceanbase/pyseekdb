@@ -3,7 +3,8 @@ name = "pyseekdb"
 version = "1.2.0.dev1"
 description = "A unified Python client for seekdb that supports embedded, server, and OceanBase."
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_COMPONENTS.md", "THIRD_PARTY_COMPONENTS.json", "REDISTRIBUTION.md"]
 authors = [{ name = "OceanBase", email = "open_oceanbase@oceanbase.com" }]
 requires-python = ">=3.11,<4"
 classifiers = [
@@ -120,5 +121,5 @@ ignore = [
 preview = true
 
 [build-system]
-requires = ["pdm-backend"]
+requires = ["pdm-backend>=2.4.0"]
 build-backend = "pdm.backend"

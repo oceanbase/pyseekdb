@@ -1,0 +1,15 @@
+pyseekdb
+Copyright (c) 2026 OceanBase and contributors
+
+This product includes software developed by OceanBase and contributors and is
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+pyseekdb does not bundle third-party code. Its direct runtime dependencies are
+installed separately; they are listed in THIRD_PARTY_COMPONENTS.md with their
+constraints, licenses and the location of their license texts. Transitive
+dependencies are resolved at install time and ship their own license texts.
+
+The embedded engine driver pylibseekdb ships its complete engine license
+bundle under pylibseekdb/licenses/ in its wheel (from version 1.4.1).
+Downstream redistributors must retain that bundle together with the pyseekdb
+package.
