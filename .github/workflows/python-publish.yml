@@ -12,7 +12,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: pyseekdb-pypi-${{ github.ref }}
+  # Serialize the registry check and upload across release tags.
+  group: >-
+    ${{ github.event_name == 'workflow_dispatch' && format('pyseekdb-pypi-check-{0}', github.ref) || 'pyseekdb-pypi-release' }}
+  queue: max
   cancel-in-progress: false
 
 jobs:
