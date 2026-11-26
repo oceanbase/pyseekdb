@@ -61,8 +61,9 @@ After running `make build`, the distribution files will be in the `dist/` direct
 
 Set `project.version` in `pyproject.toml` on the commit you want to release.
 Run **Publish pyseekdb to PyPI** manually in Actions to build and check the
-distributions. Push a matching tag such as `v1.4.1` or publish its GitHub Release
-to upload the wheel and source distribution to PyPI.
+distributions. Set `package_version` to choose the version for that run, or
+leave it blank to use `project.version`. Push a matching tag such as `v1.4.1`
+or publish its GitHub Release to upload the wheel and source distribution to PyPI.
 
 Configure [Trusted Publishing](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
 in the PyPI `pyseekdb` project with owner `oceanbase`, repository `pyseekdb`,

@@ -7,6 +7,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      package_version:
+        description: Version to build for this run (blank uses pyproject.toml)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -33,6 +38,12 @@ jobs:
           version: '0.9.22'
           python-version: '3.11'
 
+      - name: Apply the requested build version
+        if: github.event_name == 'workflow_dispatch' && inputs.package_version != ''
+        env:
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: uv version --frozen -- "$PACKAGE_VERSION"
+
       - name: Build the wheel and source distribution
         run: |
           export SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
@@ -41,7 +52,10 @@ jobs:
       - name: Validate distributions and release version
         id: check
         env:
-          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          RELEASE_TAG: >-
+            ${{ github.ref_type == 'tag' &&
+            (github.event_name != 'workflow_dispatch' || inputs.package_version == '') &&
+            github.ref_name || '' }}
           PUBLISH_TO_PYPI: ${{ github.repository == 'oceanbase/pyseekdb' && github.event_name != 'workflow_dispatch' }}
         run: |
           uv run --no-project --with twine python -m twine check --strict dist/*.whl dist/*.tar.gz
