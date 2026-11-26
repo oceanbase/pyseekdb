@@ -12,7 +12,7 @@ Database Management (AdminAPI):
 - Returns: _AdminClientProxy (database operations only)
 
 All factories use the underlying ServerAPI implementations:
-- SeekdbEmbeddedClient - Local seekdb (requires seekdb or legacy pylibseekdb)
+- SeekdbEmbeddedClient - Local seekdb (requires pylibseekdb)
 - RemoteServerClient - Remote server via pymysql (supports both seekdb Server and OceanBase Server)
 """
 

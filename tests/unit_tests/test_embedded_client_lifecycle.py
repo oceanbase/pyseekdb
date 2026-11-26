@@ -130,14 +130,23 @@ class _FakeLegacyApi:
 
 
 @pytest.fixture
-def embedded_module(monkeypatch: pytest.MonkeyPatch):
+def embedded_module(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
     """Import the embedded module without loading the native pylibseekdb extension."""
     module_name = "pyseekdb.client.client_seekdb_embedded"
-    monkeypatch.setitem(sys.modules, "pylibseekdb", ModuleType("pylibseekdb"))
+    binding = ModuleType("pylibseekdb") if getattr(request, "param", True) else None
+    monkeypatch.setitem(sys.modules, "pylibseekdb", binding)
+    monkeypatch.setitem(sys.modules, "seekdb", ModuleType("seekdb"))
     sys.modules.pop(module_name, None)
     module = importlib.import_module(module_name)
     yield module
     sys.modules.pop(module_name, None)
+
+
+@pytest.mark.parametrize("embedded_module", [True, False], indirect=True, ids=["binding-installed", "binding-missing"])
+def test_embedded_import_uses_only_pylibseekdb(embedded_module) -> None:
+    binding = sys.modules["pylibseekdb"]
+    assert embedded_module.seekdb is binding
+    assert embedded_module._PYLIBSEEKDB_AVAILABLE is (binding is not None)
 
 
 def _install_fake_seekdb(embedded_module: Any, monkeypatch: pytest.MonkeyPatch, fake_seekdb: Any) -> None:

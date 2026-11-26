@@ -243,7 +243,7 @@ results = collection.get(where={"category": {"$eq": "AI"}}, limit=10)
   - `query_texts`: str or List[str]; auto-embedded with the collection's `embedding_function` (missing function raises `ValueError`)
   - `where`: metadata filters for this vector route
   - `n_results`: candidates per vector route (k, default 10)
-- `rank` (dict, optional): ranking config; RRF tested via `{"rrf": {...}}` or `{}`. Omit to use single-route ordering.
+- `rank` (dict, optional): ranking config. Use `{"rrf": {...}}` for reciprocal rank fusion. Without `rank`, hybrid fusion uses the engine's score-sum behavior.
 - `n_results` (int): final fused result count (default 10).
 - `include` (List[str], optional): fields to return. `ids`/`distances` are always returned; `documents`/`metadatas` are returned by default when `include` is `None`; add `"embeddings"` to fetch vectors.
 
@@ -276,9 +276,39 @@ results = collection.hybrid_search(
 )
 ```
 
-**Using SQLAlchemy:** if your application manages its own tables with SQLAlchemy, you can run the same
-hybrid search with `DBMS_HYBRID_SEARCH.GET_SQL` and execute the generated SQL through SQLAlchemy. See
-[`examples/sqlalchemy_hybrid_search_example.py`](https://github.com/oceanbase/pyseekdb/blob/develop/examples/sqlalchemy_hybrid_search_example.py).
+### Weighted RRF
+
+`rank.rrf.weights` controls each route's contribution after conversion to ranks:
+
+```python
+results = collection.hybrid_search(
+    query={"where_document": {"$contains": "machine learning"}},
+    knn={"query_texts": ["AI research"], "n_results": 10},
+    rank={"rrf": {"rank_constant": 60, "weights": [0.5, 1.0]}},
+    n_results=5,
+)
+```
+
+Weights are ordered **full-text first, vector (KNN) second**. This example favors vector retrieval.
+The fused score is `sum(weight_i / (rank_constant + rank_i))` over the routes that contain the document.
+Weights do not need to sum to one. They do not change either route's candidates or internal ordering.
+`query.boost` and `knn.boost` multiply retrieval scores and are independent of RRF route weights.
+
+- Omitting `weights` preserves equal weighting and existing tie handling.
+- Each weight must be a finite, non-negative number, and at least one must be positive.
+- Exactly two weights are required for the two-route hybrid fusion.
+- A zero-weight route contributes zero. A document missing from a route receives no contribution from that route.
+- Weighted multi-KNN requests are unsupported, including multiple vectors in `knn.query_embeddings` or `knn.query_texts`.
+  Unweighted multi-KNN requests keep their existing score-sum behavior.
+
+Weighted RRF requires **SeekDB >= 1.4.1.0**. In embedded mode, this requirement applies
+to the engine bundled with `pylibseekdb`. SeekDB versions below 1.4.1.0, and OceanBase,
+raise `ValueError` before the weighted search is sent to the engine.
+Requests without `weights` keep their existing behavior.
+
+On a supported version, the SDK forwards `rank` unchanged and propagates engine validation and unsupported-feature errors.
+It never retries a weighted request as unweighted fusion. Incorrect weight counts and weighted multi-KNN requests
+return `OB_NOT_SUPPORTED`; invalid weights fail validation.
 
 ## 5.4 Filter Operators
 
