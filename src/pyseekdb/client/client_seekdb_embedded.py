@@ -5,6 +5,7 @@ Available when ``pylibseekdb`` is installed.
 
 import logging
 import os
+import re
 import threading
 from collections.abc import Sequence
 from typing import Any
@@ -32,6 +33,54 @@ except ModuleNotFoundError as exc:
 _PYLIBSEEKDB_AVAILABLE = seekdb is not None
 
 logger = logging.getLogger(__name__)
+
+
+# Released pylibseekdb builds only report the server error code inside the
+# message, e.g. "Table 'test.t' doesn't exist failed: code=1146".
+_NATIVE_ERROR_CODE_SUFFIX = re.compile(r"\s*failed: code=(-?\d+)\s*$")
+
+
+def _native_error_code(exc: BaseException) -> int | None:
+    """Return the server error code carried by a native embedded binding error."""
+    for attr in ("errno", "code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    if exc.args and isinstance(exc.args[0], int) and not isinstance(exc.args[0], bool):
+        return exc.args[0]
+    match = _NATIVE_ERROR_CODE_SUFFIX.search(str(exc))
+    return int(match.group(1)) if match else None
+
+
+def _native_error_message(exc: BaseException) -> str:
+    """Return the server message without the binding's ``failed: code=N`` suffix."""
+    msg = getattr(exc, "msg", None)
+    if isinstance(msg, str) and msg:
+        return msg
+    if len(exc.args) >= 2 and isinstance(exc.args[1], str):
+        return exc.args[1]
+    return _NATIVE_ERROR_CODE_SUFFIX.sub("", str(exc))
+
+
+def _to_pymysql_error(exc: Exception) -> pymysql.err.MySQLError | None:
+    """Map a native binding error with a MySQL error code to the PyMySQL exception class.
+
+    The PyMySQL backend and RemoteServerClient already raise PyMySQL errors.
+    Doing the same for the native cursor lets DB-API consumers (for example
+    SQLAlchemy's MySQL dialect probing a missing table with ``DESCRIBE``) see
+    ``ProgrammingError(1146, ...)`` instead of an unrecognized ``RuntimeError``.
+    Errors without a positive server error code are left unchanged.
+    """
+    if isinstance(exc, pymysql.err.MySQLError):
+        return None
+    code = _native_error_code(exc)
+    if code is None or code <= 0:
+        return None
+    # Same class selection as pymysql.err.raise_mysql_exception().
+    error_class = pymysql.err.error_map.get(code)
+    if error_class is None:
+        error_class = pymysql.err.InternalError if code < 1000 else pymysql.err.OperationalError
+    return error_class(code, _native_error_message(exc))
 
 
 class _NativeEmbeddedBackend:
@@ -238,7 +287,13 @@ class SeekdbEmbeddedClient(BaseClient):
 
         cursor = conn.cursor()
         try:
-            cursor.execute(embedded_sql)
+            try:
+                cursor.execute(embedded_sql)
+            except Exception as exc:
+                translated = _to_pymysql_error(exc)
+                if translated is None:
+                    raise
+                raise translated from exc
 
             # Check if this is a query statement (SELECT, SHOW, DESCRIBE, DESC)
             # Only query statements return result sets that need fetchall()
